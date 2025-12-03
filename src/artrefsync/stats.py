@@ -1,15 +1,16 @@
-from artrefsync.constants import STATS
 from collections.abc import Iterable
+from artrefsync.constants import STATS
 
 # module enforced singleton
-_stats={}
+_stats = {}
 for stat in STATS:
     if "set" in stat:
         _stats[stat] = set()
     else:
         _stats[stat] = 0
 
-def add(field:STATS, value):
+
+def add(field: STATS, value):
     if isinstance(value, Iterable):
         if "set" in field:
             _stats[field].update(value)
@@ -21,21 +22,23 @@ def add(field:STATS, value):
         else:
             _stats[field] += value
 
-def get(field:STATS, limit=None):
+
+def get(field: STATS, limit=None):
     if field in _stats:
         if limit and "set" in field:
             return list(_stats[field])[:limit]
-        
+
         else:
             return _stats[field]
     else:
         return None
 
+
 def report():
     print("\n")
     for stat in STATS:
         print(f"{stat} - {get(stat, 10)}")
-        
+
 
 if __name__ == "__main__":
     # TODO: Move to a test

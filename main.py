@@ -1,7 +1,2 @@
-def main():
-    print("Hello from artrefsync!")
-
-
-
-if __name__ == "__main__":
-    main()
+from artrefsync.sync import sync_config
+sync_config()

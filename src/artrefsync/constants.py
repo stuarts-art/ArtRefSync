@@ -1,14 +1,22 @@
 from enum import StrEnum, auto
 
 class TABLE(StrEnum):
+    APP = auto()
     R34 = auto()
     E621 = auto()
     EAGLE = auto()
     LOCAL = auto()
 
+class APP(StrEnum):
+    LIMIT = auto()
+
 class BOARD(StrEnum):
     R34 = auto()
     E621 = auto()
+
+class STORE(StrEnum):
+    EAGLE = auto()
+    LOCAL = auto()
 
 class R34(StrEnum):
     ENABLED = auto()

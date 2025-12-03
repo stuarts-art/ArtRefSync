@@ -1,0 +1,25 @@
+[app]
+limit = 10
+
+[r34]
+enabled = false
+artists = []
+black_list = []
+api_key = ""
+
+[e621]
+enabled = false
+artists = []
+black_list = []
+api_key = ""
+username = ""
+
+[eagle]
+enabled = false
+endpoint = "http://localhost:41595/api"
+library = ""
+artist_folder = ""
+
+[local]
+enabled = false
+artist_folder = ""

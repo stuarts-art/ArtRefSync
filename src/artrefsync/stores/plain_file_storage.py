@@ -1,18 +1,21 @@
-from artrefsync.stores.storage import ImageStorage
-from artrefsync.constants import BOARD, LOCAL, STATS
-import artrefsync.stats as stats
-from artrefsync.boards.board_handler import Post
+import json
 from pathlib import Path
 import requests
+import artrefsync.stats as stats
+from artrefsync.stores.storage import ImageStorage
+from artrefsync.constants import BOARD, LOCAL, STATS, STORE, TABLE
+from artrefsync.boards.board_handler import Post
+from artrefsync.config import Config
+
 
 def main():
-    config = {LOCAL.ARTIST_FOLDER: "artists"}
+    config = {TABLE.LOCAL: {LOCAL.ARTIST_FOLDER: "artists"}}
     plain_storage = PlainLocalStorage(config)
 
 
 class PlainLocalStorage(ImageStorage):
-    def __init__(self, config):
-        self.artist_folder = Path(config[LOCAL.ARTIST_FOLDER])
+    def __init__(self, config: Config):
+        self.artist_folder = Path(config[TABLE.LOCAL][LOCAL.ARTIST_FOLDER])
         self.board_artist_posts = {}
         self.board_artist_paths = {}
         self.board_paths = {}
@@ -33,10 +36,14 @@ class PlainLocalStorage(ImageStorage):
                 self.board_artist_paths[board][artist_name] = artist_path
 
                 for post in Path.iterdir(board_path):
-                    pid = post.name.split("-", maxsplit=1)[0]
-                    self.board_artist_posts[board][artist_name][pid] = post
+                    if post.suffix == ".json":
+                        pid = post.name.split("-", maxsplit=1)[0]
+                        self.board_artist_posts[board][artist_name][pid] = post
 
-    def get_posts(self, board: BOARD, artist:str):
+    def get_store(self):
+        return STORE.LOCAL
+
+    def get_posts(self, board: BOARD, artist: str):
         if board in self.board_artist_posts:
             if artist in self.board_artist_posts[board]:
                 return self.board_artist_posts[board][artist]
@@ -53,19 +60,21 @@ class PlainLocalStorage(ImageStorage):
             self.board_artist_paths[artist] = artist_path
 
         try:
-            img_data = requests.get(post.url).content
+            img_data = requests.get(post.url, timeout=10.0).content
             file_name = artist_path.joinpath(post.name + Path(post.url).suffix)
             with open(file_name, "wb") as f:
                 f.write(img_data)
+            file_metadata_name = artist_path.joinpath(post.name + ".json")
+            with open(file_metadata_name, "w") as f:
+                json.dump(post.__dict__, f, indent=4)
+
         except Exception:
             stats.add(STATS.FAILED_COUNT, 1)
 
-        
-        
-
-    def update_post(self, board:BOARD, post: Post):
+    def update_post(self, board: BOARD, post: Post):
         # No Metadata is saved...right?
         pass
+
 
 if __name__ == "__main__":
     main()

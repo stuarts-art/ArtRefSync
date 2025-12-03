@@ -1,6 +1,6 @@
 # Config Related setup
 from simple_toml_configurator import Configuration
-from artrefsync.constants import R34, E621, TABLE, LOCAL, EAGLE
+from artrefsync.constants import R34, E621, TABLE, LOCAL, EAGLE, APP
 
 def main():
     config = Config()
@@ -12,7 +12,9 @@ class Config:
     
     def update(self):
         self.settings.update()
-
+    
+    def __getitem__(self, field:TABLE) -> dict:
+        return self.settings.config[field]
     
     def getR34(self, field: R34 = None):
         if field:
@@ -45,6 +47,9 @@ class Config:
         self.settings.config[TABLE.LOCAL][field] = val
 
     default_config = {
+        TABLE.APP: {
+            APP.LIMIT: 10
+        },
         TABLE.R34: {
             R34.ENABLED: False,
             R34.ARTISTS: [],

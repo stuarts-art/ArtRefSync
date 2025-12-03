@@ -1,7 +1,8 @@
-import requests
+import time
 import base64
 import json
-import time
+import requests
+from artrefsync.config import Config
 import artrefsync.stats as stats
 from artrefsync.boards.board_handler import Post, ImageBoardHandler
 from artrefsync.constants import STATS, BOARD, E621
@@ -14,9 +15,10 @@ class E621Handler(ImageBoardHandler):
         ImageBoardHandler: Abstract Base Class which is implemented by the E621 Handler.
     """
 
-    def __init__(self, config):
-        username = config[E621.USERNAME]
-        api_key = config[E621.API_KEY]
+    def __init__(self, config:Config):
+        username = config.getE621(E621.USERNAME)
+        api_key = config.getE621(E621.API_KEY)
+        self.black_list = config.getE621(E621.BLACK_LIST)
         self.website = "https://e621.net/posts.json"
         self.hostname = "e621.net"
         self.limit = 320
@@ -26,13 +28,17 @@ class E621Handler(ImageBoardHandler):
             "User-Agent": f"MyProject/1.0 (by {username} on e621)",
         }
 
+    def get_board(self) -> BOARD:
+        return BOARD.E621
+
     def get_posts(self, tag, post_limit=None) -> dict[str, Post]:
         post_dict = {}
         post_list = self.get_raw_tag_data(tag)
 
         for raw_post in post_list:
             post = self.handle_post(raw_post, tag)
-            post_dict[post.id] = post
+            if post:
+                post_dict[post.id] = post
 
         stats.add(STATS.POST_COUNT, (len(post_dict)))
         return post_dict
@@ -46,7 +52,7 @@ class E621Handler(ImageBoardHandler):
             response = requests.get(
                 self._build_website_parameters(page, tag),
                 headers=self.website_headers,
-                timeout=2,
+                timeout=10,
             )
             page_data = json.loads(response.content)["posts"]
             print(len(page_data))
@@ -65,14 +71,15 @@ class E621Handler(ImageBoardHandler):
     def handle_post(self, post, artist):
         species = post["tags"]["species"]
         artists = post["tags"]["artist"]
-        copyright = post["tags"]["copyright"]
+        franchise = post["tags"]["copyright"]
         character = post["tags"]["character"]
         meta = post["tags"]["meta"]
         rating = f"rating_{post["rating"]}"
-        tags = species + artists + copyright + character + meta + [rating]
+        tags = species + artists + franchise + character + meta + [rating]
 
-        id = str(post["id"]).zfill(8)
-        name = id + (
+
+        pid = str(post["id"]).zfill(8)
+        name = pid + (
             (f"-{'_'.join(character)}" if character else "")
             + (f"-{'_'.join(species)}" if species else "")
         )
@@ -80,15 +87,20 @@ class E621Handler(ImageBoardHandler):
         url = post["file"]["url"]
         website = f"https://e621.net/posts/{post["id"]}"
 
+        for black_listed in self.black_list:
+            if black_listed in tags:
+                stats.add(STATS.SKIP_COUNT, 1)
+                print(f"Skipping {pid} for {black_listed}. ({website})")
+
         stats.add(STATS.TAG_SET, tags)
         stats.add(STATS.SPECIES_SET, species)
         stats.add(STATS.ARTIST_SET, artists)
-        stats.add(STATS.COPYRIGHT_SET, copyright)
+        stats.add(STATS.COPYRIGHT_SET, franchise)
         stats.add(STATS.CHARACTER_SET, character)
         stats.add(STATS.META_SET, meta)
         stats.add(STATS.RATING_SET, rating)
 
-        return Post(id, artist, name, url, tags, website, BOARD.E621)
+        return Post(pid, artist, name, url, tags, website, BOARD.E621)
 
     def _build_website_parameters(self, page, tag) -> str:
         return f"{self.website}?limit={self.limit}&tags={tag}&page={page}"
