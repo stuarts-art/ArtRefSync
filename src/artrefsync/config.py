@@ -1,6 +1,6 @@
 # Config Related setup
 from simple_toml_configurator import Configuration
-from artrefsync.constants import R34, E621, TABLE, LOCAL, EAGLE, APP
+from artrefsync.constants import R34, E621, TABLE, LOCAL, EAGLE, APP, STORE, BOARD
 
 def main():
     config = Config()
@@ -10,42 +10,9 @@ class Config:
     def __init__(self, config_path = "config", config_name = "config"):
        self.settings = Configuration(config_path, self.default_config, config_name)
     
-    def update(self):
-        self.settings.update()
-    
-    def __getitem__(self, field:TABLE) -> dict:
+    def __getitem__(self, field:TABLE|STORE|BOARD) -> dict[R34|E621|EAGLE|LOCAL,]:
         return self.settings.config[field]
     
-    def getR34(self, field: R34 = None):
-        if field:
-            return self.settings.config[TABLE.R34][field]
-        else:
-            return self.settings.config[TABLE.R34]
-    def getE621(self, field: E621):
-        if field:
-            return self.settings.config[TABLE.E621][field]
-        else:
-            return self.settings.config[TABLE.E621]
-    def getEAGLE(self, field: EAGLE):
-        if field:
-            return self.settings.config[TABLE.EAGLE][field]
-        else:
-            return self.settings.config[TABLE.EAGLE]
-    def getLOCAL(self, field: LOCAL):
-        if field:
-            return self.settings.config[TABLE.LOCAL][field]
-        else:
-            return self.settings.config[TABLE.LOCAL]
-
-    def setR34(self, field: R34, val):
-        self.settings.config[TABLE.R34][field] = val
-    def setE621(self, field: E621, val):
-        self.settings.config[TABLE.E621][field] = val
-    def setEagle(self, field: EAGLE, val):
-        self.settings.config[TABLE.EAGLE][field] = val
-    def setLOCAL(self, field: LOCAL, val):
-        self.settings.config[TABLE.LOCAL][field] = val
-
     default_config = {
         TABLE.APP: {
             APP.LIMIT: 10

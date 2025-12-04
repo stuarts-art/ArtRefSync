@@ -10,7 +10,7 @@ for stat in STATS:
         _stats[stat] = 0
 
 
-def add(field: STATS, value):
+def add(field: STATS, value=1):
     if isinstance(value, Iterable):
         if "set" in field:
             _stats[field].update(value)

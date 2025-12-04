@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json
 from artrefsync.constants import BOARD
 
@@ -13,6 +13,7 @@ class Post():
     tags: list[str]
     website:str
     board: BOARD
+    file: str = field(default="")
 
     def __str__(self):
         return f"{self.name} - {self.url}"

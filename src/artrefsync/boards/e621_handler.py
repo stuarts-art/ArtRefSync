@@ -16,9 +16,9 @@ class E621Handler(ImageBoardHandler):
     """
 
     def __init__(self, config:Config):
-        username = config.getE621(E621.USERNAME)
-        api_key = config.getE621(E621.API_KEY)
-        self.black_list = config.getE621(E621.BLACK_LIST)
+        username = config[BOARD.E621][E621.USERNAME]
+        api_key = config[BOARD.E621][E621.API_KEY]
+        self.black_list = config[BOARD.E621][E621.BLACK_LIST]
         self.website = "https://e621.net/posts.json"
         self.hostname = "e621.net"
         self.limit = 320
@@ -35,16 +35,18 @@ class E621Handler(ImageBoardHandler):
         post_dict = {}
         post_list = self.get_raw_tag_data(tag)
 
+        print(f"{self.get_board} - {tag} - TOTAL POSTS: {len(post_list)}")
         for raw_post in post_list:
             post = self.handle_post(raw_post, tag)
             if post:
                 post_dict[post.id] = post
-
-        stats.add(STATS.POST_COUNT, (len(post_dict)))
+                stats.add(STATS.POST_COUNT, 1)
+            else:
+                stats.add(STATS.SKIP_COUNT, 1)
         return post_dict
 
     def get_raw_tag_data(self, tag: str) -> list:
-        print(f"Getting metadata for tag: {tag}")
+        print(f"{self.get_board} - Getting metadata for tag: {tag}")
         metadata = []
         oldest_id = ""
         for page in range(1, 50):  # handle pagination
@@ -89,7 +91,6 @@ class E621Handler(ImageBoardHandler):
 
         for black_listed in self.black_list:
             if black_listed in tags:
-                stats.add(STATS.SKIP_COUNT, 1)
                 print(f"Skipping {pid} for {black_listed}. ({website})")
 
         stats.add(STATS.TAG_SET, tags)

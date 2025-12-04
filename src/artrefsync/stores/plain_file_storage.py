@@ -64,6 +64,7 @@ class PlainLocalStorage(ImageStorage):
             file_name = artist_path.joinpath(post.name + Path(post.url).suffix)
             with open(file_name, "wb") as f:
                 f.write(img_data)
+            post.file = file_name
             file_metadata_name = artist_path.joinpath(post.name + ".json")
             with open(file_metadata_name, "w") as f:
                 json.dump(post.__dict__, f, indent=4)
