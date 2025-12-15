@@ -50,15 +50,5 @@ def main():
     with Bm("Make Tag to post list dict"):
         tpm = TagPostManager()
 
-    
-    with Bm("Testing Tag Queries"):
-
-        with Bm("Query One"):
-            q1 = tpm.get_posts("anthro", "blush")
-            q2 = tpm.get_posts("anthro", "blush", "diives")
-    
-
-        
-
 if __name__ == "__main__":
     main()

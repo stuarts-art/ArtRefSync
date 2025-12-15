@@ -3,6 +3,9 @@ import json
 import time
 import requests
 from artrefsync.api.e621_model import E621_Post
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -31,6 +34,7 @@ class E621_Client():
                 headers=self.website_headers,
                 timeout=10,
             )
+            response.raise_for_status()
             page_data = json.loads(response.content)["posts"]
 
             if len(page_data) == 0:

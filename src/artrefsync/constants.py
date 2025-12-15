@@ -25,6 +25,9 @@ class APP(StrEnum):
 class BOARD(StrEnum):
     R34 = auto()
     E621 = auto()
+    OTHER = auto()
+    
+
 
 class STORE(StrEnum):
     EAGLE = auto()

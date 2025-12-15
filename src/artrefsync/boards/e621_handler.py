@@ -18,8 +18,8 @@ def main():
     print("Hello World")
     api_key = config[TABLE.E621][E621.API_KEY]
     user_name = config[TABLE.E621][E621.USERNAME]
-    client = E621_Client(user_name, api_key)
-    posts = client.get_posts("diives")
+    # client = E621_Client(user_name, api_key)
+    posts = e621_handler.client.get_posts("")
 
     for p in posts:
         try:
