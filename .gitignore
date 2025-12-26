@@ -213,3 +213,5 @@ artists/
 config/
 config/config.toml
 scratch/
+metadata_cache/
+.vscode/

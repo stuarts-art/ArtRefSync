@@ -19,11 +19,13 @@ class __Stats():
                 self._stats[field].update(value)
             else:
                 self._stats[field] += len(value)
+                return self._stats[field]
         else:
             if "set" in field:
                 self._stats[field].add(value)
             else:
                 self._stats[field] += value
+                return self._stats[field]
 
     def get(self, field: STATS, limit=None):
         if field in self._stats:

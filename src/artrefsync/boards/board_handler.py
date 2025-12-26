@@ -7,13 +7,15 @@ from artrefsync.config import config
 @dataclass_json
 @dataclass
 class Post():
-    id: str
+    id: str             # Centralized App ID
+    ext_id: str         # external id (When from Board->BoardID, Store -> StoreID)
+    name: str           # Name of file/post
     artist_name: str
-    name: str           # Functions as a defacto system ID
-    url: str
     tags: list[str]
-    website:str
-    board: BOARD
+    board: BOARD | None
+    score: str | None
+    url: str | None
+    website:str | None
     file: str = field(default="")
 
     def __post_init__(self):
@@ -24,8 +26,8 @@ class Post():
         
     @staticmethod
     def make_storage_id(raw_id, board: BOARD) -> str:
-        if board in [BOARD.E621, BOARD.R34]:
-            return f"{str(raw_id).zfill(config[TABLE.APP][APP.ID_LENGTH])}"
+        return f"{str(raw_id).zfill(int(config[TABLE.APP][APP.ID_LENGTH]))}.{board}"
+        
     
     @staticmethod
     def check_id(id_str:str) -> bool:
@@ -44,13 +46,11 @@ class Post():
         if len(id_split) == 1 or id_split[0] == "":
             return id_str
         return id_split[0]
-        
-        
 
 
 class ImageBoardHandler(ABC):
     @abstractmethod
-    def get_posts(self, tag, post_limit=None) -> dict[str, Post]:
+    def get_posts(self, tag) -> dict[str, Post]:
         pass
 
     @abstractmethod 
@@ -61,8 +61,5 @@ class ImageBoardHandler(ABC):
         pass
 
 if __name__ == "__main__":
-    import json
-    p = Post("a", "Artist name", "12345.1231231.R2131-dfasdfe asdfasdf", "url str", ["tag1", "tag2"], "website", str(BOARD.E621))
-    with open("test.json", "w") as f:
-        json.dump(p.__dict__, f)
-    print (p.__dict__)
+
+    print("")

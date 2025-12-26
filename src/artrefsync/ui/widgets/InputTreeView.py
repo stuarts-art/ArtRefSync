@@ -61,7 +61,7 @@ class InputTreeviewFrame(ttk.Frame):
         self.tree_frame = ttk.Frame(self, takefocus=True)
         # self.tree = ttk.Treeview(tree_frame, columns=("Artists","Close"), show="")
         self.tree = InputTreeview(
-            self.tree_frame, input_list, columns=("Input", "Delete"), show=""
+            self.tree_frame, input_list, columns=("Delete"), show="tree"
         )
         self.scroll = ttk.Scrollbar(
             self.tree_frame, orient="vertical", command=self.tree.yview
@@ -87,7 +87,7 @@ class InputTreeviewFrame(ttk.Frame):
         row_id = self.tree.identify_row(event.y)
         logger.debug((f"{column_id} {row_id}"))
 
-        if column_id == "#2":
+        if column_id == "#1":
             self.tree.delete(row_id)
 
 
@@ -107,10 +107,10 @@ class InputTreeview(ttk.Treeview):
         self.deleted = []  # Deleted Stack
 
         # Enforce alphabetical order for ease.
-        self.column("Input", anchor="w")
+        # self.column("Input", anchor="w")
         self.column("Delete", anchor="e", width=30)
         for val in self.sorted:
-            self.insert("", "end", iid=val, values=(val, "❌"))
+            self.insert("", "end", iid=val, text=val,  values=("❌"))
 
     def delete_selected(self, event=None):
         for item in self.selection():
@@ -128,7 +128,7 @@ class InputTreeview(ttk.Treeview):
         if item not in self.sorted:
             self.sorted.add(item)
             index = self.sorted.index(item)
-            self.insert("", index, iid=item, values=(item, "❌"))
+            self.insert("", index, iid=item, text = item, values=("❌"))
 
     def undo_delete(self, event):
         print("Undo Recieved")

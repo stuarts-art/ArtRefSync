@@ -10,8 +10,9 @@ logger.setLevel(config.log_level)
 
 
 class TkThreadCaller:
-    def __init__(self, root :ttk.Frame):
-        root.bind("<<gui_call>>", self._gui_call_handler)
+    def __init__(self, root :ttk.Frame, event_name=None):
+        self.event_name =f"<<{f'{event_name}_' if event_name else ""}gui_call>>"
+        root.bind(self.event_name, self._gui_call_handler)
         self.root = root
         self.call_queue = Queue()
 
@@ -45,7 +46,7 @@ class TkThreadCaller:
             
         data = self._GUICallData(on_finish, response)
         self.call_queue.put(data)
-        self.root.event_generate("<<gui_call>>", when="tail")
+        self.root.event_generate(self.event_name, when="tail")
         data.reply_event.wait()
         return data.reply
 

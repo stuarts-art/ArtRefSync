@@ -1,15 +1,17 @@
 import base64
+import logging
 import json
 import time
 import requests
 from artrefsync.api.e621_model import E621_Post
-import logging
+from artrefsync.metadata_cache import metadata_cache
+from artrefsync.config import config
 
 logger = logging.getLogger(__name__)
+logger.setLevel(config.log_level)
 
 
-
-class E621_Client():
+class E621_Client:
 
     def __init__(self, username, api_key):
         user_string = f"{username}:{api_key}"
@@ -20,15 +22,20 @@ class E621_Client():
         self.website = "https://e621.net/posts.json"
         self.hostname = "e621.net"
         self.limit = 320
-        self.last_run = time.time()
+        self.last_run = 0
 
     def _build_website_parameters(self, page, tag) -> str:
         return f"{self.website}?limit={self.limit}&tags={tag}&page={page}"
 
-    def get_posts(self, tags:str) -> list[E621_Post]:
+    @metadata_cache
+    def get_posts(self, tags: str, post_limit=None) -> list[E621_Post]:
         posts = []
-        # for page in range(1, 50):  # handle pagination
         for page in range(1, 50):  # handle pagination
+            # Very minimal rate limiter
+            if time.time() - self.last_run < 0.6:
+                time.sleep(time.time() - self.last_run)
+            self.last_run = time.time()
+
             response = requests.get(
                 self._build_website_parameters(page, tags),
                 headers=self.website_headers,
@@ -47,12 +54,14 @@ class E621_Client():
             for post_data in page_data:
                 post = E621_Post(**post_data)
                 posts.append(post)
+                if post_limit and post_limit < len(posts):
+                    break
+            if post_limit and post_limit < len(posts):
+                break
 
-            curr_time = time.time() - self.last_run
-            if curr_time < .6:
-                time.sleep(.6-curr_time)
+        logger.info("Client GetPosts len = %s", len(posts))
         return posts
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

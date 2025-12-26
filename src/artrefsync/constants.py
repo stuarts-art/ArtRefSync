@@ -1,5 +1,10 @@
 from enum import StrEnum, auto
 
+__all__ = [
+    'get_table_mapping', 'TABLE', 'APP', 'BOARD', 'STORE', 
+    'R34', 'E621', 'EAGLE', 'LOCAL', 'TAGS', 'STATS'
+]
+
 
 def get_table_mapping():
     return {
@@ -21,6 +26,8 @@ class APP(StrEnum):
     LIMIT = auto()
     LOG_LEVEL = auto()
     ID_LENGTH = auto()
+    CACHE_DIR = auto()
+    CACHE_TTL = auto()
 
 class BOARD(StrEnum):
     R34 = auto()
@@ -76,3 +83,4 @@ class STATS(StrEnum):
     POST_COUNT = auto()
     SKIP_COUNT = auto()
     FAILED_COUNT = auto()
+    METADATA_CACHE_HIT = auto()

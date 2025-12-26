@@ -11,29 +11,30 @@ config = dacite.Config(
 
 @dataclass
 class R34_Post():
-    height: int
-    score: int
+    height: int | None
+    score: int | None
     file_url: str
     parent_id: str
     sample_url: str
-    sample_width: int
-    sample_height: int
+    sample_width: int | None
+    sample_height: int | None
     preview_url: str
     rating: str
     tags: List[str]
-    id: int
-    width: int
-    change: int
+    id: str
+    width: int | None
+    change: int | None
     md5: str
-    creator_id: int
-    has_children: str
+    creator_id: int | None
+    has_children: str | None
     created_at: str
     status: str
     source: str
     has_notes: str
     has_comments: str
-    preview_width: int
-    preview_height: int    
+    preview_width: int | None
+    preview_height: int | None   
     
 def parse_r34_post(post_dict) -> R34_Post:
-    return dacite.from_dict(R34_Post, post_dict, config=config)
+    post = dacite.from_dict(R34_Post, post_dict, config=config)
+    return post

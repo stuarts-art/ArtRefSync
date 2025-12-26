@@ -1,2 +1,7 @@
-from artrefsync.sync import sync_config
-sync_config()
+from artrefsync.ui.TagApp import ImagViewerApp
+if __name__ == "__main__":
+    app = ImagViewerApp()
+    app.start()
+    
+
+    
