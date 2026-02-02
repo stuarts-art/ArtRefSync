@@ -1,16 +1,13 @@
-
 from dataclasses import dataclass
 from typing import List
 
 import dacite
 
-config = dacite.Config(
-    cast=[int],
-    type_hooks={List[str]: (lambda x: x.split())}
-)
+config = dacite.Config(cast=[int], type_hooks={List[str]: (lambda x: x.split())})
+
 
 @dataclass
-class R34_Post():
+class R34_Post:
     height: int | None
     score: int | None
     file_url: str
@@ -18,6 +15,7 @@ class R34_Post():
     sample_url: str
     sample_width: int | None
     sample_height: int | None
+    change: str
     preview_url: str
     rating: str
     tags: List[str]
@@ -33,8 +31,9 @@ class R34_Post():
     has_notes: str
     has_comments: str
     preview_width: int | None
-    preview_height: int | None   
-    
+    preview_height: int | None
+
+
 def parse_r34_post(post_dict) -> R34_Post:
     post = dacite.from_dict(R34_Post, post_dict, config=config)
     return post

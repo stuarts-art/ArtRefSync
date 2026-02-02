@@ -1,3 +1,4 @@
+from threading import Event
 import time
 import base64
 import json
@@ -7,20 +8,22 @@ from artrefsync.config import config
 from artrefsync.stats import stats
 from artrefsync.boards.board_handler import Post, ImageBoardHandler
 from artrefsync.constants import STATS, BOARD, E621, TABLE
-from artrefsync.metadata_cache import metadata_cache
+from artrefsync.disk_cache import disk_cache
 
 import logging
+
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+
 class __E621Handler(ImageBoardHandler):
-    """Class to handle messages from the image board E621
-    """
+    """Class to handle messages from the image board E621"""
+
     def __init__(self):
         logger.info("Initialize E621 Handler")
         self.reload()
         config.subscribe_reload(self.reload)
-    
+
     def reload(self):
         username = config[BOARD.E621][E621.USERNAME]
         api_key = config[BOARD.E621][E621.API_KEY]
@@ -33,23 +36,25 @@ class __E621Handler(ImageBoardHandler):
         self.limit = 320
         user_string = f"{username}:{api_key}"
         self.website_headers = {
-            "Authorization": f'Basic {base64.b64encode(user_string.encode("utf-8")).decode("utf-8")}',
+            "Authorization": f"Basic {base64.b64encode(user_string.encode('utf-8')).decode('utf-8')}",
             "User-Agent": f"MyProject/1.0 (by {username} on e621)",
         }
 
     def get_board(self) -> BOARD:
         return BOARD.E621
-    
+
     def get_artist_list(self):
+        # return  list(set(config[BOARD.E621][E621.ARTISTS]))
         return self.artist_list
 
-    @metadata_cache
-    def get_posts(self, tag, post_limit = None) -> dict[str, Post]:
-        
+    @disk_cache
+    def get_posts(self, tag, post_limit=None, stop_event: Event=None) -> dict[str, Post]:
         post_dict = {}
         e621_posts = self.client.get_posts(tag, post_limit)
-        if ' ' in tag:
-            tag = tag.split()[0] # Remove query and metatags
+        if stop_event and stop_event.is_set():
+            return None
+        if " " in tag:
+            tag = tag.split()[0]  # Remove query and metatags
 
         for epost in e621_posts:
             tags = []
@@ -59,8 +64,8 @@ class __E621Handler(ImageBoardHandler):
             franchise = epost.tags.copyright
             character = epost.tags.character
             meta = epost.tags.meta
-            rating = f"rating_{epost.rating}"
-            tags = general + species + artists + franchise + character + meta + [rating]
+            rating = f"rating_{epost.rating.value}"
+            tags = general + species + artists + franchise + character + meta + [rating,]
 
             pid = Post.make_storage_id(epost.id, self.get_board())
             name = f"{pid}-{tag}"
@@ -72,26 +77,39 @@ class __E621Handler(ImageBoardHandler):
             for black_listed in self.black_list:
                 if black_listed in tags:
                     stats.add(STATS.SKIP_COUNT, 1)
-                    logger.debug("Skipping %s for blacklist item '%s'. %s", post_id, black_listed, website)
+                    logger.debug(
+                        "Skipping %s for blacklist item '%s'. %s",
+                        post_id,
+                        black_listed,
+                        website,
+                    )
                     is_black_listed = True
                     break
             if is_black_listed:
                 continue
 
-            
-                    
-
+            height = epost.file.height
+            width = epost.file.width
+            ratio = None
+            if height and width:
+                ratio = height / width
             post = Post(
-                id = pid,
+                id=pid,
                 ext_id=epost.id,
-                name = name,
+                name=name,
                 artist_name=tag,
                 tags=tags,
-                score=epost.score,
+                score=epost.score.up,
                 url=url,
+                board_update_str=epost.updated_at,
                 website=website,
+                height=height,
+                width=width,
+                ratio=ratio,
+                ext=epost.file.ext,
+                thumbnail=epost.preview.url,
                 board=self.get_board(),
-                file=""
+                file="",
             )
             stats.add(STATS.TAG_SET, tags)
             stats.add(STATS.SPECIES_SET, species)
@@ -104,9 +122,6 @@ class __E621Handler(ImageBoardHandler):
             stats.add(STATS.POST_COUNT)
         return post_dict
 
+
 e621_handler = __E621Handler()
 
-if __name__=="__main__":
-    posts = e621_handler.client.get_posts("yasmil")
-
-    print(len(posts))

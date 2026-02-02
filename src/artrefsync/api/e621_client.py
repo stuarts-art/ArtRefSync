@@ -1,10 +1,11 @@
 import base64
 import logging
 import json
+from threading import Event
 import time
 import requests
 from artrefsync.api.e621_model import E621_Post
-from artrefsync.metadata_cache import metadata_cache
+from artrefsync.disk_cache import disk_cache
 from artrefsync.config import config
 
 logger = logging.getLogger(__name__)
@@ -12,13 +13,17 @@ logger.setLevel(config.log_level)
 
 
 class E621_Client:
-
     def __init__(self, username, api_key):
-        user_string = f"{username}:{api_key}"
-        self.website_headers = {
-            "Authorization": f'Basic {base64.b64encode(user_string.encode("utf-8")).decode("utf-8")}',
-            "User-Agent": f"MyProject/1.0 (by {username} on e621)",
-        }
+        if username and api_key:
+            user_string = f"{username}:{api_key}"
+            self.website_headers = {
+                "Authorization": f"Basic {base64.b64encode(user_string.encode('utf-8')).decode('utf-8')}",
+                "User-Agent": f"MyProject/1.0 (by {username} on e621)",
+            }
+        else:
+            user_string = None
+            self.website_headers = None
+
         self.website = "https://e621.net/posts.json"
         self.hostname = "e621.net"
         self.limit = 320
@@ -27,10 +32,13 @@ class E621_Client:
     def _build_website_parameters(self, page, tag) -> str:
         return f"{self.website}?limit={self.limit}&tags={tag}&page={page}"
 
-    @metadata_cache
-    def get_posts(self, tags: str, post_limit=None) -> list[E621_Post]:
+    @disk_cache
+    def get_posts(self, tags: str, post_limit=None, stop_event: Event=None) -> list[E621_Post]:
         posts = []
+        oldest_id = ""
         for page in range(1, 50):  # handle pagination
+            if stop_event and stop_event.is_set():
+                return None
             # Very minimal rate limiter
             if time.time() - self.last_run < 0.6:
                 time.sleep(time.time() - self.last_run)
@@ -59,9 +67,6 @@ class E621_Client:
             if post_limit and post_limit < len(posts):
                 break
 
-        logger.info("Client GetPosts len = %s", len(posts))
+        logger.info("E621 Client GetPosts for tags=%s len = %s, ", tags, len(posts))
         return posts
 
-
-# if __name__ == "__main__":
-#     main()

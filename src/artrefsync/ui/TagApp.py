@@ -1,233 +1,163 @@
 # import pywinstyles
-import abc
 import ttkbootstrap as ttk
-import ttkbootstrap.style as style
+import tkinter as tk
 import time
 
 # import sv_ttk
 from PIL import Image, ImageTk
 import logging
-from artrefsync.boards.board_handler import Post
 from artrefsync.config import config
-from artrefsync.ui.TkThreadCaller import TkThreadCaller
-from ttkbootstrap import utility
+from artrefsync.ui.tabs.ActiveTags import ActiveTagsTab
+from artrefsync.ui.tabs.ConfigTab import ConfigTab
+from artrefsync.ui.widgets.LoadingBar import LoadingBars
+from artrefsync.ui.tabs.ViewerTab import ViewerTab
+from artrefsync.ui.tabs.TagTab import TagTab
+from artrefsync.utils.PyInstallerUtils import resource_path
+from artrefsync.utils.TkThreadCaller import TkThreadCaller
 
-from artrefsync.ui.tabs.ArtistTab import Artist_Tree
-from artrefsync.ui.tabs.PostTab import Post_Tree
-from artrefsync.ui.tag_post_manager import TagPostManager
+from artrefsync.ui.tabs.ArtistTab import ArtistTab
+from artrefsync.ui.widgets.PostInfo import PostInfo
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar, RoundedIcon
-from artrefsync.ui.widgets.PhotoLabel import PhotoImageGallery
+from artrefsync.ui.widgets.PhotoGallery import PhotoImageGallery
+from tkinterdnd2 import TkinterDnD
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 
-class AppTab(abc.ABC):
-    @abc.abstractmethod
-    def init_ui(self, root):
-        pass
-
-
 def main():
     app = ImagViewerApp()
+    app.mainloop()
 
 
 class ImagViewerApp(ttk.Window):
     def __init__(self):
         logger.info("Starting App")
-        self.tag_post_manager:TagPostManager = None
+        self.init_scafolding()
+        self.init_tabs()
+        self.init_views()
+        self.init_bindings()
 
-        super().__init__(themename="darkly", size=(1080, 1080))
+    def init_scafolding(self):
+        logger.info("Init Scafolding")
+        super().__init__(themename="darkly", size=(1080, 1080), hdpi=True, scaling=2)
+        TkinterDnD._require(self)
+
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
-
-        self.bar = ModernTopBar(self)
-
+        self.bar = ModernTopBar(self, False)
+        # self.bar = ModernTopBar(self, override_default_top_bar=True)
         self.stime = time.time()
-        # Init Window
         self.thread_caller = TkThreadCaller(self)
-        ico = Image.open("resources/small_cat.png")
+        ico = Image.open(resource_path("resources/small_cat.png"))
         photo = ImageTk.PhotoImage(ico)
         self.wm_iconphoto(False, photo)
-        # self.menu = self.menus(self)
 
         self.bar.mid.columnconfigure(0, weight=0)
         self.bar.mid.columnconfigure(1, weight=4)
         self.bar.mid.rowconfigure(0, weight=1)
 
-
-        self.side_bar_icons = ttk.Frame(self.bar.mid)
+        self.bar.left.rowconfigure(0, weight=1)
+        self.bar.left.columnconfigure(0, weight=1, minsize=250)
+        self.bar.right.rowconfigure(0, weight=1)
+        self.bar.right.columnconfigure(0, weight=1, minsize=250)
+        self.left_tabs = ttk.Frame(self.bar.left)
         self.right = ttk.Frame(self.bar.mid)
 
-        self.side_bar_icons.grid(row=0, column=0, sticky="wns")
-        self.right.grid(row=0, column=1, sticky="nsew")
+        self.left_tabs.grid(row=0, column=0, sticky=tk.NSEW)
+        self.right.grid(row=0, column=1, sticky=tk.NSEW)
+        self.right.rowconfigure(0, weight=1)
+        self.right.columnconfigure(0, weight=1)
 
-        self.side_bar_icons.rowconfigure(3, weight=1)
+        self.left_tabs.rowconfigure(3, weight=1)
+        self.left_tabs.columnconfigure(0, weight=1)
 
-        self.config_button = RoundedIcon(self.side_bar_icons, text="Config", size=(100,30))
-        self.artists_button = RoundedIcon(self.side_bar_icons, text="Artists", size=(100,30))
-        self.posts_button = RoundedIcon(self.side_bar_icons, text="Posts", size=(100,30))
+        self.button_frame = ttk.Frame(self.left_tabs)
+        self.button_frame.grid(column=0, row=1, padx=5)
 
-        self.config_tab = ttk.Frame(self.side_bar_icons)
-        self.artists_tree = Artist_Tree(self.side_bar_icons)
-        self.post_tree = Post_Tree(self.side_bar_icons)
-        
-        self.config_button.grid(column=0, row=0, sticky='ew')
-        self.artists_button.grid(column=0, row=1, sticky='ew')
-        self.posts_button.grid(column=0, row=2, sticky='ew')
+        self.artists_button = RoundedIcon(
+            self.button_frame, text="Artists", size=(100, 30)
+        )
+        self.artists_button.grid(column=0, row=0, sticky=tk.EW, padx=5)
+        self.tags_button = RoundedIcon(self.button_frame, text="Tags", size=(100, 30))
+        self.tags_button.grid(column=1, row=0, sticky=tk.EW, padx=5)
 
-        self.config_tab.grid(column=0, row=3, sticky="nsew")
-        self.artists_tree.grid(column=0, row=3, sticky="nsew")
-        self.post_tree.grid(column=0, row=3, sticky="nsew")
+    def init_tabs(self):
+        logger.info("Init tabs")
 
-        self.gallery = PhotoImageGallery(self.right)
-        self.gallery.pack(fill="both", expand=True)
-        self.filter_set = set()
+        self.artist_tab = ArtistTab(self.left_tabs)
+        self.artist_tab.grid(column=0, row=3, sticky=tk.NSEW)
 
+        self.tag_tab = TagTab(self.left_tabs)
+        self.tag_tab.grid(column=0, row=3, sticky=tk.NSEW)
+        self.tag_tab.grid_forget()
 
-        # self.thread_caller.add(self.import_viewer_tab, self.init_tab_ui)
+        self.active_tab = ActiveTagsTab(self.left_tabs)
 
-        self.config_button.bind("<Button-1>", self.toggle_config)
-        self.artists_button.bind("<Button-1>",self.toggle_artists)
-        self.posts_button.bind("<Button-1>", self.toggle_posts)
-        self.bar.side_bar_label_button.bind("<Button-1>", self.toggle_side_bar)
-        self.artists_tree.bind("<<TreeviewSelect>>", self.query_by_artist)
-        self.post_tree.bind("<<TreeviewSelect>>", self.add_image_to_gallery)
+        self.post_info = PostInfo(self.bar.right, self.thread_caller)
+        self.loading_bar = LoadingBars(self.bar.bot)
 
-        self.thread_caller.add(self.import_config_tab, self.init_tab_ui)
-        self.thread_caller.add(self.init_tag_post_manager, self.after_tag_post_manager)
-        self.after(20,self.toggle_config)
-        self.mainloop()
+    def init_views(self):
+        logger.info("Init Views")
+        self.config_tab = ConfigTab(self.right)
+        self.image_viewer = ViewerTab(self.right)
+        self.image_viewer.grid(column=0, row=0, sticky=tk.NSEW)
+        self.image_viewer.grid_forget()
+        self.gallery = PhotoImageGallery(self.right, self.thread_caller)
+        self.gallery.grid(column=0, row=0, sticky=tk.NSEW)
 
-    def query_by_artist(self, e=None):
+    def init_bindings(self):
+        logger.info("Init Bindings")
+        self.bind(self.bar.menu_event_name, self.toggle_config)
 
-        self.filter_set = set()
-        artist = self.artists_tree.selection()[0]
-        if artist not in self.filter_set:
-            self.filter_set.add(artist)
-            print(f"Current FilterSet {self.filter_set}")
-            self.post_tree.refresh(self.filter_set)
-        
-            self.reset_toggle()
-            self.toggle_posts()
-            
-        
+        self.artists_button.bind("<Button-1>", self.toggle_artists)
+        self.tags_button.bind("<Button-1>", self.toggle_tags)
 
-    def init_tag_post_manager(self):
-        self.tag_post_manager = TagPostManager()
-        logger.info("Tag Post Manager Initiated.")
+    def taskedGetImage(self, file_name, size):
+        image = Image.open(file_name)
+        image.thumbnail(size)
+        return ImageTk.PhotoImage(image)
 
-    def after_tag_post_manager(self, event=None):
-        self.post_tree.populate_tree(self.tag_post_manager)
-    
-    
-    def reset_toggle(self, event=None):
-        if len(self.config_button.grid_info()) == 0:
-            self.config_button.grid(column=0, row=0, sticky='ew')
-
-        if len(self.artists_button.grid_info()) == 0:
-            self.artists_button.grid(column=0, row=1, sticky='ew')
-
-        if len(self.posts_button.grid_info()) == 0:
-            self.posts_button.grid(column=0, row=2, sticky='ew')
+    def setImage(self, photoimage):
+        self.image_label.config(image=photoimage)
 
     def toggle_config(self, event=None):
-        if len(self.artists_button.grid_info()) == 0:
-            self.artists_button.grid(column=0, row=1, sticky='ew')
-            self.posts_button.grid(column=0, row=2, sticky='ew')
+        if self.config_tab.grid_info():
+            self.gallery.grid(column=0, row=0, sticky=tk.NSEW)
+            self.config_tab.grid_forget()
         else:
-            self.artists_button.grid_forget()
-            self.posts_button.grid_forget()
-            self.config_tab.lift()
+            self.config_tab.grid(column=0, row=0, sticky=tk.NSEW)
+            self.gallery.grid_forget()
 
     def toggle_artists(self, event=None):
-        if len(self.config_button.grid_info()) == 0:
-            self.config_button.grid(column=0, row=0, sticky='ew')
-            self.posts_button.grid(column=0, row=2, sticky='ew')
-        else:
-            self.config_button.grid_forget()
-            self.posts_button.grid_forget()
-            self.artists_tree.lift()
+        logger.info("Toggling Artist")
+        if len(self.artist_tab.grid_info()) == 0:
+            self.artist_tab.grid(column=0, row=3, sticky=tk.NSEW)
+            self.artists_button.configure(bootstyle="secondary-inverse")
+            self.tags_button.configure(bootstyle="normal")
+            self.tag_tab.grid_forget()
 
-    def toggle_posts(self, event= None):
-        if len(self.config_button.grid_info()) == 0:
-            self.artists_button.grid(column=0, row=1, sticky='ew')
-            self.config_button.grid(column=0, row=0, sticky='ew')
-        else:
-            self.config_button.grid_forget()
-            self.artists_button.grid_forget()
-            self.post_tree.lift()
+    def toggle_tags(self, event=None):
+        logger.info("Toggling Tags")
+        if len(self.tag_tab.grid_info()) == 0:
+            self.artists_button.configure(bootstyle="normal")
+            self.tags_button.configure(bootstyle="secondary-inverse")
+            self.tag_tab.grid(column=0, row=3, sticky=tk.NSEW)
+            self.artist_tab.grid_forget()
 
     def toggle_side_bar(self, event):
+        logger.info("Toggling Sidebar")
+        left_info = self.bar.left.grid_info()
+        logger.info("Toggling side bar. Pack Info = %s", str(left_info))
 
-        # mid_info = self.side_bar_icons.pack_info()
-        mid_info = self.side_bar_icons.grid_info()
-        logger.info("Toggling side bar. Pack Info = %s", str(mid_info))
-
-        if len(mid_info) != 0:
-            logger.info("Forgetting = %s", str(mid_info))
-
-            # self.paned_window.forget(self.side_bar_icons)
-            # self.side_bar_icons.pack_forget()
-            self.side_bar_icons.grid_remove()
-            # self.sep.grid_remove()
-            # self.left_side_bar.grid_remove()
+        if len(left_info) != 0:
+            logger.info("Forgetting = %s", str(left_info))
+            self.bar.right.grid_forget()
+            self.bar.left.grid_forget()
         else:
-            logger.info("Reattaching = %s", str(mid_info))
-            # self.paned_window.insert(0, self.side_bar_icons)
-            # self.side_bar_icons.pack_forget()
-            # self.side_bar_icons.pack(side="left", fill="y")
-            self.side_bar_icons.grid(row=0, column=0, sticky="ns")
-            # self.sep.grid(row=0, column=1, sticky="ns")
-            # self.left_side_bar.grid(row=0, column=2, sticky="nsw")
-    
-    def add_image_to_gallery(self, event):
-        if not self.tag_post_manager:
-            logger.warning("Warning, Tag Post Manager not initialized.")
-            return
-
-        selection = self.post_tree.selection()[0]
-        index = self.post_tree.image_set.bisect_left(selection)
-        print(index)
-        start = min(len(self.post_tree.image_set)-1, index + 10)
-        end = max(index - 10, 0)
-        print(f"start: {start}, end: {end}")
-        # for pid in islice:
-        for i in range(start, end, -1):
-            print(i)
-            pid = self.post_tree.image_set[i]
-            print(pid)
-            post: Post = self.tag_post_manager.post_id[pid]
-            self.gallery.add_image(post)
-        # frame_w = self.post_tree.winfo_width()
-        # frame_h = self.post_tree.winfo_height()
-        # image = self.get_photo_image(selection, frame_w, frame_h)
-
-
-        # self.gallery_tree.item("top", image=image)
-
-    def menus(self, root):
-        self.menu = ttk.Menu(root)
-        self.filemenu = ttk.Menu(self.menu, tearoff=0)
-        self.menu.add_cascade(label="File", menu=self.filemenu)
-        root.config(menu=self.menu)
-        self.menu.add
-
-    def import_config_tab(self):
-        import artrefsync.ui.tabs.ConfigTab as configTab
-
-        config_wrapper = configTab.TabWrapper()
-        return config_wrapper
-
-    def import_viewer_tab(self):
-        import artrefsync.ui.tabs.ViewerTab as viewerTab
-
-        return viewerTab.TabWrapper()
-
-    def init_tab_ui(self, tab: AppTab):
-        logger.info("Init Tab UI %s", tab.__module__.split(".")[-1])
-        tab.init_ui(self)
-
+            logger.info("Reattaching = %s", str(left_info))
+            self.right.grid(column=2, row=2, sticky="nse")
+            self.bar.left.grid(row=2, column=0, sticky="nws")
 
 if __name__ == "__main__":
     main()

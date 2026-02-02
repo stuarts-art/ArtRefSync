@@ -1,252 +1,291 @@
-from functools import lru_cache
-from sortedcontainers import SortedSet
+from itertools import count, cycle
+from PIL import Image, ImageTk, ImageSequence
+import tkinter as tk
 import ttkbootstrap as ttk
-from ttkbootstrap.widgets.scrolled import ScrolledFrame
-from PIL import Image, ImageTk
-
-from artrefsync.boards.board_handler import Post
-from artrefsync.constants import E621, R34, TABLE
+from artrefsync.boards.board_handler import PostFile
 from artrefsync.config import config
+from artrefsync.constants import BINDING, NAMES
+from artrefsync.db.post_db import PostDb
 import logging
-from artrefsync.ui.TagApp import AppTab, ImagViewerApp
-from artrefsync.ui.tag_post_manager import TagPostManager
+from artrefsync.ui.AdvancedScrolling  import CanvasImage
+from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
+from artrefsync.utils.EventManager import ebinder
+
+from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.benchmark import Bm
+from artrefsync.utils.image_utils import ImageUtils
+
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 
-class TabWrapper(AppTab):
-    def init_ui(self, root):
-        return ViewerTab(root)
-
-
-# Prettier Tab
-# Click once, Open, twice, close
-class Side_bar(ttk.Frame):
-    def __init__(self, root):
-        super().__init__(root)
-        self.l_frame = ttk.Frame(self, padding= 5)
+class ViewerTab(ttk.Frame):
+    def __init__(self, root, *args, **kwargs):
+        logger.info("Init Viewer Tab")
+        super().__init__(root, name=NAMES.VIEWER_TAB, *args, **kwargs)
         self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=0)
-        self.columnconfigure(2, weight=0)
         self.rowconfigure(0, weight=1)
-        self.sep = ttk.Separator(self, orient="vertical")
-        self.widgets: ttk.Frame = []
-        self.buttons: list[ttk.Button] = []
-        self.widget_index = {}
 
-    def pack_widgets(self):
-        self.l_frame.grid(column=0, row=0, sticky="ns")
-        self.l_frame.grid_columnconfigure(0, minsize=75, weight=1)
+        self.file = ""
+        self.post_file:PostFile = None
+        self.thread_caller = TkThreadCaller(self)
+        self.height = self.winfo_height()
+        self.width = self.winfo_width()
+        self.canvas_image = None
 
-        for i, button in enumerate(self.buttons):
-            self.l_frame.grid_rowconfigure(i, minsize=85)
-            button.grid(column=0, row=i, stick="nwes", pady=5)
-            # button.config(height)
-        self.sep.grid(column=1, row=0, sticky="ns")
-        if len(self.widgets) > 0:
-            self.widgets[0].grid(row=0, column=2, stick="ns")
-
-    def add_widget(self, name, widget, image=None):
-        if name not in self.widget_index:
-
-            self.widget_index[name] = len(self.widget_index)
-            button = ttk.Button(self.l_frame, text=name, bootstyle="dark", padding=5)
-            button.bind("<Button-1>", self.toggle_widget)
-            # self.button.bind()
-            self.buttons.append(button)
-            self.widgets.append(widget)
-
-    def toggle_widget(self, event):
-        name = event.widget["text"]
-        index = self.widget_index[name]
-        widget: ttk.Frame = self.widgets[index]
-        if widget.grid_info():
-            widget.grid_forget()
-        else:
-            for w in self.widgets:
-                if w.grid_info():
-                    w.grid_forget()
-            widget.grid(row=0, column=2, sticky="ns")
-
-
-class ViewerTab:
-    def __init__(self, root: ImagViewerApp):
-        self.packed = False
-        self.root = root
-        self.tab = root.viewer_tab
-        self.tag_post_manager: TagPostManager = None
-        self.current_frame = 0
-
-        self.artists = {
-            TABLE.E621: set(config[TABLE.E621][E621.ARTISTS]),
-            TABLE.R34: set(config[TABLE.R34][R34.ARTISTS]),
-        }
         self.init_widgets()
-        self.set_icon_map(16)
-        self.artist_set = SortedSet(set().union(*self.artists.values()))
-        self.init_artists_tree()
-        self.root.thread_caller.add(self.init_tag_post_manager, self.init_image_frame)
-        self.filter_set = set()
+        self.init_bindings()
+        self.gif_top = False
 
     def init_widgets(self):
-        logger.info("Initializing widgets")
+        self.image_label = ttk.Label(self, justify=tk.CENTER)
+        self.image_label.grid(row=0, column=0, sticky= tk.NSEW)
 
-        self.frame_top = ttk.Frame(self.tab)
-        self.frame_bot = ttk.Frame(self.tab)
-        self.combo = ttk.Combobox(self.frame_top)
+        self.clear_button = RoundedIcon(self, text="✕", size=(25, 25))
+        self.clear_button.place(relx=1.0, rely= 0.0, anchor=tk.NE)
+        self.gif_viewer:GifViewer = GifViewer(self.image_label)
 
-        self.side_bar = Side_bar(self.frame_bot)
+    def init_bindings(self):
+        self.bind("<Configure>", self.resize)
+        self.image_label.bind("<Button-2>", self.close_image_viewer)
+        self.clear_button.bind("<Button-1>", self.close_image_viewer)
+        self.clear_button.bind("<Button-2>", self.toggle_gif)
+        ebinder.bind(BINDING.ON_IMAGE_DOUBLE_CLICK, self.open_image_viewer, self)
+        ebinder.bind(BINDING.ON_POST_SELECT, self.update_viewer_image, self)
+        ebinder.bind(BINDING.ON_FILTER_UPDATE, self.close_image_viewer, self)
 
-        # self.style = ttk.Style()
-        # self.style.configure('Custom.Treeview', rowheight=15)
+    def open_image_viewer(self, pid):
+        self.grid(column=0, row=0, sticky=tk.NSEW)
+        self.lift()
+        self.after(50, self.update_viewer_image, pid)
 
-        self.artist_tree = ttk.Treeview(self.side_bar, columns=("Name",))
-        self.image_tree = ttk.Treeview(self.side_bar, columns=("Name",),)
-        self.gallery_tree = ttk.Treeview(self.frame_bot, columns=("Name",))
+    def toggle_gif(self, _=None):
+        logger.info("Toggling Gif from %s",  self.gif_top)
+        if self.gif_top:
+            self.image_label.lower()
+            self.gif_top = False
+        else:
+            self.canvas_image.canvas.master.lower()
+            self.gif_top = True
 
-        self.side_bar.add_widget("Artists", self.artist_tree)
-        self.side_bar.add_widget("Posts", self.image_tree)
 
-        self.artist_tree.column("#0", width = 30, stretch=0, anchor='w')
-        self.image_tree.column("#0", width = 30, stretch=0, anchor='w')
-        self.gallery_tree.column("#0", stretch=True, anchor="center")
 
-        self.on_tab_changed()
-        # self.root.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+    def close_image_viewer(self, _=None):
+        if self.grid_info():
+            logger.info("Closing Image Viewer")
+            self.grid_forget()
 
-    def pack_frames(self):
-        print("Packing")
-        self.tab.rowconfigure(0, weight=0)
-        self.tab.rowconfigure(1, weight=1)
-        self.tab.columnconfigure(0, weight=1)
-        self.frame_top.grid(row=0, column=0, sticky="we")
-        self.frame_bot.grid(row=1, column=0, sticky="nswe")
+    def resize(self, e):
+        if not self.post_file:
+            return
+        if e.widget == self:
 
-        # 2nd level top -> (combobox),
-        self.combo.grid(row=0, column=0)
+            height = self.winfo_height()
+            width = self.winfo_width()
+            if height != self.height or width != self.width:
+                self.height = height
+                self.width = width
+                self.async_update_image()
 
-        # 2nd level bot -> (left, mid, right)
-        self.frame_bot.columnconfigure(0, weight=0)
-        self.frame_bot.columnconfigure(1, weight=1)
-        # self.frame_bot.columnconfigure(2, weight=1)
-        self.frame_bot.rowconfigure(0, weight=1)
-        self.side_bar.grid(row=0, column=0, sticky="ns")
-        self.side_bar.pack_widgets()
-        # # self.frame_left.grid(row=0, column=0, sticky='ns')
-        # # self.frame_mid.grid(row=0, column=1, sticky='ns')
-        # # self.frame_right.grid(row=0, column=2, sticky='nwse')
-        self.gallery_tree.grid(row=0, column=1, sticky="nwse")
+    def async_update_image(self):
+        post_file = self.post_file
+        self.file = post_file.thumbnail if post_file.ext in ("webm", "mp4") else post_file.file
+        self.thread_caller.cancel(__name__)
+        # self.thread_caller.add(
+        #     ImageUtils.getPilImage,
+        #     self.setImage,
+        #     __name__,
+        #     self.file,
+        # )
+        self.setImage()
 
-        # 3rd level, trees left->artists_tree, mid->image_tree, right -> image_label
-        #self.artist_tree.pack(fill="both", expand=1)
-        #self.image_tree.pack(side="left", fill="y")
-        # self.image_tree_scroll.pack(side="right", fill="y")
-        # self.image_label.pack(fill="both", expand=1)
-        # self.image_label.pack(fill="both", expand=1)
 
-    def tab_oppened(self):
-        tab_id = self.root.notebook.select()
-        tab_index = self.root.notebook.index(tab_id)
-        print(f"Tab Index {tab_index} {type(tab_index)}")
-        return tab_index == 1
 
-    def on_tab_changed(self, event=None):
-        # print(f"On Tab Changed {self.tab_oppened()} {self.root.notebook.select()}")
-        # if self.tab_oppened():
-        #     if not self.packed:
-        self.pack_frames()
+    def update_viewer_image(self, pid):
+        if not pid:
+            logger.error("Missing PID in viewer")
+            return
+        if self.grid_info():
+            logger.info("Opening Image Viewer for %s", pid)
+            with PostDb() as postdb:
+                # self.post_file:PostFile = postdb.files[pid]
+                post_file:PostFile = postdb.files[pid]
+            # self.post_file = post_file
+            # file_name = post_file.thumbnail if post_file.ext in ("webm", "mp4") else post_file.file
+            # self.file = file_name
 
-    # Note that init happens beffore
-    def init_artists_tree(self):
-        # self.image_tree.configure(yscrollcommand=self.image_tree_scroll.set)
-        artists = self.artists
-        atree = self.artist_tree
-        aset = self.artist_set
-        for table in [TABLE.E621, TABLE.R34]:
-            atree.insert(
-                "",
-                "end",
-                iid=table,
-                image=self.icon_map[table],
-                values=(table),
-                open=True,
-            )
-            for artist in aset:
-                if artist in artists[table]:
-                    atree.insert(
-                        table,
-                        "end",
-                        iid=artist,
-                        values=(f"  │ {artist}",),
-                        image=self.icon_map[table],
-                    )
-                        # values=(f"  {artist}",),
+            self.file = post_file.thumbnail if post_file.ext in ("webm", "mp4") else post_file.file
+            # if post_file.ext != "gif":
+            if not self.canvas_image:
+                self.canvas_image = CanvasImage(self, self.file)
+                self.canvas_image.grid(row=0, column=0)
+            else: 
+                self.canvas_image.set_image(self.file)
+            # self.canvas_image.canvas.master.lift()
+            # self.image_label.lower()
+            self.clear_button.lift()
 
-    def init_tag_post_manager(self):
-        self.tag_post_manager = TagPostManager()
 
-    def init_image_frame(self, _):
-        self.image_set = SortedSet(self.tag_post_manager.post_set)
-        for i in reversed(range(len(self.image_set))):
-            val = self.image_set[i]
-            self.image_tree.insert("", "end", iid=val, values=(val,))
-        self.image_tree.bind("<<TreeviewSelect>>", self.update_label_image)
-        self.artist_tree.bind("<<TreeviewSelect>>", self.update_label_image)
-        self.gallery_tree.insert("", "end", iid="top", values=("top"))
+            if post_file.ext == "gif":
 
-    def update_filter(self, event):
-        selection = self.artist_tree.selection()[0]
-        if selection not in self.filter_set:
-            self.filter_set.add(selection)
+                # photoimage = ImageUtils.get_tk_thumb(post_file.thumbnail, (self.winfo_width(), self.winfo_height()))
+                # self.image_label.config(image=photoimage)
+                # self.image_label.image=photoimage
 
-    def print_winfo_stats(self, widget: ttk.Frame):
-        print(
-            f"\n{'-' * 10}\nPrinting winget vars for {widget.__class__.__name__}  {widget=}"
-        )
-        funcs = [
-            widget.winfo_geometry,
-            widget.winfo_width,
-            widget.winfo_height,
-            widget.winfo_x,
-            widget.winfo_y,
-            widget.winfo_height,
-            widget.winfo_rootx,
-            widget.winfo_rooty,
-            widget.winfo_vrootheight,
-            widget.winfo_vrootwidth,
-        ]
-        for f in funcs:
-            print(f"{f.__name__} {f()}")
+                self.gif_viewer.load( post_file.file, (self.winfo_width(), self.winfo_height()))
+                # self.image_label.lift()
+                # self.clear_button.lift()
+                # self.async_update_image()
 
-    def update_label_image(self, event):
-        selection = self.image_tree.selection()[0]
-        frame_w = self.gallery_tree.winfo_width()
-        frame_h = self.gallery_tree.winfo_height()
-        image = self.get_photo_image(selection, frame_w, frame_h)
 
-        self.gallery_tree.item("top", image=image)
-        # self.gallery_tree.item("top", imageanchor='center')
-        # self.gallery_tree.insert("", 0, iid=selection, image=image)
 
-        # self.image_label.image = image
-        # self.image_label.config(image=image)
 
-    @lru_cache(maxsize=5)
-    def get_photo_image(self, pid, width, height):
-        logger.info("Loading %s", pid)
-        post: Post = self.tag_post_manager.post_id[pid]
-        file = post.file
-        image = Image.open(file)
-        image.thumbnail((1000, 500))
-        return ImageTk.PhotoImage(image)
 
-    def set_icon_map(self, size=24):
-        self.icon_map = {}
-        for table, icon in [
-            (TABLE.E621, "resources/favicon-32x32.png"),
-            (TABLE.R34, "resources/apple-touch-icon-precomposed.png"),
-        ]:
-            image = Image.open(icon)
-            image.thumbnail((size, size))
-            self.icon_map[table] = ImageTk.PhotoImage(image)
+
+
+
+            # size = (self.winfo_width(), self.winfo_height())
+            # self.thread_caller.add(self.tasked_GetImage, self.setImage, file_name, size)
+
+    # def tasked_GetImage(self, file_name, size):
+    #     try:
+    #         image = ImageUtils.getPilImage(file_name, None, None)
+    #         # image = Image.open(file_name)
+    #         # image.thumbnail(size)
+    #         return image
+    #     except:
+    #         return None
+
+    def setImage(self):
+        width = self.winfo_width()
+        height = self.winfo_height()
+        self.gif_viewer.unload()
+        if self.post_file.ext != 'gif':
+            with Bm():
+                self.image_label = ttk.Label(self, justify=tk.CENTER)
+                photoimage = ImageUtils.get_tk_thumb(self.file, (width, height))
+                self.image_label.config(image=photoimage)
+                self.image_label.image = photoimage
+        else:
+            # photoimage = ImageUtils.get_tk_thumb(self.file)
+            # self.image_label.config(image=photoimage)
+            # self.image_label.image = photoimage
+            # self.after(0, self.gif_viewer.load, self.post_file.file, (self.winfo_width(), self.winfo_height()))
+            with Bm():
+                photoimage = ImageUtils.get_tk_thumb(self.post_file.thumbnail, (width, height))
+                self.image_label.config(image=photoimage)
+                self.image_label.image=photoimage
+
+            with Bm():
+                self.gif_viewer.load( self.post_file.file, (self.winfo_width(), self.winfo_height()))
+
+class GifViewer:
+    def __init__(self, label):
+        self.image_label:ttk.Label = label
+        self.frames:cycle  = None # image frames
+        self.delay=None
+        self.image = None
+        self.file = None
+        self.raw_frames = []
+        self.job_id = None
+        # self.delay_map = {} #Only call duration once per file.
+        self.thread_caller = TkThreadCaller(label)
+        self.task_name = "load_frames"
+
+    def load(self, file:str, size:tuple):
+        self.file = file
+        self.size = size
+        logger.info("Gif Viewer with %s", file)
+        self.thread_caller.cancel(self.task_name)
+        self.thread_caller.add(ImageUtils.getPilFrames, self.set_frames, self.task_name, file)
+        # self.image_label.after(0, self.set_frames, self.file)
+
+    def set_frames(self, result):
+
+        frames, duration = ImageUtils.getTkFrames(self.file, self.size)
+        self.frames=cycle(frames)
+        self.delay=duration
+
+        logger.info("Gif Viewer with %d frames and %d delay", len(frames), self.delay)
+        if len(frames) == 1:
+            self.image_label.config(image=next(self.frames))
+        else:
+            # self.next_frame()
+            # self.frames=None
+            self.job_id = self.image_label.after(0, self.next_frame, self.file)
+
+
+        
+        
+        
+        
+
+    def oldload(self, file:str, size:tuple):
+        logger.info("Gif Viewer with %s", file)
+
+        # width, height = size
+        thumb = ImageUtils.get_tk_thumb(file, size=size)
+        self.image_label.config(image=thumb)
+
+
+        if self.job_id:
+            self.image_label.after_cancel(self.job_id)
+        # Reload Raw Frames
+        if file != self.file:
+        # Get delay between frames
+            self.image = ImageUtils.getPilImage(file, None, None)
+            # self.image = ImageUtils.getPilImage(file, None, None)
+            self.raw_frames = []
+            try:
+                self.delay = self.image.info['duration']
+            except:
+                self.delay = 100
+
+            try:
+                for frame in ImageSequence.Iterator(self.image):
+                    frame = self.image.copy()
+                    self.raw_frames.append(frame)
+                    # self.image.seek(i)
+            except EOFError:
+                pass
+        
+        frames = []
+        for raw_frame in self.raw_frames:
+            frame = raw_frame.copy()
+            frame.thumbnail(size=size)
+            frames.append(ImageTk.PhotoImage(image=frame))
+
+        self.frames = cycle(frames)
+
+        logger.info("Gif Viewer with %d frames and %d delay", len(frames), self.delay)
+        # If single image, display frame and don't animate.
+        if len(frames) == 1:
+            self.image_label.config(image=next(self.frames))
+        else:
+            # self.next_frame()
+            # self.frames=None
+            self.job_id = self.image_label.after(0, self.next_frame)
+    
+
+    # def load_raw_map(self, file, size):
+
+        
+    # def load_thumb_frames(self, file, size):
+
+    
+
+    def next_frame(self, filename):
+        if filename != self.file:
+            return
+        elif self.frames:
+            self.image_label.config(image=next(self.frames))
+            self.job_id = self.image_label.after(self.delay, self.next_frame, filename)
+
+    def unload(self):
+        self.image_label.config(image=None)
+        self.frames = None
+
+        if self.job_id:
+            self.image_label.after_cancel(self.job_id)

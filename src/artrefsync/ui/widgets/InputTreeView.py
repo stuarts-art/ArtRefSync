@@ -8,6 +8,7 @@ from sortedcontainers import SortedDict, SortedSet
 from artrefsync.stores.eagle_storage import EagleHandler
 
 import logging
+
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
@@ -40,7 +41,9 @@ class InputTreeviewFrame(ttk.Frame):
 
     def setup_bindings(self):
         self.entry.bind("<Return>", self.on_return)
-        self.entry.bind("<KeyRelease>", lambda e: self.tree.focus_on_text(self.entry.get()))
+        self.entry.bind(
+            "<KeyRelease>", lambda e: self.tree.focus_on_text(self.entry.get())
+        )
         self.tree.bind("<Double-1>", self.on_tree_lclick)
         self.tree.bind("<BackSpace>", self.tree.delete_selected)
         self.tree.bind("<KeyRelease-a>", self.tree.delete_selected)
@@ -54,12 +57,9 @@ class InputTreeviewFrame(ttk.Frame):
         entry_frame.pack(side="top", fill="x")
         self.entry = ttk.Entry(entry_frame)
         self.entry.pack(side="left", fill="x", expand=True)
-        # self.button = ttk.Button(entry_frame)
-        # self.button.pack(side="right")
 
     def setup_tree(self, input_list: Iterable, ascending=True):
         self.tree_frame = ttk.Frame(self, takefocus=True)
-        # self.tree = ttk.Treeview(tree_frame, columns=("Artists","Close"), show="")
         self.tree = InputTreeview(
             self.tree_frame, input_list, columns=("Delete"), show="tree"
         )
@@ -79,7 +79,7 @@ class InputTreeviewFrame(ttk.Frame):
     def on_return(self, event):
         if self.focus_get() == self.entry:
             self.tree.add(self.entry.get())
-        print(event)
+        logger.info(event)
 
     def on_tree_lclick(self, event):
         # rid = self.tree.selection()[0]
@@ -90,10 +90,7 @@ class InputTreeviewFrame(ttk.Frame):
         if column_id == "#1":
             self.tree.delete(row_id)
 
-
-
     def on_tree_rclick(self, event):
-
         selection = self.tree.selection()
         self.tree.detach()
 
@@ -110,7 +107,7 @@ class InputTreeview(ttk.Treeview):
         # self.column("Input", anchor="w")
         self.column("Delete", anchor="e", width=30)
         for val in self.sorted:
-            self.insert("", "end", iid=val, text=val,  values=("❌"))
+            self.insert("", "end", iid=val, text=val, values=("❌"))
 
     def delete_selected(self, event=None):
         for item in self.selection():
@@ -124,18 +121,18 @@ class InputTreeview(ttk.Treeview):
         return super().delete(*items)
 
     def add(self, item):
-        print(f"Adding {item}")
+        logger.debug(f"Adding {item}")
         if item not in self.sorted:
             self.sorted.add(item)
             index = self.sorted.index(item)
-            self.insert("", index, iid=item, text = item, values=("❌"))
+            self.insert("", index, iid=item, text=item, values=("❌"))
 
     def undo_delete(self, event):
-        print("Undo Recieved")
+        logger.debug("Undo Recieved")
         if len(self.deleted) > 0:
             item = self.deleted.pop()
             self.add(item)
-            print("Item {item} added back")
+            logger.debug("Item {item} added back")
 
     def focus_on_text(self, text):
         for item in self.selection():
@@ -150,7 +147,7 @@ class InputTreeview(ttk.Treeview):
             match = self.sorted[idx]
             focus_match = self.sorted[focusidx]
 
-            print(match)
+            logger.debug(match)
             self.focus(match)
             self.see(match)
             self.selection_add(match)
@@ -160,13 +157,13 @@ class InputTreeview(ttk.Treeview):
         # for item in self.selection():
         #     self.selection_remove(item)
         next = self.next(self.selection()[0])
-        print(next)
+        logger.debug(next)
         # self.focus(next)
         # self.see(next)
 
     def focus_on_prev(self):
         prev = self.prev(self.selection()[0])
-        print(prev)
+        logger.debug(prev)
         # self.focus(prev)
         # self.see(prev)
 
