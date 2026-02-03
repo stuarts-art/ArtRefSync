@@ -22,14 +22,16 @@ class ArtistTab(ttk.Frame):
         self.tree = ttk.Treeview(self, columns=("Name", "Count"), show="tree", *kwargs)
         # self.tree = ttk.Treeview(self, columns=("Count"), show="tree", *kwargs)
         self.board_var = ttk.StringVar()
-        self.board_menu_button = ttk.Menubutton(self, textvariable=self.board_var, image=None, compound="left")
+        self.board_menu_button = ttk.Menubutton(
+            self, textvariable=self.board_var, image=None, compound="left"
+        )
         self.board_menu_button.pack(side=tk.TOP, fill="x")
         self.board_menu = ttk.Menu(self.board_menu_button)
         self.board_menu_button["menu"] = self.board_menu
 
         # self.entry.pack(side=tk.TOP, fill="x")
         self.tree.pack(side=tk.TOP, fill="both", expand=True)
-        self.set_icon_map(16)
+        # self.set_icon_map(16)
         # self.tree.column("#0", width=0, anchor="w", stretch=False, minwidth=0)
         self.tree.column("#0", width=0, anchor="w", stretch=True)
         self.tree.column("#1", width=0, stretch=0, anchor="w")
@@ -73,11 +75,16 @@ class ArtistTab(ttk.Frame):
         self.set_artist_counts()
 
         # menu_options = [""].update(self)
-        for board in [""] + list(self.board_artists_map.keys()) :
+        for board in [""] + list(self.board_artists_map.keys()):
             b = str(board)
-            self.board_menu.add_radiobutton(label=b, value=b, variable=self.board_var, image=self.icon_map[b], compound="left", command=self.on_board_menu_select)
-                    # image=self.icon_map[table],
-        # self.board_menu.
+            self.board_menu.add_radiobutton(
+                label=b,
+                value=b,
+                variable=self.board_var,
+                # image=self.icon_map[b],
+                compound="left",
+                command=self.on_board_menu_select,
+            )
 
     def on_board_menu_select(self):
         selected_board = self.board_var.get()
@@ -88,16 +95,13 @@ class ArtistTab(ttk.Frame):
                     selected_found = True
                 else:
                     self.tree.detach(c)
-                    
+
             if not selected_found:
-                self.tree.move(selected_board, "", 'end')
+                self.tree.move(selected_board, "", "end")
             self.tree.selection_set((selected_board,))
         else:
             for i, b in enumerate(self.board_artists_map.keys()):
                 self.tree.move(b, "", i)
-
-
-
 
     def query_by_artist(self, e=None):
         artist = self.tree.selection()[0]
@@ -152,18 +156,17 @@ class ArtistTab(ttk.Frame):
                         logger.warning("Exception %s", e)
                         pass
 
-    def set_icon_map(self, size=24):
-        self.icon_map = {}
-        for table, icon in [
-            (TABLE.E621, resource_path("resources/favicon-32x32.png")),
-            (TABLE.R34, resource_path("resources/apple-touch-icon-precomposed.png")),
-            (
-                TABLE.DANBOORU,
-                resource_path("resources/apple-touch-icon-precomposed.png"),
-            ),
-        ]:
-            image = Image.open(icon)
-            image.thumbnail((size, size))
-            self.icon_map[table] = ImageTk.PhotoImage(image)
-        self.icon_map[""] = None
-
+    # def set_icon_map(self, size=24):
+    #     self.icon_map = {}
+    #     for table, icon in [
+    #         (TABLE.E621, resource_path("resources/favicon-32x32.png")),
+    #         (TABLE.R34, resource_path("resources/apple-touch-icon-precomposed.png")),
+    #         (
+    #             TABLE.DANBOORU,
+    #             resource_path("resources/apple-touch-icon-precomposed.png"),
+    #         ),
+    #     ]:
+    #         image = Image.open(icon)
+    #         image.thumbnail((size, size))
+    #         self.icon_map[table] = ImageTk.PhotoImage(image)
+    #     self.icon_map[""] = None

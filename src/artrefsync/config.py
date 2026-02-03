@@ -99,7 +99,7 @@ class __Config:
             EAGLE.ARTIST_FOLDER: "",
         },
         TABLE.LOCAL: {
-            LOCAL.ENABLED: False,
+            LOCAL.ENABLED: True,
             LOCAL.ARTIST_DIR: "",
             LOCAL.DB_FILE_NAME: DB.TAGAPP_LOCAL_DB,
         },

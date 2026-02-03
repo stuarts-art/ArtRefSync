@@ -12,7 +12,6 @@ from artrefsync.ui.tabs.ConfigTab import ConfigTab
 from artrefsync.ui.widgets.LoadingBar import LoadingBars
 from artrefsync.ui.tabs.ViewerTab import ViewerTab
 from artrefsync.ui.tabs.TagTab import TagTab
-from artrefsync.utils.PyInstallerUtils import resource_path
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 
 from artrefsync.ui.tabs.ArtistTab import ArtistTab
@@ -33,25 +32,21 @@ def main():
 class ImagViewerApp(ttk.Window):
     def __init__(self):
         logger.info("Starting App")
-        self.init_scafolding()
+        self.init_scaffolding()
         self.init_tabs()
         self.init_views()
         self.init_bindings()
 
-    def init_scafolding(self):
+    def init_scaffolding(self):
         logger.info("Init Scafolding")
-        super().__init__(themename="darkly", size=(1080, 1080), hdpi=True, scaling=2)
+        super().__init__(themename="darkly", size=(1080, 1080), hdpi=True, scaling=2, title="Art Ref Sync App")
         TkinterDnD._require(self)
 
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.bar = ModernTopBar(self, False)
-        # self.bar = ModernTopBar(self, override_default_top_bar=True)
         self.stime = time.time()
         self.thread_caller = TkThreadCaller(self)
-        ico = Image.open(resource_path("resources/small_cat.png"))
-        photo = ImageTk.PhotoImage(ico)
-        self.wm_iconphoto(False, photo)
 
         self.bar.mid.columnconfigure(0, weight=0)
         self.bar.mid.columnconfigure(1, weight=4)

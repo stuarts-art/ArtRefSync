@@ -7,7 +7,7 @@ from artrefsync.config import config
 from artrefsync.constants import BINDING, NAMES
 from artrefsync.db.post_db import PostDb
 import logging
-from artrefsync.ui.AdvancedScrolling  import CanvasImage
+from artrefsync.ui.widgets.AdvancedScrolling  import CanvasImage
 from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
 from artrefsync.utils.EventManager import ebinder
 

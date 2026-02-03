@@ -1,28 +1,35 @@
 # ArtRefSync
 
-Given a list of artist names, sync missing works to local system from public image boards.
+This is a tool for artists that:
+
+1. Syncs down image and tag information from image boards (E621, Rule34, Danbooru)
+2. Maintains a local tag-to-image index which allows for fast searching
+3. Provides a Desktop UI for searching by tag or artist, modifying settings, and viewing media
+    - Image zooming down to the pixel level!
+    - Gif playing
+    - Drag images out of app to copy (e.g. dragging media to PureRef)
 
 > [!WARNING]
 > Supported Image boards contain both SFW and **NSFW** Works.
 > Only use this tool if it is appropriate to do so and does not violate the relevant website's TOS.
 > This project requires the user to provide their own API key for each site.
 
-> [!Caution]
-> Only use this tool to learn. Do not use it to steal works or train AI. I'm sure you can vibe code something.
+Motivation:
+
+- I'm an artist and was tired of questioning if the pinterest reference image I was looking at came from generative AI.
+- I find the rise of censorship and surveillance concerning.
+- My ADHD can't handle the 3 seconds waiting for a website to load.
 
 ### Supported Image Boards
 
 - R34 ([Get your API Key](https://api.rule34.xxx/#:~:text=API%20Keys,The%20API%20key))
 - E621 ([How to get an API Key](https://e621.net/help/api#:~:text=Authorization,an%20API%20key.))
+- Danbooru <https://danbooru.donmai.us/wiki_pages/help:api>
 
 ### Supported Local Storage
 
-- (Broken) [Eagle](https://en.eagle.cool/)
+- [Eagle](https://en.eagle.cool/)
 - Plain File System
-
-- [ ] Make it easier for non coders to use this tool
-  - [ ] GUI
-  - [ ] Easier to set up config
 
 ## Installation
 
@@ -37,6 +44,8 @@ pip install -e .
 ```
 
 ## Usage
+
+- [ ] TODO: Update this section
 
 To run the sync, use:
 

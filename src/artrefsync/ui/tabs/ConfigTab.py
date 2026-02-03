@@ -141,6 +141,7 @@ class ConfigTab(ttk.Frame):
         # self.start_sync_button["text"] = "Start Sync"
         # self.start_sync_button.state(["normal"])
         self.start_sync_button.configure(state="normal", text="Start Sync")
+        config.reload_config()
 
         self.start_event = None
 

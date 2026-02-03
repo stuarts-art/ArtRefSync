@@ -1,0 +1,49 @@
+name: Test Pythont then Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build distribution 📦
+    # runs-on: ubuntu-latest
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+
+    - name: Update pip
+      run: >-
+        python3 -m pip install --upgrade pip
+    - name: Install pypa/build
+      run: >-
+        python3 -m
+        pip install
+        build
+        pyinstaller
+        --user
+    - name: Install dependencies before testing
+      run: >-
+        python3 -m
+        pip install
+        .
+        --user
+    - uses: pavelzw/pytest-action@v2
+      with:
+        emoji: true
+        verbose: false
+        job-summary: true
+    # - name: Build a binary wheel and a source tarball
+    #   run: python3 -m build
+    - name: Run pyinstaller
+      run: pyinstaller main.py --collect-all ttkbootstrap --name ArtRefSync
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/

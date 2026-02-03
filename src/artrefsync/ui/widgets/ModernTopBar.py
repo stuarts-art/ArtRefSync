@@ -9,7 +9,6 @@ from PIL import ImageTk
 from artrefsync.config import config
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
-import pywinstyles
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
