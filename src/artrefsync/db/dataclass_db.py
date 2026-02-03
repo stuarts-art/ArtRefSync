@@ -38,9 +38,9 @@ class Dataclass_DB(Generic[T]):
             self.connection_owner = True
         self.commit = self.connection.commit
 
-        if cls in self.field_type_map:
-            self.field_type = self.field_type_map[cls] 
-            self.primary_key = self.primary_key_map[cls] 
+        if cls in Dataclass_DB.field_type_map:
+            self.field_type = Dataclass_DB.field_type_map[cls] 
+            self.primary_key = Dataclass_DB.primary_key_map[cls] 
             return
 
         _type_map = {str: "TEXT", StrEnum: "TEXT", int: "INTEGER", float: "REAL"}
@@ -53,8 +53,8 @@ class Dataclass_DB(Generic[T]):
 
         if DbUtils.table_exists(self.connection, self.table_name):
             existing_cols = DbUtils.table_columns(self.connection, self.table_name)            
-
         table_fields = []
+
         for i, (annotation , ann_field) in enumerate(annotations):
             types = list(ann_field.__args__) if isinstance(ann_field, UnionType) else [ann_field,]
             self.logger.debug(types)
@@ -108,8 +108,8 @@ class Dataclass_DB(Generic[T]):
             """
             cur.execute(auto_update_query)
 
-        self.field_type_map[cls] = self.field_type 
-        self.primary_key_map[cls] = self.primary_key
+        Dataclass_DB.field_type_map[cls] = self.field_type 
+        Dataclass_DB.primary_key_map[cls] = self.primary_key
         
     def insert(self, item: T, merge_field:str = None, id_field:str = "id"):
         """
