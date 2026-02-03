@@ -2,7 +2,7 @@ import logging
 import pickle
 import sqlite3
 from dataclasses import asdict, dataclass
-from enum import StrEnum
+from enum import Enum, StrEnum
 from types import NoneType, UnionType
 from typing import Generic, Type, TypeVar, get_type_hints
 
@@ -21,6 +21,7 @@ class Dataclass_DB(Generic[T]):
 
     def __init__(self, cls: Type[T], connection: sqlite3.Connection|None = None, table_name = None, db_name = None):
         self.logger = logging.getLogger(cls.__name__)
+        self.logger.setLevel("DEBUG")
         """ Stripped down sqlite dataclass connector
         Args:
             connection: Connection - If no connection given, create one.
@@ -43,22 +44,26 @@ class Dataclass_DB(Generic[T]):
             self.primary_key = Dataclass_DB.primary_key_map[cls] 
             return
 
-        _type_map = {str: "TEXT", StrEnum: "TEXT", int: "INTEGER", float: "REAL"}
+        _type_map = {str: "TEXT", StrEnum: "TEXT", Enum: "TEXT", int: "INTEGER", float: "REAL"}
 
         self.field_type = {}
         self.primary_key = ""
         # annotations = cls.__annotations__.items()
-        annotations = get_type_hints(cls).items()
+        annotations = get_type_hints(cls)
         existing_cols = []
 
         if DbUtils.table_exists(self.connection, self.table_name):
             existing_cols = DbUtils.table_columns(self.connection, self.table_name)            
         table_fields = []
 
-        for i, (annotation , ann_field) in enumerate(annotations):
+        for i, (annotation , ann_field) in enumerate(annotations.items()):
             types = list(ann_field.__args__) if isinstance(ann_field, UnionType) else [ann_field,]
-            self.logger.debug(types)
+            # self.logger.debug(types)
             field_sql_type = "BLOB"
+            for type in types:
+                if type in _type_map:
+                    field_sql_type = _type_map[type]
+                    break
 
             # Set Suffix
             if i == 0:
@@ -66,14 +71,6 @@ class Dataclass_DB(Generic[T]):
                 field_suffix = " PRIMARY KEY"
             else:
                 field_suffix = " NOT NULL" if NoneType not in types else ""
-
-            # Determine Field type
-            for sql_type_field, sql_type_str in _type_map.items():
-                for type in types:
-                    
-                    if isinstance(type, sql_type_field):
-                        field_sql_type = sql_type_str
-                        break
             self.field_type[annotation] = field_sql_type
 
             self.logger.debug(f"{annotation} {field_sql_type}{field_suffix}")
