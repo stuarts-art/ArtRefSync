@@ -35,7 +35,7 @@ class __Config:
 
         logging.basicConfig(
             level=self.log_level,
-            format="%(asctime)s %(funcName)s(%(levelname)s): %(message)s",
+            format="%(asctime)s %(name)s %(funcName)s (%(levelname)s): %(message)s",
             datefmt="%I:%M:%S",
             handlers=[
                 logging.StreamHandler(sys.stdout),

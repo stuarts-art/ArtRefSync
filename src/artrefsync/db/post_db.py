@@ -41,12 +41,14 @@ class PostDb:
         self.connection = connection
         self.connection_owner = False
         if not self.connection:
-            db_dir = resource_path(config[TABLE.APP][APP.DB_DIR])
+            db_dir = config[TABLE.APP][APP.DB_DIR]
             db_name = config[TABLE.APP][APP.DB_FILE_NAME]
             logger.debug("Creating connection with dir: %s, dbname: %s", db_dir, db_name)
             if db_dir:
                 os.makedirs(db_dir, exist_ok=True)
-                db_name = os.path.join(db_dir, db_name)
+                db_name = resource_path(os.path.join(db_dir, db_name))
+            else:
+                db_name = resource_path(db_name)
             self.connection = sqlite3.connect(db_name)
             self.connection_owner = True
         self.commit = self.connection.commit
@@ -91,12 +93,3 @@ class PostDb:
         logger.debug("Closing PostDB")
         self.connection.close()
 
-
-def main():
-    with PostDb() as db:
-        for post in db.posts.select([("board", "danbooru")]):
-            print(post.id)
-
-
-if __name__ == "__main__":
-    main()

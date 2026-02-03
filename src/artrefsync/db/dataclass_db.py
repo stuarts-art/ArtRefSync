@@ -8,8 +8,9 @@ from typing import Generic, Type, TypeVar, get_type_hints
 
 import dacite
 
-from artrefsync.boards.board_handler import Post
+from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.db.db_utils import DbUtils
+from artrefsync.utils.PyInstallerUtils import resource_path
 
 T = TypeVar("T", contravariant=dataclass)
 
@@ -33,17 +34,19 @@ class Dataclass_DB(Generic[T]):
         self.connection = connection
         self.connection_owner = False
         self.table_name = table_name if table_name else cls.__name__
-        self.db_name = db_name if db_name else cls.__name__ +"_dataclassdb.db"
+        self.db_name = db_name if db_name else resource_path( cls.__name__ +"_dataclassdb.db")
         if not self.connection:
             self.connection = sqlite3.connect(self.db_name)
             self.connection_owner = True
         self.commit = self.connection.commit
 
         if cls in Dataclass_DB.field_type_map:
+            self.logger.info("Table %s is already initialized.", self.table_name)
             self.field_type = Dataclass_DB.field_type_map[cls] 
             self.primary_key = Dataclass_DB.primary_key_map[cls] 
             return
-
+        
+        self.logger.info("Creating table: %s", self.table_name)
         _type_map = {str: "TEXT", StrEnum: "TEXT", Enum: "TEXT", int: "INTEGER", float: "REAL"}
 
         self.field_type = {}
@@ -259,4 +262,7 @@ class Dataclass_DB(Generic[T]):
 if __name__ == "__main__":
 
     with Dataclass_DB(Post) as db:
+        pass
+    with Dataclass_DB(PostFile, db_name="test2.db") as db:
+        db.get("test")
         pass
