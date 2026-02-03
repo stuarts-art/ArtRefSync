@@ -11,6 +11,7 @@ from artrefsync.constants import APP, BOARD, DB, DB_TABLE, STORE, TABLE
 from artrefsync.db.db_utils import BlobDb, DbUtils
 from artrefsync.db.dataclass_db import Dataclass_DB
 
+from artrefsync.utils.PyInstallerUtils import resource_path
 
 import logging
 
@@ -40,7 +41,7 @@ class PostDb:
         self.connection = connection
         self.connection_owner = False
         if not self.connection:
-            db_dir = config[TABLE.APP][APP.DB_DIR]
+            db_dir = resource_path(config[TABLE.APP][APP.DB_DIR])
             db_name = config[TABLE.APP][APP.DB_FILE_NAME]
             logger.debug("Creating connection with dir: %s, dbname: %s", db_dir, db_name)
             if db_dir:
