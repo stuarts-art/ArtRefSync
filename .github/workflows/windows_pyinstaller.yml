@@ -1,4 +1,4 @@
-name: Test Pythont then Build
+name: Package exe and publish to store
 
 on: [push, pull_request]
 
@@ -33,11 +33,11 @@ jobs:
         pip install
         .
         --user
-    - uses: pavelzw/pytest-action@v2
-      with:
-        emoji: true
-        verbose: false
-        job-summary: true
+    # - uses: pavelzw/pytest-action@v2
+    #   with:
+    #     emoji: true
+    #     verbose: false
+    #     job-summary: true
     # - name: Build a binary wheel and a source tarball
     #   run: python3 -m build
     - name: Run pyinstaller
