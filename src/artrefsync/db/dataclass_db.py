@@ -1,14 +1,14 @@
-from enum import StrEnum
 import logging
+import pickle
 import sqlite3
+from dataclasses import asdict, dataclass
+from enum import StrEnum
 from types import NoneType, UnionType
+from typing import Generic, Type, TypeVar, get_type_hints
 
 import dacite
-from artrefsync.boards.board_handler import Post, PostFile
-from typing import Generic, Literal, TypeVar, List, Type, get_type_hints
-from dataclasses import dataclass, astuple, asdict, fields
-import pickle
-from artrefsync.constants import BOARD
+
+from artrefsync.boards.board_handler import Post
 from artrefsync.db.db_utils import DbUtils
 
 T = TypeVar("T", contravariant=dataclass)
@@ -71,7 +71,7 @@ class Dataclass_DB(Generic[T]):
             for sql_type_field, sql_type_str in _type_map.items():
                 for type in types:
                     
-                    if issubclass(type, sql_type_field):
+                    if isinstance(type, sql_type_field):
                         field_sql_type = sql_type_str
                         break
             self.field_type[annotation] = field_sql_type
