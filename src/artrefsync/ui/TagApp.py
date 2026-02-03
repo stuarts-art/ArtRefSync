@@ -1,4 +1,3 @@
-# import pywinstyles
 import ttkbootstrap as ttk
 import tkinter as tk
 import time

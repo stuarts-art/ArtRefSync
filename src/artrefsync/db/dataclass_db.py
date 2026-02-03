@@ -16,6 +16,9 @@ T = TypeVar("T", contravariant=dataclass)
 
 
 class Dataclass_DB(Generic[T]):
+    field_type_map = {}
+    primary_key_map = {}
+
     def __init__(self, cls: Type[T], connection: sqlite3.Connection|None = None, table_name = None, db_name = None):
         self.logger = logging.getLogger(cls.__name__)
         """ Stripped down sqlite dataclass connector
@@ -35,7 +38,13 @@ class Dataclass_DB(Generic[T]):
             self.connection_owner = True
         self.commit = self.connection.commit
 
+        if cls in self.field_type_map:
+            self.field_type = self.field_type_map[cls] 
+            self.primary_key = self.primary_key_map[cls] 
+            return
+
         _type_map = {str: "TEXT", StrEnum: "TEXT", int: "INTEGER", float: "REAL"}
+
         self.field_type = {}
         self.primary_key = ""
         # annotations = cls.__annotations__.items()
@@ -45,10 +54,10 @@ class Dataclass_DB(Generic[T]):
         if DbUtils.table_exists(self.connection, self.table_name):
             existing_cols = DbUtils.table_columns(self.connection, self.table_name)            
 
-
         table_fields = []
         for i, (annotation , ann_field) in enumerate(annotations):
             types = list(ann_field.__args__) if isinstance(ann_field, UnionType) else [ann_field,]
+            self.logger.debug(types)
             field_sql_type = "BLOB"
 
             # Set Suffix
@@ -61,6 +70,7 @@ class Dataclass_DB(Generic[T]):
             # Determine Field type
             for sql_type_field, sql_type_str in _type_map.items():
                 for type in types:
+                    
                     if issubclass(type, sql_type_field):
                         field_sql_type = sql_type_str
                         break
@@ -98,7 +108,8 @@ class Dataclass_DB(Generic[T]):
             """
             cur.execute(auto_update_query)
 
-
+        self.field_type_map[cls] = self.field_type 
+        self.primary_key_map[cls] = self.primary_key
         
     def insert(self, item: T, merge_field:str = None, id_field:str = "id"):
         """
