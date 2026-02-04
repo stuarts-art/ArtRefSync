@@ -49,6 +49,7 @@ class PostDb:
                 db_name = resource_path(os.path.join(db_dir, db_name))
             else:
                 db_name = resource_path(db_name)
+            logger.info("Creating or connecting to Database: %s", db_name)
             self.connection = sqlite3.connect(db_name)
             self.connection_owner = True
         self.commit = self.connection.commit
@@ -93,3 +94,6 @@ class PostDb:
         logger.debug("Closing PostDB")
         self.connection.close()
 
+if __name__ == "__main__":
+    with PostDb(db_name="Test3.db") as db:
+        db.files.select(None)

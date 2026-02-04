@@ -36,6 +36,7 @@ class Dataclass_DB(Generic[T]):
         self.table_name = table_name if table_name else cls.__name__
         self.db_name = db_name if db_name else resource_path( cls.__name__ +"_dataclassdb.db")
         if not self.connection:
+            self.logger.info("Creating or connecting to Database: %s", self.db_name)
             self.connection = sqlite3.connect(self.db_name)
             self.connection_owner = True
         self.commit = self.connection.commit
@@ -107,6 +108,7 @@ class Dataclass_DB(Generic[T]):
                 END;
             """
             cur.execute(auto_update_query)
+        self.commit()
 
         Dataclass_DB.field_type_map[cls] = self.field_type 
         Dataclass_DB.primary_key_map[cls] = self.primary_key
