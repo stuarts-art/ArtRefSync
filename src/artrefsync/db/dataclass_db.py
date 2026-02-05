@@ -20,6 +20,7 @@ class Dataclass_DB(Generic[T]):
     field_type_map = {}
     primary_key_map = {}
 
+
     def __init__(self, cls: Type[T], connection: sqlite3.Connection|None = None, table_name = None, db_name = None):
         self.logger = logging.getLogger(cls.__name__)
         self.logger.setLevel("DEBUG")
@@ -41,25 +42,24 @@ class Dataclass_DB(Generic[T]):
             self.connection_owner = True
         self.commit = self.connection.commit
 
-        if cls in Dataclass_DB.field_type_map:
-            self.logger.info("Table %s is already initialized.", self.table_name)
-            self.field_type = Dataclass_DB.field_type_map[cls] 
-            self.primary_key = Dataclass_DB.primary_key_map[cls] 
-            return
         
         self.logger.info("Creating table: %s", self.table_name)
         _type_map = {str: "TEXT", StrEnum: "TEXT", Enum: "TEXT", int: "INTEGER", float: "REAL"}
 
         self.field_type = {}
         self.primary_key = ""
-        # annotations = cls.__annotations__.items()
         annotations = get_type_hints(cls)
         existing_cols = []
 
         if DbUtils.table_exists(self.connection, self.table_name):
             existing_cols = DbUtils.table_columns(self.connection, self.table_name)            
-        table_fields = []
+            # if cls in Dataclass_DB.field_type_map:
+            #     self.logger.info("Table %s is already initialized.", self.table_name)
+            #     self.field_type = Dataclass_DB.field_type_map[cls] 
+            #     self.primary_key = Dataclass_DB.primary_key_map[cls] 
+            #     return
 
+        table_fields = []
         for i, (annotation , ann_field) in enumerate(annotations.items()):
             types = list(ann_field.__args__) if isinstance(ann_field, UnionType) else [ann_field,]
             # self.logger.debug(types)
@@ -110,8 +110,10 @@ class Dataclass_DB(Generic[T]):
             cur.execute(auto_update_query)
         self.commit()
 
-        Dataclass_DB.field_type_map[cls] = self.field_type 
-        Dataclass_DB.primary_key_map[cls] = self.primary_key
+        # Dataclass_DB.field_type_map[cls] = self.field_type 
+        # Dataclass_DB.primary_key_map[cls] = self.primary_key
+
+
         
     def insert(self, item: T, merge_field:str = None, id_field:str = "id"):
         """

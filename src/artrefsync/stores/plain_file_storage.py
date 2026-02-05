@@ -72,6 +72,7 @@ class PlainLocalStorage(ImageStorage):
         return STORE.LOCAL
 
     def create_board_and_artist_folders(self, board: str, artists: Iterable[str]):
+        logger.debug("Creating Board for %s, and artists: %s", board, artists)
         board_folder = os.path.join(self.artists_folder, board)
         self.board_paths[board] = board_folder
         self.board_artist_posts[board] = {}
@@ -90,6 +91,7 @@ class PlainLocalStorage(ImageStorage):
         # return super().create_board_and_artist_folders(board, artists)
 
     def get_posts(self, board: BOARD, artist: str):
+        logger.debug("GEtting posts for Board for %s, and artist: %s", board, artist)
         with Dataclass_DB(PostFile, db_name=self.db_path) as post_file_db:
             result = post_file_db.select(
                 conditions=[("board", str(board)), ("artist_name", artist)]
@@ -99,6 +101,7 @@ class PlainLocalStorage(ImageStorage):
         return {}
 
     def queue_db_write(self, post: Post):
+        logger.debug("Writing to DB %post", post)
         self.post_write_queue.put(post)
         if self.writing_event.is_set():
             return
@@ -128,6 +131,7 @@ class PlainLocalStorage(ImageStorage):
     def save_post(
         self, post: Post, link_cache: Link_Cache = None, event: Event = None
     ) -> Post | None:
+        logger.debug("Saving post :", post)
         board = str(post.board)
         artist = post.artist_name
         # board_path = self.board_paths[board]
@@ -154,6 +158,7 @@ class PlainLocalStorage(ImageStorage):
         return post
 
     def get_thumbnail(self, post):
+        logger.debug("Getting thumbnail for %s", post.id)
         with Dataclass_DB(PostFile, db_name=self.db_path) as post_file_db:
             if post.id in post_file_db:
                 post_file = post_file_db[post.id]
@@ -161,6 +166,7 @@ class PlainLocalStorage(ImageStorage):
         return ""
 
     def update_post(self, board: BOARD, post: Post):
+        logger.warning("Update post called for  %s but this method is not implemented yet.", post.id)
         # No Metadata is saved...right?
         pass
 
