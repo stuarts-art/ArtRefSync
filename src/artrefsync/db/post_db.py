@@ -45,8 +45,8 @@ class PostDb:
             db_name = config[TABLE.APP][APP.DB_FILE_NAME]
             logger.debug("Creating connection with dir: %s, dbname: %s", db_dir, db_name)
             if db_dir:
-                os.makedirs(db_dir, exist_ok=True)
                 db_name = resource_path(os.path.join(db_dir, db_name))
+                os.makedirs(os.path.dirname(db_name), exist_ok=True)
             else:
                 db_name = resource_path(db_name)
             logger.info("Creating or connecting to Database: %s", db_name)
