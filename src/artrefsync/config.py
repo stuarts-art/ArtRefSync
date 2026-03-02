@@ -66,9 +66,9 @@ class __Config:
             APP.LIMIT: 10,
             APP.LOG_LEVEL: "INFO",
             APP.ID_LENGTH: 8,
-            APP.CACHE_DIR: "metadata_cache",
+            APP.CACHE_DIR: ".metadata_cache",
             APP.CACHE_TTL: 300,
-            APP.DB_DIR: "",
+            APP.DB_DIR: ".db",
             APP.DB_FILE_NAME: DB.TAGAPP_DB,
             APP.DB_BLOB_NAME: DB.BLOB_DB,
         },
@@ -100,7 +100,7 @@ class __Config:
         },
         TABLE.LOCAL: {
             LOCAL.ENABLED: True,
-            LOCAL.ARTIST_DIR: "",
+            LOCAL.ARTIST_DIR: "media",
             LOCAL.DB_FILE_NAME: DB.TAGAPP_LOCAL_DB,
         },
     }

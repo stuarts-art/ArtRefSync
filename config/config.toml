@@ -1,5 +1,12 @@
 [app]
 limit = 10
+log_level = "INFO"
+id_length = 8
+cache_dir = ".metadata_cache"
+cache_ttl = 300
+db_dir = ".db"
+db_file_name = "tagapp.db"
+db_blob_name = "blob.db"
 
 [r34]
 enabled = false
@@ -14,6 +21,13 @@ black_list = []
 api_key = ""
 username = ""
 
+[danbooru]
+enabled = false
+artists = []
+black_list = []
+api_key = ""
+username = ""
+
 [eagle]
 enabled = false
 endpoint = "http://localhost:41595/api"
@@ -21,5 +35,6 @@ library = ""
 artist_folder = ""
 
 [local]
-enabled = false
-artist_folder = ""
+enabled = true
+artist_dir = "media"
+db_file_name = "tagapp.local_storage.db"
