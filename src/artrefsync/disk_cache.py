@@ -32,7 +32,7 @@ def disk_cache(func: Callable[P, R]) -> Callable[P, R]:
         )
         key_name = f"{arg_str}.{func_name}.{cls_name}"
 
-        with BlobDb(table_name_default=f"{cls_name}_{func_name}_blob") as db:
+        with BlobDb(table_name=f"{cls_name}_{func_name}_blob") as db:
             data = db.loads_blob(key_name, cache_ttl)
             if data:
                 return data

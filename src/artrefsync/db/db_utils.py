@@ -1,9 +1,12 @@
 from collections.abc import Iterable
+from dataclasses import dataclass, fields, MISSING
+from enum import Enum, StrEnum
 import sqlite3
 import pickle
 import time
+from types import NoneType, UnionType
+from typing import get_type_hints, Union, get_origin, get_args
 
-from artrefsync.utils.benchmark import Bm
 import logging
 
 logger = logging.getLogger()
@@ -46,18 +49,73 @@ class DbUtils:
         cursor = connection.cursor()
         cursor.execute(f"PRAGMA table_info('{table_name}')")
         result = cursor.fetchall()
+        # print(result)
         if result:
-            return [row[1] for row in result]
+            # return [row[1] for row in result]
+            return {row[1]:row[2] for row in result}
         return None
+    
+    _type_map = {str: "TEXT", StrEnum: "TEXT", Enum: "TEXT", int: "INTEGER", float: "REAL"}
+    @staticmethod
+    def get_sql_fields(cls):
+        field_type = {}
+        table_fields = []
+        primary_key = ""
+
+        for i, field in enumerate(fields(cls)):
+            field_sql_type = "BLOB"
+            mapped = False
+
+            name = field.name
+            # origin = get_origin(field.type)
+            if isinstance(field.type, UnionType):
+            # if origin is Union or origin is UnionType:
+                # types = list(get_args(origin))
+                types = get_args(field.type)
+            else:
+                types = [field.type,]
+
+            for type in types:
+                if issubclass(type, Enum):
+                    field_sql_type = "TEXT"
+                    break
+                for mapped_type in DbUtils._type_map:
+                    if issubclass(type, mapped_type):
+                        field_sql_type = DbUtils._type_map[type]
+                        mapped = True
+                        break
+                if mapped:
+                    break
+            
+            if i == 0:
+                primary_key = name
+                field_suffix = " PRIMARY KEY"
+            else:
+                field_suffix = "" if any(x is NoneType for x in types) else " NOT NULL"
+
+            default = ""
+            if field.default is not MISSING:
+                if field.default is None:
+                    pass
+                elif field_sql_type == "TEXT":
+                    default = f" DEFAULT \"{field.default}\""
+                else:
+                    default = f" DEFAULT {field.default}"
+
+            field_type[name] = field_sql_type
+            table_fields.append(f"{name} {field_sql_type}{field_suffix}{default}")
+
+        return field_type, table_fields, primary_key
 
 
 class BlobDb:
     def __init__(
         self,
         connection: sqlite3.Connection | None = None,
-        table_name_default="blob_table",
+        table_name="blob_table",
         db_name="blob.db",
         count_field=False,
+        lazy = False
     ):
         """
         Simple sqllite context manager to dump and load serialized (pickle) blob files
@@ -75,13 +133,13 @@ class BlobDb:
         if not self.connection:
             self.connection = sqlite3.connect(db_name)
             self.connection_owner = True
-        self.loaded_tables = set()
-        self.table_name_default = table_name_default
+        self.table_name = table_name
         self.commit = self.connection.commit
         self.primary_key = "id"
 
         self.cols = ["id", "data", "count", "updatetime"]
-        self.create_if_missing(self.table_name_default)
+        if not lazy:
+            self.create_table(self.table_name)
 
     def __enter__(self):
         return self
@@ -92,46 +150,39 @@ class BlobDb:
             self.connection.close()
         pass
 
-    def create_if_missing(self, table_name):
-        create_table = False
-        cursor = self.connection.cursor()
-        if table_name not in self.loaded_tables:
-            if not DbUtils.table_exists(self.connection, table_name):
-                create_table = True
-            else:
-                existing_cols = DbUtils.table_columns(
-                    self.connection, self.table_name_default
-                )
-                if existing_cols != self.cols:
-                    create_table = True
-        if create_table:
-            cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
-            cursor.execute(
-                f"CREATE TABLE {table_name} (id TEXT PRIMARY KEY, data BLOB, count INTEGER, updatetime INTEGER)"
-            )
-            self.loaded_tables.add(table_name)
+    def create_table(self, table_name):
+        create_table_flag = False
+        drop_table_flag = False
+        if not DbUtils.table_exists(self.connection, table_name):
+            create_table_flag = True
+        elif DbUtils.table_columns(self.connection, self.table_name) != self.cols:
+            drop_table_flag = True
 
-    def dumps_blob(self, key, object, table_name=None):
+        cursor = self.connection.cursor()
+        # if drop_table_flag:
+            # print("Dropping Table")
+            # cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+        if create_table_flag:
+            print("Creating Table")
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS {table_name} (id TEXT PRIMARY KEY, data BLOB, count INTEGER, updatetime INTEGER)"
+            )
+
+    def dumps_blob(self, key, object):
         count = 0
         if hasattr(object, "__len__"):
             count = len(object)
 
-        if table_name:
-            self.create_if_missing(table_name)
-        table_name = table_name if table_name else self.table_name_default
-
+        logger.debug("Dumps Blob called for %s, with obj len %d", key, count)
         cursor = self.connection.cursor()
         cursor.execute(
-            f"INSERT OR REPLACE INTO {table_name} (id, data, count, updatetime) VALUES (?, ?, ?, ?)",
+            f"INSERT OR REPLACE INTO {self.table_name} (id, data, count, updatetime) VALUES (?, ?, ?, ?)",
             (key, pickle.dumps(object), count, int(time.time())),
         )
 
     def loads_blob(
-        self, key: int | str | float | Iterable, max_age_seconds=0, table_name=None
+        self, key: int | str | float | Iterable, max_age_seconds=0
     ):
-        if table_name:
-            self.create_if_missing(table_name)
-        table_name = table_name if table_name else self.table_name_default
         cursor = self.connection.cursor()
         time_suffix = ""
         if max_age_seconds:
@@ -139,7 +190,7 @@ class BlobDb:
 
         if isinstance(key, list) or isinstance(key, set):
             key = list(key)  # explicitly cast to list incase of set.
-            query = f"SELECT data FROM {table_name}  WHERE (id) IN ({', '.join('?' * len(key))}){time_suffix};"
+            query = f"SELECT data FROM {self.table_name}  WHERE (id) IN ({', '.join('?' * len(key))}){time_suffix};"
             cursor.execute(query, key)
             fetch = cursor.fetchall()
             if fetch:
@@ -148,7 +199,7 @@ class BlobDb:
                 return None
         else:
             cursor.execute(
-                f"SELECT data FROM {table_name}  WHERE (id) = (?){time_suffix};", (key,)
+                f"SELECT data FROM {self.table_name}  WHERE (id) = (?){time_suffix};", (key,)
             )
             fetch = cursor.fetchone()
             if fetch:
@@ -157,11 +208,10 @@ class BlobDb:
                 return None
 
     def count(self, key):
-        query = f"SELECT count FROM {self.table_name_default} WHERE {self.primary_key} = ? LIMIT 1"
+        query = f"SELECT count FROM {self.table_name} WHERE {self.primary_key} = ? LIMIT 1"
         cur = self.connection.cursor()
         cur.execute(query, (key,))
         result = cur.fetchone()
-        # print(f" QUERY RESULT for key {key} - {result}")
         if result and len(result) == 1:
             return result[0]
         else:
@@ -169,11 +219,11 @@ class BlobDb:
 
     def count_list(self, starts_with=None, limit=100, count_order="DESC"):
         if starts_with:
-            query = f"SELECT id, count FROM {self.table_name_default} WHERE {self.primary_key} LIKE ? ORDER BY count DESC LIMIT ?"
+            query = f"SELECT id, count FROM {self.table_name} WHERE {self.primary_key} LIKE ? ORDER BY count DESC LIMIT ?"
             cur = self.connection.cursor()
             cur.execute(query, (f"%{starts_with}%", limit))
         else:
-            query = f"SELECT id, count FROM {self.table_name_default} ORDER BY count DESC LIMIT ?"
+            query = f"SELECT id, count FROM {self.table_name} ORDER BY count DESC LIMIT ?"
             cur = self.connection.cursor()
             cur.execute(query, (limit,))
 
@@ -186,9 +236,8 @@ class BlobDb:
             return []
 
     def union_update(self, key, input_set: set):
-        """If the picked object is a set, union it and replace the value.
-
-        PARAMS:
+        """If the picked object is a set, union it and replace the value.  
+        PARAMS:  
         key: Table Key
         input_set: Input set to union on
         """
@@ -210,7 +259,7 @@ class BlobDb:
 
     def __contains__(self, key) -> bool:
         # key in db
-        query = f"SELECT 1 FROM {self.table_name_default} WHERE {self.primary_key} = ? LIMIT 1"
+        query = f"SELECT 1 FROM {self.table_name} WHERE {self.primary_key} = ? LIMIT 1"
         cur = self.connection.cursor()
         cur.execute(query, (key,))
         result = cur.fetchone()
@@ -218,15 +267,3 @@ class BlobDb:
 
     def __getitem__(self, key):
         return self.loads_blob(key)
-
-
-if __name__ == "__main__":
-    s = set([1, 2, 3, 4, 5])
-    with BlobDb(db_name="testing.db") as blob_db:
-        blob_db.dumps_blob("test1", s)
-        blob_db.dumps_blob("test2", [6, 7, 8])
-        blob_db.dumps_blob("test3", [6, 7, 8, 0, 19, 390])
-
-        with Bm():
-            print(blob_db.count("test"))
-            print(blob_db.count_list("te"))

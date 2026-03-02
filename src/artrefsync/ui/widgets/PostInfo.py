@@ -82,8 +82,8 @@ class PostInfo(ttk.Frame):
             # print(post_file)
 
         if post_file and post:
-            post.file = post_file.file
-            post.thumbnail = post_file.thumbnail
+            post.file_link = post_file.file
+            post.sample_link = post_file.preview
             self.winfo_toplevel
             self.name.delete("1.0", tk.END)
             self.name.insert(tk.END, post.name)
@@ -91,7 +91,7 @@ class PostInfo(ttk.Frame):
             self.artist.insert(tk.END, post.artist_name)
             self.score.delete("1.0", tk.END)
             self.score.insert(tk.END, post.score)
-            self.file.configure(text=post.file)
+            self.file.configure(text=post.file_link)
             self.tags.config(state=tk.NORMAL)
             self.tags.delete("1.0", tk.END)
             self.tags.config(state=tk.DISABLED)
@@ -100,9 +100,9 @@ class PostInfo(ttk.Frame):
 
     def after_on_post_select(self, post: Post):
         if self.thumbnail:
-            file_name = post.thumbnail if post.ext in ("webm", "mp4") else post.file
-            if not os.path.exists(post.thumbnail):
-                file_name = post.file
+            file_name = post.sample_link if post.ext in ("webm", "mp4") else post.file_link
+            if not os.path.exists(post.sample_link):
+                file_name = post.file_link
 
             thumbnail = ImageUtils.get_tk_thumb(file_name, (190, 190))
             self.thumbnail.config(image=thumbnail)

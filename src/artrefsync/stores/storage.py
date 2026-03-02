@@ -5,7 +5,7 @@ from artrefsync.stores.link_cache import Link_Cache
 from artrefsync.constants import BOARD, STORE
 
 
-class ImageStorage(ABC):
+class ImageStoreHandler(ABC):
     @abstractmethod
     def get_store(self) -> STORE:
         pass

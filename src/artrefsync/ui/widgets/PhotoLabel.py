@@ -415,7 +415,7 @@ class PhotoImageGallery(ttk.Frame):
         # self.text_widget.yview_scroll(delta, "units")
 
     def add_image(self, post: Post, at_end=True):
-        file_name = post.file
+        file_name = post.file_link
         if file_name.endswith("webm"):
             return False
 

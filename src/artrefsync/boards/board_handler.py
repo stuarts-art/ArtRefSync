@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from threading import Event
-from dataclasses_json import dataclass_json
 from artrefsync.constants import BOARD, TABLE, APP, STORE
 from artrefsync.config import config
 
@@ -11,20 +10,21 @@ from artrefsync.config import config
 class Post:
     id: str  # Centralized App ID
     ext_id: str  # external id (When from Board->BoardID, Store -> StoreID)
-    name: str  # Name of file/post
-    artist_name: str
-    tags: list[str]
-    board: BOARD | None
-    score: int | None
-    url: str | None
-    website: str | None
-    board_update_str: str | None = field(default=None)
-    height: int | None = field(default=0)
-    width: int | None = field(default=0)
-    ratio: float | None = field(default=None)
-    file: str | None = field(default="")
-    ext: str = field(default="")
-    thumbnail: str | None = field(default="")
+    name: str  = ""
+    artist_name: str = ""
+    tags: list[str] = None
+    board: BOARD | None = None
+    score: int | None = 0
+    url: str | None = ""
+    website: str = ""
+    board_update_str: str = ""
+    height: int | None = 0
+    width: int | None = 0
+    ratio: float | None = 0.0
+    ext: str | None = ""
+    file_link: str | None = ""
+    sample_link: str | None = ""
+    preview_link: str | None = ""
 
     def __post_init__(self):
         self.storage_id = self.name[: self.name.find("-")]
@@ -62,7 +62,8 @@ class PostFile:
     width: int | None = field(default=0)
     ratio: float | None = field(default=None)
     ext: str = field(default="")
-    thumbnail: str | None = field(default="")
+    preview: str | None = field(default="")
+    sample: str | None = field(default="")
     file: str | None = field(default="")
 
 
@@ -86,10 +87,8 @@ if __name__ == "__main__":
     types_dict = {}
     for f in types_list:
         f_split = f.split(":")
-        # print(f_split)
         types_dict[f_split[0]] = f_split[1].strip().split(" = ")[0].split(" | ")
 
-    # print(types_list)
     print(types_dict)
 
     p = Post

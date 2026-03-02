@@ -34,7 +34,7 @@ class __EagleClient:
         ) -> EagleFolder.CreatedFolder:
             data = {
                 k: v
-                for k, v in {"folderName": folderName, "parent": parent}.items()
+                for k, v in {"folderName": f"{folderName}", "parent": parent}.items()
                 if v is not None
             }
             with self.lock:

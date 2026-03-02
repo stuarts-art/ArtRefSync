@@ -249,7 +249,7 @@ class SimpleFrames:
                 if 'sel' in self.text.tag_names(photo):
                     if photo.file:
                         if photo.file.ext in ["webm", "mp4"]:
-                            files.append(photo.file.thumbnail)
+                            files.append(photo.file.preview)
                         else:
                             files.append(photo.file.file)
                 # print(frame.post.file)
@@ -566,23 +566,24 @@ class SimplePhotoLabel(tk.Label):
         if not self.cget("image") or self.pid != pid or self.image_h != self.height_var.get():
             self.pid = pid
             self.file:PostFile = SimplePhotoLabel.get_post_file(pid) 
-            self.image_h = self.height_var.get()
-            # file = self.file.thumbnail
+            if self.file:
+                self.image_h = self.height_var.get()
+                # file = self.file.thumbnail
 
-            self.file_name = self.file.thumbnail if self.file.ext in ("webm", "mp4") else self.file.file
-            if not os.path.exists(self.file.thumbnail):
-                self.file_name = self.file.file
-            # if self.file.ext in ["mp4", "webm"]:
-            # else:
-            #     file = self.file.thumbnail
-            thread_caller.add(
-                ImageUtils.getPilImageThumb,
-                self.set_image,
-                self.get_image_cancel_key,
-                self.file_name,
-                (self.width_var.get(), self.height_var.get())
-            )
-        self.pid = pid
+                self.file_name = self.file.preview if self.file.ext in ("webm", "mp4") else self.file.file
+                if not os.path.exists(self.file.preview):
+                    self.file_name = self.file.file
+                # if self.file.ext in ["mp4", "webm"]:
+                # else:
+                #     file = self.file.thumbnail
+                thread_caller.add(
+                    ImageUtils.getPilImageThumb,
+                    self.set_image,
+                    self.get_image_cancel_key,
+                    self.file_name,
+                    (self.width_var.get(), self.height_var.get())
+                )
+            self.pid = pid
 
     def set_image(self, image):
         if image:

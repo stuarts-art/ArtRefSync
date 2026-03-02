@@ -1,5 +1,7 @@
 from collections import deque
 from asyncio import Event
+import os
+from pathlib import Path
 import sys
 import dacite
 import queue
@@ -7,10 +9,11 @@ import requests
 import json
 import time
 from artrefsync.api.eagle_client import eagle_client
+from artrefsync.boards.board_handler import PostFile
 from artrefsync.models import EagleItem
 from urllib import parse
 from artrefsync.stores.link_cache import Link_Cache
-from artrefsync.stores.storage import ImageStorage, Post
+from artrefsync.stores.storage import ImageStoreHandler, Post
 from artrefsync.constants import BOARD, EAGLE, STORE, STATS
 from artrefsync.config import config
 from artrefsync.stats import stats
@@ -51,7 +54,7 @@ def main():
             pass
 
 
-class EagleHandler(ImageStorage):
+class EagleHandler(ImageStoreHandler):
     """
     Helper class for interacting with Eagle using https://api.eagle.cool/
     """
@@ -125,85 +128,39 @@ class EagleHandler(ImageStorage):
         return data
 
     def eagle_item_to_post(
-        self, item: EagleItem.Item, artist_name=None, artist_board=None
+        self, item: EagleItem.Item, artist_name=None, artist_board=BOARD.OTHER
     ) -> Post | None:
-        if not artist_name:
-            artist_name = ""
-            artist_folder = None
-            for item_folder in item.folders:
-                if item_folder in self.folder_artist_dict:
-                    artist_name = self.folder_artist_dict[item_folder]
-                    artist_folder = item_folder
-                    break
-            if artist_name == "":
-                return None
-
-        if not artist_board:
-            artist_board = BOARD.OTHER
-            for board in self.board_artist_dict:
-                if artist_folder in board:
-                    artist_board = board
-                    break
         pid = Post.parse_id(item.name)
-        ratio = None
-        if item.width and item.height:
-            ratio = item.width / item.height
+        lib = self.library_path_dict[self.library]
+        # dir = f"{self.library_path_dict[self.library]}/images/{item.id}.info/"
+        board_path = Path(os.path.join(lib, "images", f"{item.id}.info"))
+        thumbnail = "" 
+        file = f"{self.library_path_dict[self.library]}/images/{item.id}.info/{item.name}.{item.ext}"
+        for path in  board_path.iterdir():
+            strpath = str(path)
+            if "metadata.json" in strpath:
+                continue
+            if "thumbnail" in strpath:
+                thumbnail = strpath
+            else:
+                file = strpath
 
-        post = Post(
+        post = PostFile(
             id=pid,
             ext_id=item.id,  # External ID
-            ext=item.ext,
-            name=item.name,
-            artist_name=artist_name,
-            tags=item.tags,
-            board=artist_board,
-            score=0,
-            url=item.url,
-            website="",
-            height=item.height,
-            width=item.width,
-            ratio=ratio,
+            store=self.get_store(),
+            board=None,
+            preview=thumbnail,
             file=f"{self.library_path_dict[self.library]}/images/{item.id}.info/{item.name}.{item.ext}",
         )
         return post
 
-    def get_post_tag_dict(self) -> dict[str, Post]:
-        posts = {}
-        for board, artist_dict in self.board_artist_dict.items():
-            for artist, artist_folder in artist_dict.items():
-                items: list[EagleItem] = self.get_list_items(folders=artist_folder)
-
-                for item in items:
-                    post = self.eagle_item_to_post(item, artist, board)
-                    if board not in post.tags:
-                        post.tags.append(board)
-                    if artist not in post.tags:
-                        post.tags.append(artist)
-                    posts[post.id] = post
-        return posts
-
     def create_board_and_artist_folders(self, board: BOARD, artists: list[str]):
         self.get_or_create_artist_folder()
-        board = str(board)
-        if board not in self.board_artist_dict:
-            board_folder = self.client.folder.create(board, self.artists_id)
-            self.board_artist_dict[board] = {}
-            self.board_dict[board] = board_folder.id
-
         for artist in artists:
-            if artist not in self.board_artist_dict[board]:
-                artist_folder = self.client.folder.create(
-                    artist, self.board_dict[board]
-                )
-                self.board_artist_dict[board][artist] = artist_folder.id
-                self.folder_artist_dict[artist_folder.id] = artist
-                time.sleep(0.01)
+            self.make_board_artist_dir(board, artist)
 
-    # Assuming that we will always call get_posts before save_posts
-    def get_posts(self, board: BOARD, artist: str) -> dict[str, Post]:
-        # print(board.value)
-        board = str(board)
-
+    def make_board_artist_dir(self, board: BOARD, artist: str) -> dict[str, Post]:
         folder_created = False
         # Create board folder if not exists
         if board not in self.board_dict:
@@ -211,25 +168,29 @@ class EagleHandler(ImageStorage):
             self.board_dict[board_folder.name] = board_folder.id
             self.board_artist_dict[board_folder.name] = {}
             folder_created = True
-
         # Create board folder if not exists
         if artist not in self.board_artist_dict[board]:
             artist_folder = self.client.folder.create(artist, self.board_dict[board])
             self.board_artist_dict[board][artist] = artist_folder.id
+            self.folder_artist_dict[artist_folder.id] = artist
             folder_created = True
+        return folder_created
+        
 
-        if folder_created:
+    # Assuming that we will always call get_posts before save_posts
+    def get_posts(self, board: BOARD, artist: str) -> dict[str, PostFile]:
+        if self.make_board_artist_dir(board, artist):
             return {}
 
         limit = 10000
         data = self.get_list_items(folders=self.board_artist_dict[board][artist])
-        posts = {}
+        post_files = {}
         for item in data:
-            post = self.eagle_item_to_post(item)
-            if post:
-                posts[post.id] = post
-        logger.info(f"Eagle Items for {board}, {artist} - {len(posts)}")
-        return posts
+            post_file = self.eagle_item_to_post(item)
+            if post_file:
+                post_files[post_file.id] = post_file
+        logger.info(f"Eagle Items for {board}, {artist} - {len(post_files)}")
+        return post_files
 
     def save_post(
         self, post: Post, link_cache: Link_Cache = None, event: Event = None
@@ -247,7 +208,7 @@ class EagleHandler(ImageStorage):
             with tempfile.NamedTemporaryFile(mode="wb", suffix=suffix) as f:
                 Link_Cache.download_link_to_file(post.url, tempfile)
                 response = self.post_add_from_path(post, f.name)
-
+        response.raise_for_status()
         return response
 
     def update_post(self, post: Post):

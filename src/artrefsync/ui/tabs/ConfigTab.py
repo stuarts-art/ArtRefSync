@@ -9,7 +9,7 @@ import ttkbootstrap as ttk
 # from PIL import Image, ImageTk
 from artrefsync.config import config
 from artrefsync.constants import TABLE, get_table_mapping
-from artrefsync.sync import sync_config
+from artrefsync.sync_coordinator import sync_config
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 

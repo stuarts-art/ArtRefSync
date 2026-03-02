@@ -8,22 +8,17 @@ from typing import Generic, Type, TypeVar, get_type_hints
 
 import dacite
 
-from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.db.db_utils import DbUtils
 from artrefsync.utils.PyInstallerUtils import resource_path
+from artrefsync.config import config
 
 T = TypeVar("T", contravariant=dataclass)
-
-
 
 class Dataclass_DB(Generic[T]):
     field_type_map = {}
     primary_key_map = {}
 
-
-    def __init__(self, cls: Type[T], connection: sqlite3.Connection|None = None, table_name = None, db_name = None):
-        self.logger = logging.getLogger(cls.__name__)
-        self.logger.setLevel("DEBUG")
+    def __init__(self, cls: Type[T], connection: sqlite3.Connection|None = None, table_name = None, db_name = None, lazy = False):
         """ Stripped down sqlite dataclass connector
         Args:
             connection: Connection - If no connection given, create one.
@@ -31,6 +26,8 @@ class Dataclass_DB(Generic[T]):
             db_name: Overridable database name. If not given, name db after dataclass.
             * This class does not automatically commit on each transaction.
         """
+        self.logger = logging.getLogger(cls.__name__)
+        self.logger.setLevel(config.log_level)
         self.cls = cls
         self.connection = connection
         self.connection_owner = False
@@ -41,8 +38,60 @@ class Dataclass_DB(Generic[T]):
             self.connection = sqlite3.connect(self.db_name)
             self.connection_owner = True
         self.commit = self.connection.commit
+        self.field_types, self.table_fields, self.primary_key = DbUtils.get_sql_fields(cls)
 
-        
+        self.create_or_update_table(cls)
+
+    def create_or_update_table(self, cls):
+        cur = self.connection.cursor()
+        create_table_flag = False
+        drop_table_flag = False
+
+        if DbUtils.table_exists(self.connection, self.table_name):
+            existing_cols = DbUtils.table_columns(self.connection, self.table_name)
+            for i, (field, type) in enumerate(self.field_types.items()):
+                table_field = self.table_fields[i]
+                if field not in existing_cols:
+                    if "PRIMARY KEY" in table_field or "UNIQUE" in table_field:
+                        drop_table_flag = True
+                        create_table_flag = True
+                        break
+
+                    query = f'ALTER TABLE {self.table_name} ADD COLUMN {self.table_fields[i]};'
+                    self.logger.warning("Adding field %s to table %s with query: %s", field, self.table_name, query)
+                    cur.execute(query)
+                elif type != existing_cols[field]:
+                    drop_table_flag = True
+                    create_table_flag = True
+                    break
+        else:
+            create_table_flag = True
+
+        if drop_table_flag:
+            query = f"DROP TABLE {self.table_name}"
+            self.logger.warning("Unsupported field modification. Dropping, then remaking table.", field, self.table_name, query)
+            cur.execute(query)
+
+        if create_table_flag:
+            query = f'CREATE TABLE IF NOT EXISTS {self.table_name} (\n{",\n".join(self.table_fields)}\n);'
+            self.logger.debug(query)
+            cur.execute(query)
+            self.commit()
+
+            auto_update_query = f"""
+                CREATE TRIGGER IF NOT EXISTS update_{self.table_name}_updated
+                AFTER UPDATE ON {self.table_name}
+                WHEN old.updated <> strftime('%s', 'now')
+                BEGIN
+                    UPDATE {self.table_name}
+                    SET updated = strftime('%s', 'now')
+                    WHERE {self.primary_key} = OLD.{self.primary_key};
+                END;
+            """
+            cur.execute(auto_update_query)
+            self.commit()
+
+    def create_table(self, cls):
         self.logger.info("Creating table: %s", self.table_name)
         _type_map = {str: "TEXT", StrEnum: "TEXT", Enum: "TEXT", int: "INTEGER", float: "REAL"}
 
@@ -52,12 +101,7 @@ class Dataclass_DB(Generic[T]):
         existing_cols = []
 
         if DbUtils.table_exists(self.connection, self.table_name):
-            existing_cols = DbUtils.table_columns(self.connection, self.table_name)            
-            # if cls in Dataclass_DB.field_type_map:
-            #     self.logger.info("Table %s is already initialized.", self.table_name)
-            #     self.field_type = Dataclass_DB.field_type_map[cls] 
-            #     self.primary_key = Dataclass_DB.primary_key_map[cls] 
-            #     return
+            existing_cols = DbUtils.table_columns(self.connection, self.table_name)
 
         table_fields = []
         for i, (annotation , ann_field) in enumerate(annotations.items()):
@@ -88,7 +132,6 @@ class Dataclass_DB(Generic[T]):
             table_fields.append(f"{time_field} TEXT NOT NULL DEFAULT(strftime('%s', 'now'))")
 
         cur = self.connection.cursor()
-
         if existing_cols:
             for f in table_fields:
                 query = f'ALTER TABLE {self.table_name} ADD {f};'
@@ -109,11 +152,7 @@ class Dataclass_DB(Generic[T]):
             """
             cur.execute(auto_update_query)
         self.commit()
-
-        # Dataclass_DB.field_type_map[cls] = self.field_type 
-        # Dataclass_DB.primary_key_map[cls] = self.primary_key
-
-
+        self.field_type_map[cls] = self.field_type
         
     def insert(self, item: T, merge_field:str = None, id_field:str = "id"):
         """
@@ -135,14 +174,13 @@ class Dataclass_DB(Generic[T]):
                 return True
 
         query_values = tuple(
-            pickle.dumps(kv[1]) if self.field_type [kv[0]] == "BLOB" else kv[1]
+            pickle.dumps(kv[1]) if self.field_types[kv[0]] == "BLOB" else kv[1]
             for kv in item_dict.items()
-            if kv[0] in self.field_type
+            if kv[0] in self.field_types
         )
-        field_names: str =", ".join([k for k in self.field_type])
-        placeholders = DbUtils.placeholder(len(self.field_type))
+        field_names: str =", ".join([k for k in self.field_types])
+        placeholders = DbUtils.placeholder(len(self.field_types))
         query = f"INSERT OR REPLACE INTO {self.table_name} ({field_names}) VALUES({placeholders})"
-        # query = f"INSERT OR REPLACE INTO {self.table_name} ({field_names}) VALUES({placeholders})"
 
         cur = self.connection.cursor()
         cur.execute(query, query_values)
@@ -168,7 +206,7 @@ class Dataclass_DB(Generic[T]):
         else:
             return dacite.from_dict(self.cls, item, config=dacite.Config(cast=[StrEnum]))
 
-    def select(self, conditions: list[tuple], select_fields: list[str] = None, suffix = "") -> list[T]:
+    def select(self, conditions: list[tuple] = [], select_fields: list[str] = None, suffix = "") -> list[T]:
         if conditions:
             condition_fields, condition_vals = zip(*conditions)
             condition_query_str = " WHERE " + " AND ".join([f"{x} = ?" for x in condition_fields])
@@ -191,12 +229,42 @@ class Dataclass_DB(Generic[T]):
             cur.execute(query)
         items  = cur.fetchall()
 
+
         if has_select_fields:
             return items
         elif not items:
             return []
         else:
+            # print(items)
             return [dacite.from_dict(self.cls, item, config=dacite.Config(cast=[StrEnum])) for item in items]
+
+    def select_id_list(self, conditions: list[tuple], suffix = "") -> list[T]:
+        if conditions:
+            condition_fields, condition_vals = zip(*conditions)
+            condition_query_str = " WHERE " + " AND ".join([f"{x} = ?" for x in condition_fields])
+        else:
+            condition_vals = None
+            condition_query_str = ""
+        
+        # has_select_fields = select_fields is not None
+        select_fields = self.primary_key
+        query = f'SELECT {select_fields} FROM {self.table_name}{condition_query_str}{suffix}'
+
+
+        self.logger.debug(query)
+        cur = self.connection.cursor()
+        # cur.row_factory = DbUtils.dict_factory
+
+        if condition_vals:
+            cur.execute(query, (*condition_vals,))
+        else:
+            cur.execute(query)
+        items  = cur.fetchall()
+        # return items
+        return [row[0] for row in items]
+
+
+
 
     def update(self, item_id:str, item: T, item_fields: list[str] = None):
         """Update list of fields. If no item field is given, replace the item."""
@@ -206,7 +274,7 @@ class Dataclass_DB(Generic[T]):
         field_names = ", ".join(f"{item_f} = ?" for item_f in item_fields)
         query = f"UPDATE {self.table_name} SET {field_names} WHERE id = ?"
         query_values = tuple(
-            pickle.dumps(kv[1]) if self.field_type [kv[0]] == "BLOB" else kv[1]
+            pickle.dumps(kv[1]) if self.field_types[kv[0]] == "BLOB" else kv[1]
             for kv in asdict(item).items()
             if kv[0] in item_fields
         ) 
@@ -219,7 +287,7 @@ class Dataclass_DB(Generic[T]):
 
         field_names = ", ".join(f"{ifield} = ?" for ifield,_ in item_field_values)
         query_values = tuple(
-            pickle.dumps(ivalue) if self.field_type [ifield] == "BLOB" else ivalue
+            pickle.dumps(ivalue) if self.field_types[ifield] == "BLOB" else ivalue
             for ifield, ivalue in item_field_values
         ) 
         query = f"UPDATE {self.table_name} SET {field_names} WHERE id = ?"
@@ -261,12 +329,4 @@ class Dataclass_DB(Generic[T]):
         self.connection.commit()
         if self.connection_owner:
             self.connection.close()
-        pass
-
-if __name__ == "__main__":
-
-    with Dataclass_DB(Post) as db:
-        pass
-    with Dataclass_DB(PostFile, db_name="test2.db") as db:
-        db.get("test")
         pass

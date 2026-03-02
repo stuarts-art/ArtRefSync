@@ -91,7 +91,7 @@ class ViewerTab(ttk.Frame):
 
     def async_update_image(self):
         post_file = self.post_file
-        self.file = post_file.thumbnail if post_file.ext in ("webm", "mp4") else post_file.file
+        self.file = post_file.preview if post_file.ext in ("webm", "mp4") else post_file.file
         self.thread_caller.cancel(__name__)
         # self.thread_caller.add(
         #     ImageUtils.getPilImage,
@@ -116,7 +116,7 @@ class ViewerTab(ttk.Frame):
             # file_name = post_file.thumbnail if post_file.ext in ("webm", "mp4") else post_file.file
             # self.file = file_name
 
-            self.file = post_file.thumbnail if post_file.ext in ("webm", "mp4") else post_file.file
+            self.file = post_file.preview if post_file.ext in ("webm", "mp4") else post_file.file
             # if post_file.ext != "gif":
             if not self.canvas_image:
                 self.canvas_image = CanvasImage(self, self.file)
@@ -174,7 +174,7 @@ class ViewerTab(ttk.Frame):
             # self.image_label.image = photoimage
             # self.after(0, self.gif_viewer.load, self.post_file.file, (self.winfo_width(), self.winfo_height()))
             with Bm():
-                photoimage = ImageUtils.get_tk_thumb(self.post_file.thumbnail, (width, height))
+                photoimage = ImageUtils.get_tk_thumb(self.post_file.preview, (width, height))
                 self.image_label.config(image=photoimage)
                 self.image_label.image=photoimage
 

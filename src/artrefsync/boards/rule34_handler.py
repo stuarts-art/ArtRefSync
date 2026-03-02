@@ -44,7 +44,7 @@ class R34Handler(ImageBoardHandler):
     def get_posts(self, tag, post_limit=None, stop_event: Event = None) -> dict[str, Post]:
         posts = {}
 
-        r34_posts = self.client.get_posts(tag, post_limit, stop_event)
+        r34_posts: list[R34_Post] = self.client.get_posts(tag, post_limit, stop_event)
         if stop_event and stop_event.is_set():
             return None
 
@@ -59,8 +59,6 @@ class R34Handler(ImageBoardHandler):
 
             tags = rpost.tags
             tags.append(f"rating_{rpost.rating}")
-
-
             for black_listed in self.black_list:
                 if black_listed in rpost.tags:
                     stats.add(STATS.SKIP_COUNT, 1)
@@ -69,9 +67,6 @@ class R34Handler(ImageBoardHandler):
                     break
             if skip_rpost:
                 continue
-            
-                
-
 
             ext=rpost.file_url.split(".")[-1]
             post = Post(
@@ -90,9 +85,10 @@ class R34Handler(ImageBoardHandler):
                 ratio=rpost.width / rpost.height
                 if rpost.width and rpost.height
                 else None,
-                thumbnail=rpost.preview_url if ext == 'mp4' else rpost.sample_url,
+                sample_link=rpost.sample_url,
+                preview_link=rpost.preview_url,
+                file_link=rpost.file_url,
                 ext=ext,
-                file="",
             )
             stats.add(STATS.TAG_SET, rpost.tags)
             stats.add(STATS.TAG_SET, tag)
@@ -102,4 +98,4 @@ class R34Handler(ImageBoardHandler):
         return posts
 
 
-r34_handler = R34Handler()
+# r34_handler = R34Handler()

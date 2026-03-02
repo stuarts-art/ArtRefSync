@@ -118,6 +118,8 @@ class ArtistTab(ttk.Frame):
             self.tree.set(board, "#1", f" {icon} {board}")
 
     def set_artist_counts(self):
+        self.tree.delete(*self.tree.get_children())
+
         with PostDb() as postdb:
             for table, artists in postdb.board_artists.items():
                 count = postdb.tag_posts.count(str(table))

@@ -20,13 +20,7 @@ logger.setLevel(config.log_level)
 
 
 class PostDb:
-    # _instance = None
-    # _context_depth = 0
-
-    # def __new__(cls, *args, **kwargs):
-    #     if cls._instance is None:
-    #         cls._instance = super().__new__(cls)
-    #     return cls._instance
+    tables_initialized = False
 
     def __init__(
         self, connection: sqlite3.Connection | None = None, db_name=DB.TAGAPP_DB
@@ -53,11 +47,16 @@ class PostDb:
             self.connection = sqlite3.connect(db_name)
             self.connection_owner = True
         self.commit = self.connection.commit
+        if not self.tables_initialized:
+            lazy = False
+            self.tables_initialized = True
+        else:
+            lazy = True
 
-        self.posts = Dataclass_DB(Post, self.connection)
-        self.files = Dataclass_DB(PostFile, self.connection)
-        self.tag_posts = BlobDb(self.connection, "tagposts")
-        self.artist_tags = BlobDb(self.connection, "artist_tag_counts")
+        self.posts = Dataclass_DB(Post, self.connection, lazy = lazy)
+        self.files = Dataclass_DB(PostFile, self.connection, lazy = lazy)
+        self.tag_posts = BlobDb(self.connection, "tag_posts", lazy = lazy)
+        self.artist_tags = BlobDb(self.connection, "artist_tags", lazy = lazy)
         # self = BlobDb(self.connection, "tagposts")
         logger.debug("Opening PostDB")
 
@@ -73,6 +72,20 @@ class PostDb:
                 board_artists_dict[board] = []
             board_artists_dict[board].append(artist)
         return board_artists_dict
+        
+    def get_ids(self, board: BOARD = None, artist_name: str = None, db : Dataclass_DB = None):
+        criteria = []
+        if board:
+            criteria.append(("board", board))
+        if artist_name:
+            criteria.append(("artist_name", artist_name))
+        if not db:
+            db = self.posts
+        if not criteria:
+            criteria = None
+        
+        return db.select_id_list(criteria)
+
 
     def get_tag_intersection(self, tags):
         posts = self.tag_posts.loads_blob(tags)
@@ -95,5 +108,7 @@ class PostDb:
         self.connection.close()
 
 if __name__ == "__main__":
-    with PostDb(db_name="Test3.db") as db:
+    with PostDb() as db:
         db.files.select(None)
+
+
