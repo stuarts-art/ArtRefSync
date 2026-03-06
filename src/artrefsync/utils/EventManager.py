@@ -27,7 +27,6 @@ class EventManager:
         # self.__contains__ = self.map.__contains__
         # self.__getitem__ = self.map.__getitem__
 
-
     def bind(self, sequence: str, func: callable, root: tkinter.Widget):
         sequence = str(sequence)
         logger.info("Adding Binding %s for func %s", sequence, callable.__name__)
@@ -54,7 +53,6 @@ class EventManager:
             )
 
     def __setitem__(self, key, value):
-
         self.map[str(key)] = value
 
     def __contains__(self, key):
@@ -63,16 +61,11 @@ class EventManager:
     def __getitem__(self, key):
         return self.map[str(key)]
 
+    def get_or_default(self, key, default):
+        if str(key) in self.map:
+            return self.map[str(key)]
+        else:
+            return default
+
 
 ebinder = EventManager()
-
-if __name__ == "__main__":
-    import ttkbootstrap as ttk
-    root = ttk.Window(themename="darkly", size=(1080, 1080))
-    def hello(data):
-        print(f"Hello {data}")
-
-    ebinder.bind("Test", hello, root)
-    ebinder.event_generate("Test", "World")
-
-    root.mainloop()

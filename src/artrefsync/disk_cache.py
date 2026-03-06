@@ -7,13 +7,15 @@ import logging
 from typing import Callable, ParamSpec, TypeVar
 from artrefsync.config import config
 from artrefsync.constants import STATS, TABLE, APP
-from artrefsync.db.db_utils import BlobDb
+from artrefsync.db.db_utils import BlobDb, DbUtils
 from artrefsync.stats import stats
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
-cache_dir = config[TABLE.APP][APP.CACHE_DIR]
+cache_dir = DbUtils.resource_path(config[TABLE.APP][APP.CACHE_DIR])
 cache_ttl = int(config[TABLE.APP][APP.CACHE_TTL])
+os.makedirs(cache_dir, exist_ok=True)
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -32,7 +34,7 @@ def disk_cache(func: Callable[P, R]) -> Callable[P, R]:
         )
         key_name = f"{arg_str}.{func_name}.{cls_name}"
 
-        with BlobDb(table_name=f"{cls_name}_{func_name}_blob") as db:
+        with BlobDb(db_name=f"{cache_dir}/{cls_name}_{func_name}_blob.db") as db:
             data = db.loads_blob(key_name, cache_ttl)
             if data:
                 return data

@@ -63,7 +63,7 @@ class __Config:
 
     default_config = {
         TABLE.APP: {
-            APP.LIMIT: 10,
+            APP.LIMIT: 30000,
             APP.LOG_LEVEL: "INFO",
             APP.ID_LENGTH: 8,
             APP.CACHE_DIR: ".metadata_cache",
@@ -101,7 +101,6 @@ class __Config:
         TABLE.LOCAL: {
             LOCAL.ENABLED: True,
             LOCAL.ARTIST_DIR: "media",
-            LOCAL.DB_FILE_NAME: DB.TAGAPP_LOCAL_DB,
         },
     }
 

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 def main():
-    sync_config()
+    sync_from_store()
 
 def sync_config(event: Event = Event()):
     try:
@@ -40,23 +40,56 @@ def sync_config(event: Event = Event()):
         if store == None:
             logger.warning("NO STORE ENABLED. ENDING SYNC")
             return
-            
-        if config[TABLE.E621][E621.ENABLED]:
+                
+        if config[TABLE.E621][E621.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.E621, store.get_store())
             board = E621Handler()
             sync(board, store, limit, event)
 
-        if config[TABLE.R34][R34.ENABLED]:
+        if config[TABLE.R34][R34.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.R34, store.get_store())
             board = R34Handler()
             sync(board, store, limit, event)
 
-        if config[TABLE.DANBOORU][DANBOORU.ENABLED]:
+        if config[TABLE.DANBOORU][DANBOORU.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.DANBOORU, store.get_store())
-            board = Danbooru_Handler
+            board = Danbooru_Handler()
             sync(board, store, limit, event)
+    except Exception as  e:
+        print(e)
     finally:
         ebinder.event_generate(BINDING.ON_LOADING_DONE)
+
+def sync_from_store(event: Event = Event()):
+    try:
+        store = None
+        if config[TABLE.LOCAL][LOCAL.ENABLED]:
+            store = PlainLocalStorage()
+        # EAGLE Overrides the normal FS storage.
+        if config[TABLE.EAGLE][EAGLE.ENABLED]:
+            store = EagleHandler()
+
+        for board in BOARD:
+            match(board):
+                case BOARD.R34:
+                    handler = R34Handler()
+                case BOARD.E621:
+                    handler = E621Handler()
+                case BOARD.DANBOORU:
+                    handler = Danbooru_Handler()
+                case _:
+                    continue
+            logger.info("Updating File Table for Board %s, Store %s", handler.get_board(), store.get_store())
+            sync_coordinator = SyncCoordinator(handler, store)
+            for artist in handler.artist_list:
+                if event.is_set():
+                    return
+                updated = sync_coordinator.update_post_file_table(artist=artist)
+                logger.info("%s, %s, %s, %d", handler.get_board(), store.get_store(), artist, len(updated))
+    
+    except Exception as e:
+        logger.warning(e)
+
 
 
 # TODO: Remove old Sync file
@@ -84,25 +117,32 @@ class SyncCoordinator():
         self.tag_post_dict = defaultdict(set)
         self.board_tag_count = defaultdict(int)
         self.cache = Link_Cache()
+        self.download_count = 0
 
     def sync(self):
-
         ebinder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.board_handler.artist_list))
-    # for i, artist in enumerate(artist_list):
         for artist in self.board_handler.artist_list:
-            ebinder.event_generate(BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}")
-            self.sync_artist(artist)
+            if not self.stop_event.is_set():
+                ebinder.event_generate(BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}")
+                self.sync_artist(artist)
         
         with PostDb() as post_db:
             post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_count)
             for tag, posts in self.tag_post_dict.items():
-                post_db.tag_posts.union_update(tag, posts)
+                if not self.stop_event.is_set():
+                    post_db.tag_posts.union_update(tag, posts)
     
     def sync_artist(self, artist):
         self.update_metadata(artist)
         self.update_post_file_table(artist)
-        self.download_missing_ids(artist)
-        self.update_post_file_table(artist)
+        download_list = self.download_missing_ids(artist)
+        for retry in range(1, 4):
+            inserted_post_files = self.update_post_file_table(artist)
+            download_list = [pid for pid in download_list if pid not in inserted_post_files]
+            if not download_list:
+                break
+            logger.info("Waiting for %d files to sync for artist %s", len(download_list), artist)
+            time.sleep(.5 * retry)
     
 
     def update_metadata(self, artist) -> list[Post]:
@@ -161,16 +201,19 @@ class SyncCoordinator():
                     self.stop_event.set()
                     executor.shutdown(wait=True, cancel_futures=True)
 
+        self.download_count += 1
         return success_list
 
-    def update_post_file_table(self, artist):
+    def update_post_file_table(self, artist, repair = False):
         logger.info("Updating PostFile Table for %s, %s, %s", self.store, self.board, artist)
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(self.board, artist)
-        updated = []
+        inserted_list = []
         with PostDb() as post_db:
             for pid, store_post in store_posts.items():
                 if pid not in post_db.posts:
                     continue
+                # if not repair and pid in post_db.files:
+                #     continue
                 post = post_db.posts[pid]
                 post_file = PostFile(
                     post.id,
@@ -188,8 +231,8 @@ class SyncCoordinator():
                 )
                 inserted = post_db.files.insert(post_file)
                 if inserted:
-                    updated.append(pid)
-        return updated
+                    inserted_list.append(pid)
+        return inserted_list
         
 if __name__ == "__main__":
     main()

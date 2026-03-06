@@ -62,6 +62,7 @@ class Danbooru_Handler(ImageBoardHandler):
             tags.append(f"rating_{dpost.rating}")
             tags.append(f"{self.get_board().value}")
             tags.append(dpost.file_ext)
+            tags.append(tag)
 
             for black_listed in self.black_list:
                 if black_listed in tags:

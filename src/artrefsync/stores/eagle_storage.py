@@ -2,57 +2,18 @@ from collections import deque
 from asyncio import Event
 import os
 from pathlib import Path
-import sys
-import dacite
-import queue
-import requests
-import json
-import time
 from artrefsync.api.eagle_client import eagle_client
 from artrefsync.boards.board_handler import PostFile
-from artrefsync.models import EagleItem
-from urllib import parse
 from artrefsync.stores.link_cache import Link_Cache
 from artrefsync.stores.storage import ImageStoreHandler, Post
-from artrefsync.constants import BOARD, EAGLE, STORE, STATS
+from artrefsync.constants import BOARD, EAGLE, STORE
 from artrefsync.config import config
-from artrefsync.stats import stats
-from artrefsync.api.eagle_model import EagleItem, EagleFolder, EagleLibrary
+from artrefsync.api.eagle_model import EagleItem
 import tempfile
-
 import logging
-
-from artrefsync.utils.benchmark import Bm
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
-
-
-def main():
-    logger.info("main")
-    eagle = EagleHandler()
-    toupdate: list[Post] = []
-    for board in eagle.board_artist_dict:
-        if board == BOARD.DANBOORU:
-            for artist in eagle.board_artist_dict[board]:
-                print(artist)
-                posts = eagle.get_posts(board, artist)
-                for pid, post in posts.items():
-                    if "rule34" in post.url:
-                        toupdate.append(post)
-                        # print(f"{artist} adding {pid}")
-    print(f"Posts Requring Updates {len(toupdate)}")
-    for i, post in enumerate(toupdate):
-        if i % 50 == 0:
-            sys.stdout.write(".")
-            sys.stdout.flush()
-
-        url = f"https://danbooru.donmai.us/posts/{post.id.split('.')[0]} "
-        try:
-            eagle.client.item.update(post.ext_id, url=url)
-        except:
-            pass
-
 
 class EagleHandler(ImageStoreHandler):
     """
@@ -134,9 +95,9 @@ class EagleHandler(ImageStoreHandler):
         lib = self.library_path_dict[self.library]
         # dir = f"{self.library_path_dict[self.library]}/images/{item.id}.info/"
         board_path = Path(os.path.join(lib, "images", f"{item.id}.info"))
-        thumbnail = "" 
+        thumbnail = ""
         file = f"{self.library_path_dict[self.library]}/images/{item.id}.info/{item.name}.{item.ext}"
-        for path in  board_path.iterdir():
+        for path in board_path.iterdir():
             strpath = str(path)
             if "metadata.json" in strpath:
                 continue
@@ -175,7 +136,6 @@ class EagleHandler(ImageStoreHandler):
             self.folder_artist_dict[artist_folder.id] = artist
             folder_created = True
         return folder_created
-        
 
     # Assuming that we will always call get_posts before save_posts
     def get_posts(self, board: BOARD, artist: str) -> dict[str, PostFile]:
@@ -255,9 +215,3 @@ class EagleHandler(ImageStoreHandler):
 
     def get_thumbnail(self, post):
         return self.client.item.thumbnail(post.ext_id)
-        # return super().get_thumbnail(post)
-
-
-
-if __name__ == "__main__":
-    main()

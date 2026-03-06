@@ -10,6 +10,8 @@ from artrefsync.constants import DANBOORU, TABLE
 
 import logging
 
+from artrefsync.disk_cache import disk_cache
+
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
@@ -40,7 +42,7 @@ class Danbooru_Client:
     def _build_url_request(self, tag, page) -> str:
         return f"{self.base_url}&limit={self.limit}&tags={tag}&page={page}"
 
-    # @disk_cache
+    @disk_cache
     def get_posts(
         self, tag, post_limit=None, stop_event: Event = None
     ) -> list[Danbooru_Post]:

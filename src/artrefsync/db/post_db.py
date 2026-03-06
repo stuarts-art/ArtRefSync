@@ -11,7 +11,6 @@ from artrefsync.constants import APP, BOARD, DB, DB_TABLE, STORE, TABLE
 from artrefsync.db.db_utils import BlobDb, DbUtils
 from artrefsync.db.dataclass_db import Dataclass_DB
 
-from artrefsync.utils.PyInstallerUtils import resource_path
 
 import logging
 
@@ -39,10 +38,10 @@ class PostDb:
             db_name = config[TABLE.APP][APP.DB_FILE_NAME]
             logger.debug("Creating connection with dir: %s, dbname: %s", db_dir, db_name)
             if db_dir:
-                db_name = resource_path(os.path.join(db_dir, db_name))
+                db_name = DbUtils.resource_path(os.path.join(db_dir, db_name))
                 os.makedirs(os.path.dirname(db_name), exist_ok=True)
             else:
-                db_name = resource_path(db_name)
+                db_name = DbUtils.resource_path(db_name)
             logger.info("Creating or connecting to Database: %s", db_name)
             self.connection = sqlite3.connect(db_name)
             self.connection_owner = True
@@ -57,10 +56,9 @@ class PostDb:
         self.files = Dataclass_DB(PostFile, self.connection, lazy = lazy)
         self.tag_posts = BlobDb(self.connection, "tag_posts", lazy = lazy)
         self.artist_tags = BlobDb(self.connection, "artist_tags", lazy = lazy)
-        # self = BlobDb(self.connection, "tagposts")
         logger.debug("Opening PostDB")
 
-    @functools.cached_property
+    @property
     def board_artists(self) -> dict[str : list[str]]:
         board_artists_dict = {}
         select_result = self.posts.select([], ["DISTINCT artist_name, board"])
@@ -86,7 +84,6 @@ class PostDb:
         
         return db.select_id_list(criteria)
 
-
     def get_tag_intersection(self, tags):
         posts = self.tag_posts.loads_blob(tags)
         if not posts:
@@ -106,9 +103,3 @@ class PostDb:
         self.connection.commit()
         logger.debug("Closing PostDB")
         self.connection.close()
-
-if __name__ == "__main__":
-    with PostDb() as db:
-        db.files.select(None)
-
-

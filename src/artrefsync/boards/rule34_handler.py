@@ -40,7 +40,6 @@ class R34Handler(ImageBoardHandler):
     def get_board(self) -> BOARD:
         return BOARD.R34
 
-    @disk_cache
     def get_posts(self, tag, post_limit=None, stop_event: Event = None) -> dict[str, Post]:
         posts = {}
 
@@ -56,8 +55,9 @@ class R34Handler(ImageBoardHandler):
             skip_rpost = False
             website = f"https://rule34.xxx/index.php?page=post&s=view&id={rpost.id}"
             post_id = Post.make_storage_id(rpost.id, self.get_board())
+            ext=rpost.file_url.split(".")[-1]
 
-            tags = rpost.tags
+            tags = rpost.tags + [tag, BOARD.R34.value, ext, ]
             tags.append(f"rating_{rpost.rating}")
             for black_listed in self.black_list:
                 if black_listed in rpost.tags:
@@ -68,13 +68,12 @@ class R34Handler(ImageBoardHandler):
             if skip_rpost:
                 continue
 
-            ext=rpost.file_url.split(".")[-1]
             post = Post(
                 id=post_id,
                 ext_id=rpost.id,
                 name=f"{post_id}-{tag}",
                 artist_name=tag,
-                tags=rpost.tags,
+                tags=tags,
                 board=self.board,
                 score=rpost.score,
                 url=rpost.file_url,
@@ -99,3 +98,7 @@ class R34Handler(ImageBoardHandler):
 
 
 # r34_handler = R34Handler()
+if __name__ == "__main__":
+    handler = R34Handler()
+    handler.get_posts()
+    

@@ -9,7 +9,7 @@ import ttkbootstrap as ttk
 # from PIL import Image, ImageTk
 from artrefsync.config import config
 from artrefsync.constants import TABLE, get_table_mapping
-from artrefsync.sync_coordinator import sync_config
+from artrefsync.sync_coordinator import sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 
@@ -22,15 +22,19 @@ class ConfigTab(ttk.Frame):
         super().__init__(root, *args, **kwargs)
         self.configure_style(root)
         self.thread_caller = TkThreadCaller(self)
+        self.config_notebook = ttk.Notebook(self)
+        self.config_notebook.pack(expand=True, fill="both", padx=5, pady=5)
+        self.load()
 
+    def load(self):
         self.config_table_tabs = {}
         self.widget_dict = {}
         self.var_dict = {}
         self.sync_running = False
-        self.start_event = None
+        self.sync_event = Event()
+        self.store_sync_running = False
+        self.store_sync_event = Event()
 
-        self.config_notebook = ttk.Notebook(self)
-        self.config_notebook.pack(expand=True, fill="both", padx=5, pady=5)
         for table in TABLE:
             logger.info("Initializing %s tab.", table)
             tab_frame = ttk.Frame(self.config_notebook)
@@ -39,6 +43,11 @@ class ConfigTab(ttk.Frame):
                 tab_frame,
                 text=table.capitalize().ljust(6),
             )
+    def reload(self):
+        config.reload_config()
+        for child in self.config_notebook.winfo_children():
+            child.destroy()
+        self.load()
             
     def init_config_tabs(self, table, tab_frame):
         if table == TABLE.APP:
@@ -48,6 +57,13 @@ class ConfigTab(ttk.Frame):
             self.save_config_button.grid(
                 row=1, column=1, sticky=("w", "e"), pady=10, padx=5
             )
+            self.reset_config_button = ttk.Button(
+                tab_frame, text="Reset Config", command=self.reload
+            )
+            self.reset_config_button.grid(
+                row=1, column=2, sticky=("w", "e"), pady=10, padx=5
+            )
+
             self.start_sync_button = ttk.Button(
                 tab_frame, text="Start Sync", command=self.start_sync
             )
@@ -55,12 +71,19 @@ class ConfigTab(ttk.Frame):
                 row=2, column=1, sticky=("w", "e"), pady=10, padx=5
             )
 
+            self.start_store_sync_button = ttk.Button(
+                tab_frame, text="Sync from Store", command=self.start_store_sync
+            )
+            self.start_store_sync_button.grid(
+                row=3, column=1, sticky=("w", "e"), pady=10, padx=5
+            )
+
         self.config_table_tabs[table] = tab_frame
         self.widget_dict[table] = {}
         self.var_dict[table] = {}
 
         for i, table_field in enumerate(
-            get_table_mapping()[table], 3 if table == TABLE.APP else 0
+            get_table_mapping()[table], 4 if table == TABLE.APP else 0
         ):
             label = ttk.Label(
                 # tab_frame, text=f"{table_field.capitalize()}:", width=2
@@ -125,30 +148,40 @@ class ConfigTab(ttk.Frame):
                 config[table][table_field] = val
         config.reload_config()
 
+    def start_store_sync(self):
+        if not self.store_sync_running:
+            self.store_sync_running = True
+            self.start_store_sync_button.configure(state="active", text="Cancel Sync", bootstyle="warning")
+            self.thread_caller.add(sync_from_store, self.finish_store_sync, __name__, self.store_sync_event)
+        else:
+            self.start_store_sync_button.configure(state="disabled")
+            self.store_sync_event.set()
+
+    def finish_store_sync(self, *nargs, **kwargs):
+        logger.info("Store sync Finished. Reseting button.")
+        self.store_sync_running = False
+        self.store_sync_event.clear()
+        self.start_store_sync_button.configure(state="normal", text="Start Store Sync", bootstyle="default")
+        config.reload_config()
+
     def start_sync(self):
         if not self.sync_running:
             self.sync_running = True
-            self.start_event = Event()
             self.start_sync_button.configure(state="active", text="Cancel Sync")
-            self.thread_caller.add(sync_config, self.finish_sync, __name__, self.start_event )
+            self.thread_caller.add(sync_config, self.finish_sync, __name__, self.sync_event )
         else:
             self.start_sync_button.configure(state="disabled")
-            self.start_event.set()
+            self.sync_event.set()
 
     def finish_sync(self, *nargs, **kwargs):
         logger.info("Sync Finished. Reseting button.")
         self.sync_running = False
-        # self.start_sync_button["text"] = "Start Sync"
-        # self.start_sync_button.state(["normal"])
         self.start_sync_button.configure(state="normal", text="Start Sync")
         config.reload_config()
-
-        self.start_event = None
+        self.sync_event = None
 
     def configure_style(self, root):
         self.style = ttk.Style()
-        # self.style.configure("vert.TNotebook", tabposition="wn", tabmargins=(0, 30))
-        # self.style.configure("vert.TNotebook.Tab", expand=(10, 0, 0, 0))
 
     def config_menu(self):
         self.root.filemenu.add_command(

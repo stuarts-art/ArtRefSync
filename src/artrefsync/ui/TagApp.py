@@ -6,6 +6,8 @@ import time
 from PIL import Image, ImageTk
 import logging
 from artrefsync.config import config
+from artrefsync.constants import BINDING
+from artrefsync.ui.tabs.SortByTab import SortByTab
 from artrefsync.ui.tabs.ActiveTags import ActiveTagsTab
 from artrefsync.ui.tabs.ConfigTab import ConfigTab
 from artrefsync.ui.widgets.LoadingBar import LoadingBars
@@ -17,6 +19,7 @@ from artrefsync.ui.tabs.ArtistTab import ArtistTab
 from artrefsync.ui.widgets.PostInfo import PostInfo
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar, RoundedIcon
 from artrefsync.ui.widgets.PhotoGallery import PhotoImageGallery
+from artrefsync.utils.EventManager import ebinder
 from tkinterdnd2 import TkinterDnD
 
 logger = logging.getLogger(__name__)
@@ -32,18 +35,27 @@ class ImagViewerApp(ttk.Window):
     def __init__(self):
         logger.info("Starting App")
         self.init_scaffolding()
+        self.init_top_bar_vars()
         self.init_tabs()
         self.init_views()
         self.init_bindings()
+        self.after_idle(ebinder.event_generate, BINDING.ON_SORT_BY_UPDATE)
 
     def init_scaffolding(self):
         logger.info("Init Scafolding")
-        super().__init__(themename="darkly", size=(1080, 1080), hdpi=True, scaling=2, title="Art Ref Sync App")
+        super().__init__(
+            themename="darkly",
+            size=(1080, 1080),
+            hdpi=True,
+            scaling=2,
+            title="Art Ref Sync App",
+        )
         TkinterDnD._require(self)
 
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.bar = ModernTopBar(self, False)
+        # self.bar = ModernTopBar(self, True)
         self.stime = time.time()
         self.thread_caller = TkThreadCaller(self)
 
@@ -78,18 +90,37 @@ class ImagViewerApp(ttk.Window):
 
     def init_tabs(self):
         logger.info("Init tabs")
-
         self.artist_tab = ArtistTab(self.left_tabs)
         self.artist_tab.grid(column=0, row=3, sticky=tk.NSEW)
-
         self.tag_tab = TagTab(self.left_tabs)
         self.tag_tab.grid(column=0, row=3, sticky=tk.NSEW)
         self.tag_tab.grid_forget()
-
         self.active_tab = ActiveTagsTab(self.left_tabs)
-
+        self.sort_by_tab = SortByTab(self.left_tabs)
+        self.sort_by_tab.grid(column=0, row=4, sticky=tk.E)
         self.post_info = PostInfo(self.bar.right, self.thread_caller)
         self.loading_bar = LoadingBars(self.bar.bot)
+
+    def init_top_bar_vars(self):
+        self.top_artist_text = ttk.StringVar()
+        self.top_artist_count_text = ttk.StringVar()
+        self.top_post_text = ttk.StringVar()
+        ebinder.bind(
+            BINDING.ON_ARTIST_SELECT, lambda x: self.top_artist_text.set(x), self.bar
+        )
+        ebinder.bind(
+            BINDING.ON_POST_COUNT,
+            lambda x: self.top_artist_count_text.set(f"({x})"),
+            self.bar,
+        )
+        # ebinder.bind(BINDING.ON_POST_SELECT, lambda x: self.top_post_text.set(x), self.bar)
+        ttk.Label(self.bar.top_bar_mid, textvariable=self.top_artist_text).pack(
+            side=tk.LEFT
+        )
+        ttk.Label(self.bar.top_bar_mid, textvariable=self.top_artist_count_text).pack(
+            side=tk.LEFT
+        )
+        # ttk.Label(self.bar.top_bar_mid, textvariable=self.top_post_text).pack(side=tk.LEFT)
 
     def init_views(self):
         logger.info("Init Views")
@@ -152,6 +183,7 @@ class ImagViewerApp(ttk.Window):
             logger.info("Reattaching = %s", str(left_info))
             self.right.grid(column=2, row=2, sticky="nse")
             self.bar.left.grid(row=2, column=0, sticky="nws")
+
 
 if __name__ == "__main__":
     main()

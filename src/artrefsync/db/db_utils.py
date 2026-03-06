@@ -1,9 +1,12 @@
 from collections.abc import Iterable
 from dataclasses import dataclass, fields, MISSING
 from enum import Enum, StrEnum
+import os
 import sqlite3
 import pickle
+import sys
 import time
+from pathlib import Path
 from types import NoneType, UnionType
 from typing import get_type_hints, Union, get_origin, get_args
 
@@ -23,16 +26,9 @@ class DbUtils:
         result = cursor.fetchone()
         return result is not None
 
-    # @staticmethod
-    # def table_columns(connection: sqlite3.Connection, table_name):
-    #     cursor = connection.cursor()
-    #     cursor.execute(f"SELECT * FROM {table_name} LIMIT 1")
-    #     columns = [description[0] for description in cursor.description]
-    #     return columns
 
     @staticmethod
     def dict_factory(cursor, row):
-        # return {col[0]: row[idx] for idx, col in enumerate(cursor.description)}
         return {
             col[0]: (
                 pickle.loads(row[idx]) if isinstance(row[idx], bytes) else row[idx]
@@ -49,9 +45,7 @@ class DbUtils:
         cursor = connection.cursor()
         cursor.execute(f"PRAGMA table_info('{table_name}')")
         result = cursor.fetchall()
-        # print(result)
         if result:
-            # return [row[1] for row in result]
             return {row[1]:row[2] for row in result}
         return None
     
@@ -67,10 +61,7 @@ class DbUtils:
             mapped = False
 
             name = field.name
-            # origin = get_origin(field.type)
             if isinstance(field.type, UnionType):
-            # if origin is Union or origin is UnionType:
-                # types = list(get_args(origin))
                 types = get_args(field.type)
             else:
                 types = [field.type,]
@@ -106,6 +97,18 @@ class DbUtils:
             table_fields.append(f"{name} {field_sql_type}{field_suffix}{default}")
 
         return field_type, table_fields, primary_key
+
+    @staticmethod
+    def resource_path(relative_path):
+        if os.path.isabs(relative_path):
+            return relative_path
+        try:
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, relative_path)
+
 
 
 class BlobDb:
@@ -159,11 +162,8 @@ class BlobDb:
             drop_table_flag = True
 
         cursor = self.connection.cursor()
-        # if drop_table_flag:
-            # print("Dropping Table")
-            # cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
         if create_table_flag:
-            print("Creating Table")
+            logger.info("Creating Table %s", table_name)
             cursor.execute(
                 f"CREATE TABLE IF NOT EXISTS {table_name} (id TEXT PRIMARY KEY, data BLOB, count INTEGER, updatetime INTEGER)"
             )
@@ -230,7 +230,6 @@ class BlobDb:
         result = cur.fetchall()
         logger.debug(f" QUERY RESULT for key {starts_with} - {result}")
         if result:
-            # result = sorted(result, key=lambda item: int(item[1]), reverse=True)
             return result
         else:
             return []
@@ -258,7 +257,6 @@ class BlobDb:
             return input_set
 
     def __contains__(self, key) -> bool:
-        # key in db
         query = f"SELECT 1 FROM {self.table_name} WHERE {self.primary_key} = ? LIMIT 1"
         cur = self.connection.cursor()
         cur.execute(query, (key,))

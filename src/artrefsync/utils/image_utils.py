@@ -10,7 +10,6 @@ from itertools import count, cycle
 
 from artrefsync.boards.board_handler import PostFile
 
-
 class ImageUtils:
     cache = {}
 
@@ -34,11 +33,9 @@ class ImageUtils:
 
         for retry in range(3):
             try:
-                # with ImageUtils._lock:
                 with ImageUtils._lock:
                     image = Image.open(file)
                 if height and width:
-                    # with ImageUtils._lock:
                     with ImageUtils._lock:
                         image.thumbnail((height, width))
                 return image
@@ -49,13 +46,16 @@ class ImageUtils:
         raise Exception("Failed to load PIL image %s.")
 
     @staticmethod
-    @functools.lru_cache(maxsize=20)
+    @functools.lru_cache(maxsize=100)
     def getPilImageThumb(file: str, size: tuple):
-        image = ImageUtils.getPilImage(file)
-        with ImageUtils._thumblock:
-            thumbnail = image.copy()
-            thumbnail.thumbnail(size=size)
-        return thumbnail
+        try:
+            image = ImageUtils.getPilImage(file)
+            with ImageUtils._thumblock:
+                thumbnail = image.copy()
+                thumbnail.thumbnail(size=size)
+            return thumbnail
+        except Exception as e:
+            return None
 
     @staticmethod
     @functools.lru_cache(maxsize=3)
@@ -99,7 +99,6 @@ class ImageUtils:
         with ImageUtils._photolock:
             return ImageTk.PhotoImage(image=image)
 
-
     @staticmethod
     @functools.lru_cache
     def getrounded_rect(size, radius) -> Image.Image:
@@ -122,7 +121,7 @@ class ImageUtils:
 
     @staticmethod
     @functools.lru_cache(maxsize=20)
-    def get_round_colored_rect(width, height, radius, fill="white") -> Image.Image:
+    def get_round_colored_rect(width, height, radius, fill="white", as_photoimage = False) -> Image.Image:
         scale = 4
         image = Image.new(mode="RGBA", size=(width * scale, height * scale))
         draw = ImageDraw.Draw(image)
@@ -130,4 +129,6 @@ class ImageUtils:
             (0, 0, width * scale, height * scale), fill=fill, radius=radius * scale
         )
         image.thumbnail((width, height), Image.Resampling.LANCZOS)
-        return image
+       
+        return ImageTk.PhotoImage(image) if as_photoimage else image 
+        

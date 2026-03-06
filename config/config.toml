@@ -1,5 +1,5 @@
 [app]
-limit = 10
+limit = 30000
 log_level = "INFO"
 id_length = 8
 cache_dir = ".metadata_cache"
@@ -37,4 +37,3 @@ artist_folder = ""
 [local]
 enabled = true
 artist_dir = "media"
-db_file_name = "tagapp.local_storage.db"

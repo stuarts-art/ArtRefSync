@@ -70,8 +70,6 @@ class ViewerTab(ttk.Frame):
             self.canvas_image.canvas.master.lower()
             self.gif_top = True
 
-
-
     def close_image_viewer(self, _=None):
         if self.grid_info():
             logger.info("Closing Image Viewer")
@@ -93,15 +91,7 @@ class ViewerTab(ttk.Frame):
         post_file = self.post_file
         self.file = post_file.preview if post_file.ext in ("webm", "mp4") else post_file.file
         self.thread_caller.cancel(__name__)
-        # self.thread_caller.add(
-        #     ImageUtils.getPilImage,
-        #     self.setImage,
-        #     __name__,
-        #     self.file,
-        # )
         self.setImage()
-
-
 
     def update_viewer_image(self, pid):
         if not pid:
@@ -109,54 +99,22 @@ class ViewerTab(ttk.Frame):
             return
         if self.grid_info():
             logger.info("Opening Image Viewer for %s", pid)
-            with PostDb() as postdb:
-                # self.post_file:PostFile = postdb.files[pid]
-                post_file:PostFile = postdb.files[pid]
-            # self.post_file = post_file
-            # file_name = post_file.thumbnail if post_file.ext in ("webm", "mp4") else post_file.file
-            # self.file = file_name
-
+            with PostDb() as post_db:
+                if pid in post_db.files:
+                    post_file:PostFile = post_db.files[pid]
+                else:
+                    logger.info("Failed to load postFile for %s", pid)
+                    return
             self.file = post_file.preview if post_file.ext in ("webm", "mp4") else post_file.file
-            # if post_file.ext != "gif":
             if not self.canvas_image:
                 self.canvas_image = CanvasImage(self, self.file)
                 self.canvas_image.grid(row=0, column=0)
             else: 
                 self.canvas_image.set_image(self.file)
-            # self.canvas_image.canvas.master.lift()
-            # self.image_label.lower()
             self.clear_button.lift()
-
-
             if post_file.ext == "gif":
-
-                # photoimage = ImageUtils.get_tk_thumb(post_file.thumbnail, (self.winfo_width(), self.winfo_height()))
-                # self.image_label.config(image=photoimage)
-                # self.image_label.image=photoimage
-
                 self.gif_viewer.load( post_file.file, (self.winfo_width(), self.winfo_height()))
-                # self.image_label.lift()
-                # self.clear_button.lift()
-                # self.async_update_image()
 
-
-
-
-
-
-
-
-            # size = (self.winfo_width(), self.winfo_height())
-            # self.thread_caller.add(self.tasked_GetImage, self.setImage, file_name, size)
-
-    # def tasked_GetImage(self, file_name, size):
-    #     try:
-    #         image = ImageUtils.getPilImage(file_name, None, None)
-    #         # image = Image.open(file_name)
-    #         # image.thumbnail(size)
-    #         return image
-    #     except:
-    #         return None
 
     def setImage(self):
         width = self.winfo_width()
@@ -169,10 +127,6 @@ class ViewerTab(ttk.Frame):
                 self.image_label.config(image=photoimage)
                 self.image_label.image = photoimage
         else:
-            # photoimage = ImageUtils.get_tk_thumb(self.file)
-            # self.image_label.config(image=photoimage)
-            # self.image_label.image = photoimage
-            # self.after(0, self.gif_viewer.load, self.post_file.file, (self.winfo_width(), self.winfo_height()))
             with Bm():
                 photoimage = ImageUtils.get_tk_thumb(self.post_file.preview, (width, height))
                 self.image_label.config(image=photoimage)
@@ -190,7 +144,6 @@ class GifViewer:
         self.file = None
         self.raw_frames = []
         self.job_id = None
-        # self.delay_map = {} #Only call duration once per file.
         self.thread_caller = TkThreadCaller(label)
         self.task_name = "load_frames"
 
@@ -200,7 +153,6 @@ class GifViewer:
         logger.info("Gif Viewer with %s", file)
         self.thread_caller.cancel(self.task_name)
         self.thread_caller.add(ImageUtils.getPilFrames, self.set_frames, self.task_name, file)
-        # self.image_label.after(0, self.set_frames, self.file)
 
     def set_frames(self, result):
 
@@ -212,42 +164,27 @@ class GifViewer:
         if len(frames) == 1:
             self.image_label.config(image=next(self.frames))
         else:
-            # self.next_frame()
-            # self.frames=None
             self.job_id = self.image_label.after(0, self.next_frame, self.file)
-
-
-        
-        
-        
-        
 
     def oldload(self, file:str, size:tuple):
         logger.info("Gif Viewer with %s", file)
-
-        # width, height = size
         thumb = ImageUtils.get_tk_thumb(file, size=size)
         self.image_label.config(image=thumb)
 
 
         if self.job_id:
             self.image_label.after_cancel(self.job_id)
-        # Reload Raw Frames
         if file != self.file:
-        # Get delay between frames
             self.image = ImageUtils.getPilImage(file, None, None)
-            # self.image = ImageUtils.getPilImage(file, None, None)
             self.raw_frames = []
             try:
                 self.delay = self.image.info['duration']
             except:
                 self.delay = 100
-
             try:
                 for frame in ImageSequence.Iterator(self.image):
                     frame = self.image.copy()
                     self.raw_frames.append(frame)
-                    # self.image.seek(i)
             except EOFError:
                 pass
         
@@ -260,20 +197,10 @@ class GifViewer:
         self.frames = cycle(frames)
 
         logger.info("Gif Viewer with %d frames and %d delay", len(frames), self.delay)
-        # If single image, display frame and don't animate.
         if len(frames) == 1:
             self.image_label.config(image=next(self.frames))
         else:
-            # self.next_frame()
-            # self.frames=None
             self.job_id = self.image_label.after(0, self.next_frame)
-    
-
-    # def load_raw_map(self, file, size):
-
-        
-    # def load_thumb_frames(self, file, size):
-
     
 
     def next_frame(self, filename):

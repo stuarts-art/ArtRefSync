@@ -1,10 +1,13 @@
+import platform
+
 import ttkbootstrap as ttk
+from ttkbootstrap.tooltip import ToolTip
 import tkinter as tk
 from tkinter.font import nametofont
 import os
 from tkinterdnd2 import COPY, DND_FILES
 
-from artrefsync.boards.board_handler import Post
+from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.constants import BINDING
 from artrefsync.db.post_db import PostDb
 from artrefsync.ui.widgets import InputTreeView
@@ -13,6 +16,7 @@ from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 from artrefsync.utils.EventManager import ebinder
 from artrefsync.config import config
+from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
 
 import logging
 
@@ -38,26 +42,26 @@ class PostInfo(ttk.Frame):
         self.grid_rowconfigure(5, weight=1)
 
         self.thumbnail = tk.Label(self)
-        # self.thumbnail = PhotoLabel(self, None, 190, 190)
         self.thumbnail.grid(column=0, row=0, sticky=tk.NSEW)
-        self.name = ttk.Text(self, height=1, width=text_width)
+        self.name = ttk.Label(self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1)
         self.name.grid(column=0, row=1, sticky=tk.EW)
-        self.artist = tk.Text(self, height=1, width=text_width)
-        self.artist.grid(column=0, row=2, sticky=tk.EW)
-        self.score = ttk.Text(self, height=1, width=text_width)
+        self.artist_frame = ttk.Labelframe(self, text="Artist")
+        self.artist_frame.grid(column=0, row=2, sticky=tk.EW, ipady=0)
+        self.artist = RoundedIcon.from_text(self.artist_frame, "", self.colors.primary)
+        self.artist.pack(side=tk.LEFT)
+        self.score = ttk.Label(self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1)
         self.score.grid(column=0, row=3, sticky=tk.EW)
-        self.file = ttk.Label(self, cursor="arrow", justify=tk.LEFT, wraplength=240)
+        self.file = ttk.Label(self, cursor="arrow", justify=tk.LEFT, border=1)
         self.file.grid(column=0, row=4, sticky=tk.NSEW)
-
+        self.file_tooltip = ToolTip(self.file) 
         self.tags_frame = ttk.Frame(self)
         self.tags_frame.grid(column=0, row=5, sticky=tk.NSEW)
-        # self.tags= 
-
 
         self.tags = ttk.Text(
             self.tags_frame, wrap=tk.WORD, width=text_width
         )  # , bg=self.colors.get('primary'))
         self.tags.pack(fill="both", expand=True)
+        self.grid_propagate(False)
 
         self.add_bindings()
 
@@ -66,57 +70,58 @@ class PostInfo(ttk.Frame):
         self.file.drag_source_register(DND_FILES)
         self.file.dnd_bind("<<DragInitCmd>>", self.drag_init)
         self.file.bind("<Double-1>", self.start_file)
+        self.file.bind("<Button-2>", self.start_file_dir)
         self.tags.bind("<Double-Button-1>", self.tags_double)
 
     def start_file(self, event):
         file = self.file.cget("text")
-        # file = self.file.get(1.0, 'end-1c')
-        if file:
+        if file and platform.system() == "Windows":
             os.startfile(file)
+
+    def start_file_dir(self, event):
+        file = self.file.cget("text")
+        if file and platform.system() == "Windows":
+            dir = os.path.dirname(file)
+            if dir and os.path.isdir(dir):
+                os.startfile(dir)
 
     def on_post_select(self, post_id):
         logger.info("On Post Select, post id: %s", post_id)
         with PostDb() as postdb:
             post = postdb.posts[post_id]
             post_file = postdb.files[post_id]
-            # print(post_file)
 
         if post_file and post:
             post.file_link = post_file.file
             post.sample_link = post_file.preview
-            self.winfo_toplevel
-            self.name.delete("1.0", tk.END)
-            self.name.insert(tk.END, post.name)
-            self.artist.delete("1.0", tk.END)
-            self.artist.insert(tk.END, post.artist_name)
-            self.score.delete("1.0", tk.END)
-            self.score.insert(tk.END, post.score)
+            self.name.configure(text=post.name)
+            self.artist.update_text(post_file.artist_name)
+            self.score.configure(text=post.score)
             self.file.configure(text=post.file_link)
+            self.file_tooltip.text=f"{post.file_link}\n-Double Click: Open\n-Middle Click: Open file location"
             self.tags.config(state=tk.NORMAL)
             self.tags.delete("1.0", tk.END)
             self.tags.config(state=tk.DISABLED)
+            self.after(0, self.after_on_post_select(post, post_file))
 
-            self.after(0, self.after_on_post_select(post))
+    def after_on_post_select(self, post: Post, post_file: PostFile):
+        if post_file:
+            if post_file.preview:
+                file_name = post_file.preview
+            elif post_file.sample:
+                file_name = post_file.sample
+            else:
+                file_name = post_file.file if post.ext not in ("webm", "mp4") else ""
 
-    def after_on_post_select(self, post: Post):
-        if self.thumbnail:
-            file_name = post.sample_link if post.ext in ("webm", "mp4") else post.file_link
-            if not os.path.exists(post.sample_link):
-                file_name = post.file_link
-
+        if file_name:
+            if not os.path.exists(file_name):
+                return
             thumbnail = ImageUtils.get_tk_thumb(file_name, (190, 190))
             self.thumbnail.config(image=thumbnail)
             self.thumbnail.image=thumbnail
 
         self.tags.config(state=tk.NORMAL)
         for tag in post.tags:
-            width = self.font.measure(tag)
-            ticon = ttk.Label(self.tags, text=tag, padding= 1)
-            # ticon = RoundedIcon(
-            #     self.tags, tag, size=(width + 10, 22)
-            #     # , normal_color=self.colors.primary
-            #     # , bootstyle="primary.inverted"
-            # )
             self.tags.insert(tk.END, f"{tag}  ")
         self.tags.config(state=tk.DISABLED)
 
@@ -139,8 +144,6 @@ class PostInfo(ttk.Frame):
         except:
             return ""
 
- 
-
     def query_by_tag(self, tag):
         if tag in ebinder[BINDING.ARTIST_SET]:
             ebinder.event_generate(BINDING.ON_ARTIST_SELECT, tag)
@@ -150,6 +153,4 @@ class PostInfo(ttk.Frame):
     def drag_init(self, event):
         file = self.file.cget("text")
         if file:
-            # os.startfile(file)
             return (COPY, DND_FILES, file)
-

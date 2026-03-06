@@ -21,18 +21,18 @@ class NAMES(StrEnum):
 
 
 class BINDING(StrEnum):
-    # Mapped vars 
+    # Mapped vars
     SELECTED_ARTIST = auto()
     ARTIST_SET = auto()
     BOARD_SET = auto()
+    SORT_BY = auto()
+    SORT_DIR = auto()
 
-
-    ON_LOAD_LEFT_SET = auto()  #
-    ON_LOAD_RIGHT_SET = auto()  #
-    ON_LOAD_LEFT_INCR = auto()  #
-    ON_LOAD_RIGHT_INCR = auto()  #
-    ON_LOADING_DONE = auto()  #
-
+    ON_LOAD_LEFT_SET = auto()
+    ON_LOAD_RIGHT_SET = auto()
+    ON_LOAD_LEFT_INCR = auto()
+    ON_LOAD_RIGHT_INCR = auto()
+    ON_LOADING_DONE = auto()
     ON_POST_SELECT = auto()
     ON_POST_FOCUS_CHANGE = auto()
     ON_PREV_GALLERY_IMAGE = auto()
@@ -43,11 +43,12 @@ class BINDING(StrEnum):
     ON_TAG_SELECT = auto()
     ON_TAG_MIDDLE = auto()
     ON_FILTER_UPDATE = auto()
+    ON_SORT_BY_UPDATE = auto()
+    ON_POST_COUNT = auto()
 
 
 class DB(StrEnum):
     TAGAPP_DB = "tagapp.db"
-    TAGAPP_LOCAL_DB = "tagapp.local_storage.db"
     BLOB_DB = "blob.db"
 
 
@@ -135,7 +136,6 @@ class EAGLE(StrEnum):
 
 class LOCAL(StrEnum):
     ENABLED = auto()
-    DB_FILE_NAME = auto()
     ARTIST_DIR = auto()
 
 
@@ -160,6 +160,7 @@ class STATS(StrEnum):
     SKIP_COUNT = auto()
     FAILED_COUNT = auto()
     METADATA_CACHE_HIT = auto()
+
 
 class TTKColor(StrEnum):
     PRIMARY = auto()

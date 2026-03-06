@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 import logging
 import pickle
 import sqlite3
@@ -9,7 +10,6 @@ from typing import Generic, Type, TypeVar, get_type_hints
 import dacite
 
 from artrefsync.db.db_utils import DbUtils
-from artrefsync.utils.PyInstallerUtils import resource_path
 from artrefsync.config import config
 
 T = TypeVar("T", contravariant=dataclass)
@@ -32,7 +32,7 @@ class Dataclass_DB(Generic[T]):
         self.connection = connection
         self.connection_owner = False
         self.table_name = table_name if table_name else cls.__name__
-        self.db_name = db_name if db_name else resource_path( cls.__name__ +"_dataclassdb.db")
+        self.db_name = db_name if db_name else DbUtils.resource_path( cls.__name__ +"_dataclassdb.db")
         if not self.connection:
             self.logger.info("Creating or connecting to Database: %s", self.db_name)
             self.connection = sqlite3.connect(self.db_name)
@@ -74,7 +74,7 @@ class Dataclass_DB(Generic[T]):
 
         if create_table_flag:
             query = f'CREATE TABLE IF NOT EXISTS {self.table_name} (\n{",\n".join(self.table_fields)}\n);'
-            self.logger.debug(query)
+            self.logger.debug("Creating Table with Query \"%s\"", query)
             cur.execute(query)
             self.commit()
 
@@ -91,87 +91,14 @@ class Dataclass_DB(Generic[T]):
             cur.execute(auto_update_query)
             self.commit()
 
-    def create_table(self, cls):
-        self.logger.info("Creating table: %s", self.table_name)
-        _type_map = {str: "TEXT", StrEnum: "TEXT", Enum: "TEXT", int: "INTEGER", float: "REAL"}
-
-        self.field_type = {}
-        self.primary_key = ""
-        annotations = get_type_hints(cls)
-        existing_cols = []
-
-        if DbUtils.table_exists(self.connection, self.table_name):
-            existing_cols = DbUtils.table_columns(self.connection, self.table_name)
-
-        table_fields = []
-        for i, (annotation , ann_field) in enumerate(annotations.items()):
-            types = list(ann_field.__args__) if isinstance(ann_field, UnionType) else [ann_field,]
-            # self.logger.debug(types)
-            field_sql_type = "BLOB"
-            for type in types:
-                if type in _type_map:
-                    field_sql_type = _type_map[type]
-                    break
-
-            # Set Suffix
-            if i == 0:
-                self.primary_key = annotation
-                field_suffix = " PRIMARY KEY"
-            else:
-                field_suffix = " NOT NULL" if NoneType not in types else ""
-            self.field_type[annotation] = field_sql_type
-
-            self.logger.debug(f"{annotation} {field_sql_type}{field_suffix}")
-            if existing_cols and annotation in existing_cols:
-                continue
-            else:
-                table_fields.append(f"{annotation} {field_sql_type}{field_suffix}")
-        for time_field in ["created", "updated"]:
-            if existing_cols and time_field in existing_cols: 
-                continue
-            table_fields.append(f"{time_field} TEXT NOT NULL DEFAULT(strftime('%s', 'now'))")
-
-        cur = self.connection.cursor()
-        if existing_cols:
-            for f in table_fields:
-                query = f'ALTER TABLE {self.table_name} ADD {f};'
-                cur.execute(query)
-        else:
-            query = f'CREATE TABLE IF NOT EXISTS {self.table_name} (\n{",\n".join(table_fields)}\n);'
-            self.logger.debug(query)
-            cur.execute(query)
-            auto_update_query = f"""
-                CREATE TRIGGER IF NOT EXISTS update_{self.table_name}_updated
-                AFTER UPDATE ON {self.table_name}
-                WHEN old.updated <> strftime('%s', 'now')
-                BEGIN
-                    UPDATE {self.table_name}
-                    SET updated = strftime('%s', 'now')
-                    WHERE {self.primary_key} = OLD.{self.primary_key};
-                END;
-            """
-            cur.execute(auto_update_query)
-        self.commit()
-        self.field_type_map[cls] = self.field_type
         
-    def insert(self, item: T, merge_field:str = None, id_field:str = "id"):
+    def insert(self, item: T):
         """
-        If the item does not exist, isnert. If it does exist, but hasn't been changed, do nothing.
-        If it does exist but has been changed, update the non-null fields.
-        returns True if inserted or changed, false if no db change.
+        If the item does not exist, insert, else replace.
+        Returns True if inserted, false if updated.
         """
         item_dict = asdict(item)
-        if merge_field:
-            select_item = self.get(item_dict[id_field])
-            if select_item and merge_field in item_dict:
-                select_dict = asdict(select_item)
-                if merge_field in select_dict and item_dict[merge_field] and select_dict[merge_field]:
-                    if item_dict[merge_field] == select_dict[merge_field]:
-                        return False
-                # Else set all non null fields (Note that this will not remove should-be-nulled fields.)
-                non_null_fields = [k for (k,v) in item_dict.items() if v]
-                self.update(item, item_dict[id_field], non_null_fields)
-                return True
+        exists = item_dict[self.primary_key] in self
 
         query_values = tuple(
             pickle.dumps(kv[1]) if self.field_types[kv[0]] == "BLOB" else kv[1]
@@ -184,13 +111,49 @@ class Dataclass_DB(Generic[T]):
 
         cur = self.connection.cursor()
         cur.execute(query, query_values)
-        return True
+        return not exists
+
+    def get_all(self, id_list = list[str], select_fields = None, as_tupple=False, as_scalar = False, suffix = "") -> list[T]:
+        """
+        id_list: list of ids to query from.
+        select_fields: fields to get
+        as_tupple: returns tupple of values instead of dict or class
+        as_scalar: returns list of ids. Overrides selected_fields, as_tupple
+        suffix: suffix to append to query
+        
+        """
+        if isinstance(id_list, Iterable):
+            id_list = tuple(id_list)
+        else:
+            id_list = tuple(id,)
+        
+        if as_scalar:
+            select_fields = ["id",]
+            as_tupple=True
+
+        field_str = "*" if not select_fields else ", ".join(select_fields)
+
+        # query = f'SELECT {field_str} FROM {self.table_name}  WHERE (id) = ?'
+        query = f"SELECT {field_str} FROM {self.table_name}  WHERE (id) IN ({', '.join('?' * len(id_list))}) {suffix}"
+        cur = self.connection.cursor()
+        if not as_tupple:
+            cur.row_factory = DbUtils.dict_factory
+        cur.execute(query, tuple(id_list))
+        rows  = cur.fetchall()
+
+        if not rows:
+            return None
+        elif as_scalar:
+            return[row[0] for row in rows]
+            
+        elif as_tupple or select_fields:
+            return rows
+        else:
+            return [ dacite.from_dict(self.cls, row, config=dacite.Config(cast=[StrEnum])) for row in rows ]
 
     def get(self, item_id:str, select_fields: list[str] = None, as_tupple = False) -> T:
         field_str = "*" if not select_fields else ", ".join(select_fields)
         query = f'SELECT {field_str} FROM {self.table_name}  WHERE (id) = ?'
-        self.logger.debug(query)
-
         cur = self.connection.cursor()
         if not as_tupple:
             cur.row_factory = DbUtils.dict_factory
@@ -218,8 +181,6 @@ class Dataclass_DB(Generic[T]):
         select_fields = "*" if not select_fields else ", ".join(select_fields)
         query = f'SELECT {select_fields} FROM {self.table_name}{condition_query_str}{suffix}'
 
-
-        self.logger.debug(query)
         cur = self.connection.cursor()
         cur.row_factory = DbUtils.dict_factory
 
@@ -245,15 +206,9 @@ class Dataclass_DB(Generic[T]):
         else:
             condition_vals = None
             condition_query_str = ""
-        
-        # has_select_fields = select_fields is not None
         select_fields = self.primary_key
         query = f'SELECT {select_fields} FROM {self.table_name}{condition_query_str}{suffix}'
-
-
-        self.logger.debug(query)
         cur = self.connection.cursor()
-        # cur.row_factory = DbUtils.dict_factory
 
         if condition_vals:
             cur.execute(query, (*condition_vals,))
@@ -262,9 +217,6 @@ class Dataclass_DB(Generic[T]):
         items  = cur.fetchall()
         # return items
         return [row[0] for row in items]
-
-
-
 
     def update(self, item_id:str, item: T, item_fields: list[str] = None):
         """Update list of fields. If no item field is given, replace the item."""
@@ -302,7 +254,6 @@ class Dataclass_DB(Generic[T]):
         cur.execute(query, (key,))
         result = cur.fetchone()
         return result is not None
-
 
 
     def __getitem__(self, key) -> T:

@@ -12,21 +12,7 @@ from artrefsync.utils.EventManager import ebinder
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
-
 class ActiveTagsTab(ttk.Frame):
-    """
-    ### Structure:
-    ```
-    ActiveTagsTab:
-        - button_frame:
-            - active_button: Minimizes the tags frame
-            - clear_button: Clears out tags
-        - tags_frame:
-            - tag1
-            - tag...
-    ```
-    """
-
     def __init__(self, root, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
         self.font = nametofont("TkDefaultFont")
@@ -45,7 +31,6 @@ class ActiveTagsTab(ttk.Frame):
         self.sep.pack(side=tk.BOTTOM, fill=tk.X, pady=15)
 
         self.add_bindings()
-
 
     def is_artist(self, artist):
         if (
@@ -101,7 +86,6 @@ class ActiveTagsTab(ttk.Frame):
             tags = [tag for tag in self.active_tags]
             
             for curr_tag in tags:
-                # curr_tag = str(curr_tag)
                 if not self.is_artist(curr_tag):
                     removed = self.remove_tag(curr_tag)
                     if not removed:
@@ -141,9 +125,6 @@ class ActiveTagsTab(ttk.Frame):
         if not color:
             color = self.colors.secondary
             
-        # if not self.stored_grid_info:
-        #     logger.info("Setting  GRID INFO %s", self.grid_info())
-        #     self.stored_grid_info = self.grid_info()
         logger.info("ADDING TAG %s", tag)
         if tag in self.active_tags:
             logger.info(
@@ -154,9 +135,7 @@ class ActiveTagsTab(ttk.Frame):
             return
         if not self.grid_info():
             self.place_self()
-        width = self.font.measure(tag)
-        # tag_icon = RoundedIcon(self.tabs_frame, tag, size=(width + 10, 22))
-        tag_icon = RoundedIcon(self.tabs_frame, tag, size=(width + 10, 22), normal_color=color)
+        tag_icon = RoundedIcon.from_text(self.tabs_frame, tag, color)
         tag_icon.pack(side=tk.TOP, anchor=tk.NW)
         self.active_tags[tag] = tag_icon
         tag_icon.bind("<Double-Button-1>", self.on_remove_tag)
@@ -184,6 +163,4 @@ class ActiveTagsTab(ttk.Frame):
         self.grid_forget()
 
     def place_self(self):
-        # logger.info("Placing Active Tags into Grid with grid info: %s", self.stored_grid_info)
         self.grid(column=0, row=0, sticky=tk.NSEW)
-        # self.grid(**self.stored_grid_info)

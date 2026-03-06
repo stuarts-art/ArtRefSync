@@ -11,7 +11,6 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
-
 class TkThreadCaller:
     _instance = None
 
@@ -73,10 +72,13 @@ class TkThreadCaller:
     def call_on_finish(self, future):
         try:
             if future in self.cancel_key_map:
-                self.root.after(0, self.on_finish_map.pop(future), future.result())
+                on_finish = self.on_finish_map.pop(future)
+                result = future.result()
+                self.root.after(0, on_finish, result)
                 cancel_key = self.cancel_key_map.pop(future)
                 if cancel_key in self.cancel_map:
-                    self.cancel_map[cancel_key].remove(future)
+                    if future in self.cancel_map[cancel_key]:
+                        self.cancel_map[cancel_key].discard(future)
         except Exception as e:
             logger.error(e)
 

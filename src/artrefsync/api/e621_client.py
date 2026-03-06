@@ -32,7 +32,7 @@ class E621_Client:
     def _build_website_parameters(self, page, tag) -> str:
         return f"{self.website}?limit={self.limit}&tags={tag}&page={page}"
 
-    # @disk_cache
+    @disk_cache
     def get_posts(self, tags: str, post_limit=None, stop_event: Event=None) -> list[E621_Post]:
         posts = []
         oldest_id = ""

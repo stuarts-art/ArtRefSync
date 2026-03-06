@@ -48,7 +48,6 @@ class E621Handler(ImageBoardHandler):
         # return  list(set(config[BOARD.E621][E621.ARTISTS]))
         return self.artist_list
 
-    @disk_cache
     def get_posts(self, tag, post_limit=None, stop_event: Event=None) -> dict[str, Post]:
         post_dict = {}
         e621_posts: list[E621_Post]= self.client.get_posts(tag, post_limit)
@@ -67,7 +66,7 @@ class E621Handler(ImageBoardHandler):
             meta = e_post.tags.meta
             rating = f"rating_{e_post.rating.value}"
             pools = [f"pool_e621_{pool_id}" for pool_id in e_post.pools]
-            tags = general + species + artists + franchise + character + meta + [rating, e_post.file.ext, tag, ] + pools
+            tags = general + species + artists + franchise + character + meta + [rating, e_post.file.ext, tag, BOARD.E621.value, ] + pools
 
             pid = Post.make_storage_id(e_post.id, self.get_board())
             name = f"{pid}-{tag}"

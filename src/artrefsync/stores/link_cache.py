@@ -1,12 +1,9 @@
-# CACHE links
-# module enforced static members.
 import os
 import tempfile
 import time
 import requests
 from artrefsync.config import config
 import logging
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -46,8 +43,6 @@ class Link_Cache:
             for chunk in site_response.iter_content(chunk_size=8192):
                 if chunk:
                     file.write(chunk)
-        # print(f"{link} {file.name}")
-        time.sleep(0.1)
 
     def get_file_from_link(self, link: str) -> str:
         if link not in self._link_cache:
@@ -60,7 +55,6 @@ class Link_Cache:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
-
 
     def close(self):
         for file in self._link_cache.values():

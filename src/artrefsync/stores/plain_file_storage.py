@@ -11,6 +11,7 @@ import jsonpickle
 from pathlib import Path
 import requests
 from artrefsync.db.dataclass_db import Dataclass_DB
+from artrefsync.db.db_utils import DbUtils
 from artrefsync.db.post_db import PostDb
 from artrefsync.stats import stats
 from artrefsync.stores.link_cache import Link_Cache
@@ -21,7 +22,6 @@ from artrefsync.config import config
 
 import logging
 
-from artrefsync.utils.PyInstallerUtils import resource_path
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -38,12 +38,12 @@ def main():
 
 class PlainLocalStorage(ImageStoreHandler):
     def __init__(self):
-        self.artists_base_dir = resource_path(Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR]))
+        self.artists_base_dir = DbUtils.resource_path(Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR]))
         self.dir_base_map = {}
         self.dir_map: dict[DIRS, dict[BOARD, dict[str, str]]]= defaultdict(dict)
         self.update_map: dict = {}
         self.file_map: dict = defaultdict(dict)
-        self.dir_base_map[DIRS.FILE] = resource_path(Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR]))
+        self.dir_base_map[DIRS.FILE] = DbUtils.resource_path(Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR]))
         self.dir_base_map[DIRS.PREVIEW] = os.path.join(self.dir_base_map[DIRS.FILE], DIRS.PREVIEW)
         self.dir_base_map[DIRS.SAMPLE] = os.path.join(self.dir_base_map[DIRS.FILE], DIRS.SAMPLE)
 
@@ -71,12 +71,10 @@ class PlainLocalStorage(ImageStoreHandler):
                             continue
                         self.file_map[artist_path][pid] = file
                         loaded += 1
-                    # print(f"{artist} - {loaded - prev}")
                     prev = loaded
         
     def get_artist_posts(self, dir, board, artist) -> dict[str, str]:
         artist_dir = self.get_artist_dir(dir, board, artist)
-        # print(artist_dir)
         update_time = os.path.getmtime(self.artists_base_dir)
         last_updated = self.update_map[artist_dir]  if artist_dir in self.update_map else None
         
@@ -195,7 +193,6 @@ class PlainLocalStorage(ImageStoreHandler):
         logger.warning("Update post called for  %s but this method is not implemented yet.", post.id)
         # No Metadata is saved...right?
         pass
-
 
 if __name__ == "__main__":
     main()
