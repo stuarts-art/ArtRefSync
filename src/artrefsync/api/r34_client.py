@@ -13,6 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+
 class R34_Client:
     """
     Class to handle requesting and handling messages from the image board E621
@@ -34,7 +35,9 @@ class R34_Client:
 
     # Translates XML -> DICT -> R34_Post
     @disk_cache
-    def get_posts(self, tag, post_limit=None, stop_event: Event = None) -> list[R34_Post]:
+    def get_posts(
+        self, tag, post_limit=None, stop_event: Event = None
+    ) -> list[R34_Post]:
         posts = []
         self.last_run = time.time() - 1
 
@@ -61,5 +64,3 @@ class R34_Client:
                 break
 
         return posts
-# client = R34_Client()
-# print(client.get_posts("", 1))

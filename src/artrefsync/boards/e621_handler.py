@@ -48,9 +48,11 @@ class E621Handler(ImageBoardHandler):
         # return  list(set(config[BOARD.E621][E621.ARTISTS]))
         return self.artist_list
 
-    def get_posts(self, tag, post_limit=None, stop_event: Event=None) -> dict[str, Post]:
+    def get_posts(
+        self, tag, post_limit=None, stop_event: Event = None
+    ) -> dict[str, Post]:
         post_dict = {}
-        e621_posts: list[E621_Post]= self.client.get_posts(tag, post_limit)
+        e621_posts: list[E621_Post] = self.client.get_posts(tag, post_limit)
         if stop_event and stop_event.is_set():
             return None
         if " " in tag:
@@ -66,7 +68,21 @@ class E621Handler(ImageBoardHandler):
             meta = e_post.tags.meta
             rating = f"rating_{e_post.rating.value}"
             pools = [f"pool_e621_{pool_id}" for pool_id in e_post.pools]
-            tags = general + species + artists + franchise + character + meta + [rating, e_post.file.ext, tag, BOARD.E621.value, ] + pools
+            tags = (
+                general
+                + species
+                + artists
+                + franchise
+                + character
+                + meta
+                + [
+                    rating,
+                    e_post.file.ext,
+                    tag,
+                    BOARD.E621.value,
+                ]
+                + pools
+            )
 
             pid = Post.make_storage_id(e_post.id, self.get_board())
             name = f"{pid}-{tag}"
@@ -123,7 +139,3 @@ class E621Handler(ImageBoardHandler):
             post_dict[pid] = post
             stats.add(STATS.POST_COUNT)
         return post_dict
-
-
-e621_handler = E621Handler()
-

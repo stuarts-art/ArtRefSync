@@ -11,7 +11,7 @@ from artrefsync.utils.benchmark import Bm
 import threading
 
 
-class __EagleClient:
+class EagleClient:
     def __init__(self):
         eagle_url = config[STORE.EAGLE][EAGLE.ENDPOINT].strip()
         self.eagle_url = eagle_url if eagle_url else "http://localhost:41595/api"
@@ -248,10 +248,3 @@ class __EagleClient:
             response = json.loads(response.content)["data"]
             list_items = [dacite.from_dict(EagleItem.Item, item) for item in response]
             return list_items
-
-
-eagle_client = __EagleClient()
-# items = eagle_client.item.list_items(tags="diives")
-# print(items)
-# update = eagle_client.item.update("MJ3YKTSRKO6N0", ["test2"])
-# print(update)

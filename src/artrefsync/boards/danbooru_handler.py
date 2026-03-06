@@ -25,7 +25,6 @@ class Danbooru_Handler(ImageBoardHandler):
         self.reload()
         config.subscribe_reload(self.reload)
 
-        
     def reload(self):
         self.danbooru_api_key = config[BOARD.DANBOORU][DANBOORU.API_KEY]
         self.danbooru_username = config[BOARD.DANBOORU][DANBOORU.USERNAME]
@@ -43,7 +42,9 @@ class Danbooru_Handler(ImageBoardHandler):
         return BOARD.DANBOORU
 
     # @disk_cache
-    def get_posts(self, tag, post_limit=None, stop_event: Event=None) -> dict[str, Post]:
+    def get_posts(
+        self, tag, post_limit=None, stop_event: Event = None
+    ) -> dict[str, Post]:
         posts = {}
 
         danbooru_posts = self.client.get_posts(tag, post_limit)
@@ -99,6 +100,3 @@ class Danbooru_Handler(ImageBoardHandler):
             posts[post_id] = post
             stats.add(STATS.POST_COUNT)
         return posts
-
-
-danbooru_handler = Danbooru_Handler()

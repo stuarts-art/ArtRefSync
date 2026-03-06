@@ -2,7 +2,7 @@ from collections import deque
 from asyncio import Event
 import os
 from pathlib import Path
-from artrefsync.api.eagle_client import eagle_client
+from artrefsync.api.eagle_client import EagleClient
 from artrefsync.boards.board_handler import PostFile
 from artrefsync.stores.link_cache import Link_Cache
 from artrefsync.stores.storage import ImageStoreHandler, Post
@@ -14,6 +14,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
+
 
 class EagleHandler(ImageStoreHandler):
     """
@@ -29,7 +30,7 @@ class EagleHandler(ImageStoreHandler):
     def reload_config(self):
         self.library = config[STORE.EAGLE][EAGLE.LIBRARY].strip()
         self.artists_folder_name = config[STORE.EAGLE][EAGLE.ARTIST_FOLDER].strip()
-        self.client = eagle_client
+        self.client = EagleClient()
         self.artists_id = None
         self.folder_artist_dict = {}
         self.board_dict = {}
