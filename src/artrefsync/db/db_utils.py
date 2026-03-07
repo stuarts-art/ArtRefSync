@@ -65,6 +65,7 @@ class DbUtils:
         primary_key = ""
 
         for i, field in enumerate(fields(cls)):
+            logger.debug("Initializing Field %s, type %s", field, field.__class__)
             field_sql_type = "BLOB"
             mapped = False
             name = field.name
@@ -76,6 +77,9 @@ class DbUtils:
                 ]
 
             for type in types:
+                logger.debug("Checking %s", type)
+                logger.debug("Checking %s", type.__class__)
+                logger.debug("Checking %s", type.__type_params__)
                 if issubclass(type.__class__, EnumType):
                     field_sql_type = "TEXT"
                     break

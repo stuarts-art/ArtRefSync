@@ -1,4 +1,5 @@
 # Config Related setup
+import os
 import sys
 from simple_toml_configurator import Configuration
 from artrefsync.constants import (
@@ -14,6 +15,7 @@ from artrefsync.constants import (
     DANBOORU,
 )
 import logging
+import logging.handlers
 
 __all__ = ["config"]
 
@@ -33,13 +35,15 @@ class __Config:
         self.path = self.settings._full_config_path
         self.log_level = self.settings.get_settings()["app_log_level"]
 
+        self.log_file = "log/art_sink.log"
+        os.makedirs(os.path.dirname(self.log_file), exist_ok=True)
         logging.basicConfig(
             level=self.log_level,
             format="%(asctime)s %(name)s %(funcName)s (%(levelname)s): %(message)s",
             datefmt="%I:%M:%S",
             handlers=[
                 logging.StreamHandler(sys.stdout),
-                logging.FileHandler("app.log", mode="a"),
+                logging.handlers.TimedRotatingFileHandler(self.log_file)
             ],
         )
 
