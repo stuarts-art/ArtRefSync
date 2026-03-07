@@ -55,6 +55,7 @@ class RoundedIcon(ttk.Label):
         style=None,
         **kwargs,
     ):
+        logger.info("Creating Modern Top Bar")
         if isinstance(size, int):
             self.width = size
             self.height = size

@@ -41,6 +41,7 @@ class RoundedDropDown(ttk.Label):
         radius=10,
         **kwargs,
     ):
+        logger.info("Init Rounded DropDown.")
         self.colors = ttk.Style().colors
         self.menu = ttk.Menu(root)
         self.variable = variable if variable else ttk.StringVar

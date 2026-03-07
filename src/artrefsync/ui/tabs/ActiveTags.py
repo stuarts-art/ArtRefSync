@@ -14,6 +14,7 @@ logger.setLevel(config.log_level)
 
 class ActiveTagsTab(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
+        logger.info("Init Active Tags Tab.")
         super().__init__(root, *args, **kwargs)
         self.font = nametofont("TkDefaultFont")
         self.artist = None

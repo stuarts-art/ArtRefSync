@@ -14,6 +14,7 @@ logger.setLevel(config.log_level)
 
 class ArtistTab(ttk.Frame):
     def __init__(self, root, **kwargs):
+        logger.info("Init Artist Tab.")
         super().__init__(
             root,
         )

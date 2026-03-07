@@ -1,16 +1,16 @@
-from collections.abc import Iterable
-from dataclasses import dataclass, fields, MISSING
-from enum import Enum, StrEnum
+import functools
+import logging
 import os
-import sqlite3
 import pickle
+import sqlite3
 import sys
 import time
+from collections.abc import Iterable
+from dataclasses import MISSING,  fields
+from enum import Enum, EnumType, StrEnum
 from pathlib import Path
 from types import NoneType, UnionType
-from typing import get_type_hints, Union, get_origin, get_args
-
-import logging
+from typing import get_args
 
 logger = logging.getLogger()
 
@@ -25,7 +25,6 @@ class DbUtils:
         )
         result = cursor.fetchone()
         return result is not None
-
 
     @staticmethod
     def dict_factory(cursor, row):
@@ -46,12 +45,21 @@ class DbUtils:
         cursor.execute(f"PRAGMA table_info('{table_name}')")
         result = cursor.fetchall()
         if result:
-            return {row[1]:row[2] for row in result}
+            return {row[1]: row[2] for row in result}
         return None
-    
-    _type_map = {str: "TEXT", StrEnum: "TEXT", Enum: "TEXT", int: "INTEGER", float: "REAL"}
+
+    _type_map = {
+        str: "TEXT",
+        StrEnum: "TEXT",
+        Enum: "TEXT",
+        int: "INTEGER",
+        float: "REAL",
+    }
+
+    @functools.cache
     @staticmethod
     def get_sql_fields(cls):
+        logger.info("Getting sql fields for class: %s", cls.__name__)
         field_type = {}
         table_fields = []
         primary_key = ""
@@ -59,25 +67,26 @@ class DbUtils:
         for i, field in enumerate(fields(cls)):
             field_sql_type = "BLOB"
             mapped = False
-
             name = field.name
             if isinstance(field.type, UnionType):
                 types = get_args(field.type)
             else:
-                types = [field.type,]
+                types = [
+                    field.type,
+                ]
 
             for type in types:
-                if issubclass(type, Enum):
+                if issubclass(type.__class__, EnumType):
                     field_sql_type = "TEXT"
                     break
                 for mapped_type in DbUtils._type_map:
                     if issubclass(type, mapped_type):
-                        field_sql_type = DbUtils._type_map[type]
+                        field_sql_type = DbUtils._type_map[mapped_type]
                         mapped = True
                         break
                 if mapped:
                     break
-            
+
             if i == 0:
                 primary_key = name
                 field_suffix = " PRIMARY KEY"
@@ -89,7 +98,7 @@ class DbUtils:
                 if field.default is None:
                     pass
                 elif field_sql_type == "TEXT":
-                    default = f" DEFAULT \"{field.default}\""
+                    default = f' DEFAULT "{field.default}"'
                 else:
                     default = f" DEFAULT {field.default}"
 
@@ -110,7 +119,6 @@ class DbUtils:
         return os.path.join(base_path, relative_path)
 
 
-
 class BlobDb:
     def __init__(
         self,
@@ -118,7 +126,7 @@ class BlobDb:
         table_name="blob_table",
         db_name="blob.db",
         count_field=False,
-        lazy = False
+        lazy=False,
     ):
         """
         Simple sqllite context manager to dump and load serialized (pickle) blob files
@@ -154,6 +162,7 @@ class BlobDb:
         pass
 
     def create_table(self, table_name):
+        logger.info("Creating Blob table %s", table_name)
         create_table_flag = False
         drop_table_flag = False
         if not DbUtils.table_exists(self.connection, table_name):
@@ -180,9 +189,7 @@ class BlobDb:
             (key, pickle.dumps(object), count, int(time.time())),
         )
 
-    def loads_blob(
-        self, key: int | str | float | Iterable, max_age_seconds=0
-    ):
+    def loads_blob(self, key: int | str | float | Iterable, max_age_seconds=0):
         cursor = self.connection.cursor()
         time_suffix = ""
         if max_age_seconds:
@@ -199,7 +206,8 @@ class BlobDb:
                 return None
         else:
             cursor.execute(
-                f"SELECT data FROM {self.table_name}  WHERE (id) = (?){time_suffix};", (key,)
+                f"SELECT data FROM {self.table_name}  WHERE (id) = (?){time_suffix};",
+                (key,),
             )
             fetch = cursor.fetchone()
             if fetch:
@@ -208,7 +216,9 @@ class BlobDb:
                 return None
 
     def count(self, key):
-        query = f"SELECT count FROM {self.table_name} WHERE {self.primary_key} = ? LIMIT 1"
+        query = (
+            f"SELECT count FROM {self.table_name} WHERE {self.primary_key} = ? LIMIT 1"
+        )
         cur = self.connection.cursor()
         cur.execute(query, (key,))
         result = cur.fetchone()
@@ -223,7 +233,9 @@ class BlobDb:
             cur = self.connection.cursor()
             cur.execute(query, (f"%{starts_with}%", limit))
         else:
-            query = f"SELECT id, count FROM {self.table_name} ORDER BY count DESC LIMIT ?"
+            query = (
+                f"SELECT id, count FROM {self.table_name} ORDER BY count DESC LIMIT ?"
+            )
             cur = self.connection.cursor()
             cur.execute(query, (limit,))
 
@@ -235,8 +247,8 @@ class BlobDb:
             return []
 
     def union_update(self, key, input_set: set):
-        """If the picked object is a set, union it and replace the value.  
-        PARAMS:  
+        """If the picked object is a set, union it and replace the value.
+        PARAMS:
         key: Table Key
         input_set: Input set to union on
         """

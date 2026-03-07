@@ -24,6 +24,7 @@ thread_caller: TkThreadCaller = None
 
 class PhotoImageGallery(ttk.Frame):
     def __init__(self, root: ttk.Frame, thread_caller_arg=None):
+        logger.info("Creating Photo Image Gallery.")
         global thread_caller
         super().__init__(root)
         self.tags = None
@@ -199,7 +200,8 @@ class SimpleFrames:
     def change_posts(self, posts):
         if posts == self.post_ids:
             return
-        ebinder.event_generate(BINDING.ON_POST_COUNT, len(posts))
+
+        ebinder.event_generate(BINDING.ON_POST_COUNT, len(posts) if posts else "0")
 
         self.text.focus_set()
         SimplePhotoLabel.posts = posts
@@ -397,14 +399,14 @@ class SimpleFrames:
     def on_visibility(self, e):
         widget: SimplePhotoLabel = e.widget
         if widget.bbox:
-            logger.info("Visibility TRUE for %s", widget.pid)
+            logger.debug("Visibility TRUE for %s", widget.pid)
             idx = widget.idx
             widget.get_image()
 
             if len(self.frames) - idx < 10 and len(self.frames) < len(self.post_ids):
                 self.increase_frames(idx + 10)
         else:
-            logger.info("Visibility: FALSE for %s. Resetting.", widget.pid)
+            logger.debug("Visibility: FALSE for %s. Resetting.", widget.pid)
             widget.reset()
         return
 

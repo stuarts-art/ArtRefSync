@@ -11,6 +11,7 @@ logger.setLevel(config.log_level)
 
 class LoadingBar(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
+        logger.info("Creating Loading Bar")
         super().__init__(root, *args, **kwargs)
         # self.columnconfigure(1, weight=1)
 

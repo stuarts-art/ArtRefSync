@@ -40,6 +40,8 @@ class ImagViewerApp(ttk.Window):
         self.init_views()
         self.init_bindings()
         self.after_idle(ebinder.event_generate, BINDING.ON_SORT_BY_UPDATE)
+        logger.info("App Init Complete")
+
 
     def init_scaffolding(self):
         logger.info("Init Scafolding")

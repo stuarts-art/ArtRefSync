@@ -13,6 +13,7 @@ logger.setLevel(config.log_level)
 
 class TagTab(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
+        logger.info("Init Tag Tab")
         super().__init__(root, *args, **kwargs)
         self.entry = ttk.Entry(self)
         self.tree = ttk.Treeview(self, columns=("Count"), show="tree", *kwargs)
