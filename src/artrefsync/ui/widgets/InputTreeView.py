@@ -1,11 +1,8 @@
 from typing import Iterable
-from operator import neg
 import ttkbootstrap as ttk
-from PIL import Image, ImageTk
 from artrefsync.config import config
-from artrefsync.constants import BOARD, E621, EAGLE, R34, STORE, TABLE
-from sortedcontainers import SortedDict, SortedSet
-from artrefsync.stores.eagle_storage import EagleHandler
+from artrefsync.constants import E621, R34, TABLE
+from sortedcontainers import SortedSet
 
 import logging
 

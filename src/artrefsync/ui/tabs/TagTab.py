@@ -11,6 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+
 class TagTab(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
         logger.info("Init Tag Tab")
@@ -33,7 +34,6 @@ class TagTab(ttk.Frame):
         self.after(100, self.on_key_release)
         config.subscribe_reload(self.on_key_release)
 
-    
     def update_artist(self, artist, middle=False):
         if artist != self.curr_artist:
             self.curr_artist = artist
@@ -41,23 +41,26 @@ class TagTab(ttk.Frame):
                 self.artist_tag_count_map = {}
             else:
                 with PostDb() as post_db:
-                    if artist in  post_db.artist_tags:
+                    if artist in post_db.artist_tags:
                         self.artist_tag_count_map = post_db.artist_tags[artist]
-                        self.artist_tags = [str(k) for k in self.artist_tag_count_map.keys()]
-                        self.artist_tags.sort(key=lambda tag: self.artist_tag_count_map[tag], reverse=True)
-                    else: 
+                        self.artist_tags = [
+                            str(k) for k in self.artist_tag_count_map.keys()
+                        ]
+                        self.artist_tags.sort(
+                            key=lambda tag: self.artist_tag_count_map[tag], reverse=True
+                        )
+                    else:
                         self.artist_tag_count_map = {}
 
             self.entry.delete(0, tk.END)
             self.entry.insert(0, "")
             self.after(100, self.on_key_release)
 
-
     def is_artist(self, artist):
         if (
-            artist in ebinder[BINDING.ARTIST_SET] or
-            artist in ebinder[BINDING.BOARD_SET]
-            ):
+            artist in ebinder[BINDING.ARTIST_SET]
+            or artist in ebinder[BINDING.BOARD_SET]
+        ):
             return True
         else:
             return False

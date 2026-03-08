@@ -4,16 +4,10 @@ import tkinter as tk
 from ttkbootstrap.scrolled import ScrolledText
 from PIL import Image, ImageTk, ImageDraw
 import functools
-from ctypes import windll
-import win32api
-from screeninfo import get_monitors
 from artrefsync.config import config
 import logging
-from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
 
 from artrefsync.boards.board_handler import Post
-from artrefsync.constants import BOARD, E621, TABLE
-from artrefsync.stores.eagle_storage import EagleHandler
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)

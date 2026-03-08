@@ -1,15 +1,11 @@
 from threading import Event
-import time
 import base64
-import json
-import requests
 from artrefsync.api.e621_client import E621_Client
 from artrefsync.api.e621_model import E621_Post
 from artrefsync.config import config
 from artrefsync.stats import stats
 from artrefsync.boards.board_handler import Post, ImageBoardHandler
-from artrefsync.constants import STATS, BOARD, E621, TABLE
-from artrefsync.disk_cache import disk_cache
+from artrefsync.constants import STATS, BOARD, E621
 
 import logging
 

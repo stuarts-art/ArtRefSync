@@ -9,6 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+
 class LoadingBar(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
         logger.info("Creating Loading Bar")
@@ -23,7 +24,7 @@ class LoadingBar(ttk.Frame):
             maximum=self.bar_max_val.get(),
             length=200,
             mode="determinate",
-            variable=self.bar_val
+            variable=self.bar_val,
         )
         self.bar_left_text = ttk.StringVar(self)
         self.label_left = ttk.Label(self, textvariable=self.bar_left_text)
@@ -33,8 +34,8 @@ class LoadingBar(ttk.Frame):
         self.label_right.pack(side="left")
         self.bar.pack(side="left", fill="x", expand=True)
         self.label_left.pack(side="left", fill="none")
-        
-    def increment(self, left_text = None, amount = 1, right_text = None ):
+
+    def increment(self, left_text=None, amount=1, right_text=None):
         self.bar_val.set(self.bar_val.get() + amount)
         if left_text is not None:
             self.bar_left_text.set(left_text)
@@ -46,9 +47,9 @@ class LoadingBar(ttk.Frame):
             max_len = len(max)
             self.bar_right_text.set(f"{count:0{max_len}d}/{max}")
 
-    def set(self, max = 100, left_text = "", value = 0, right_text = None ):
+    def set(self, max=100, left_text="", value=0, right_text=None):
         self.bar_max_val.set(max)
-        self.bar['maximum'] = max
+        self.bar["maximum"] = max
 
         self.bar_val.set(value)
         self.bar_left_text.set(left_text)
@@ -60,8 +61,9 @@ class LoadingBar(ttk.Frame):
             max_len = len(max_str)
             self.bar_right_text.set(f"{count:0{max_len}d}/{max_str}")
 
+
 class LoadingBars(ttk.Frame):
-    def __init__(self, root:ttk.Frame, *args, **kwargs):
+    def __init__(self, root: ttk.Frame, *args, **kwargs):
 
         super().__init__(root, *args, **kwargs)
         self.root = root
@@ -72,13 +74,13 @@ class LoadingBars(ttk.Frame):
         self.columnconfigure(0, weight=0, minsize=400)
         self.columnconfigure(1, weight=1)
         self.columnconfigure(2, weight=0, minsize=400)
-        
+
         self.left_bar = LoadingBar(self)
         self.right_bar = LoadingBar(self)
         self.sep = ttk.Label(self)
 
-        self.left_bar.grid(column=0,row=0, sticky=tk.W)
-        self.sep.grid(column=1,row=0, sticky=tk.NSEW)
+        self.left_bar.grid(column=0, row=0, sticky=tk.W)
+        self.sep.grid(column=1, row=0, sticky=tk.NSEW)
         # self.right_bar.grid(column=2,row=0, sticky=tk.W)
 
         ebinder.bind(BINDING.ON_LOAD_LEFT_SET, self.reset_right, self)
@@ -93,7 +95,7 @@ class LoadingBars(ttk.Frame):
     def reset_bar(self):
         self.is_packed = False
         self.root.grid_forget()
-        
+
     def set_bar(self, *args, **kwargs):
         if not self.is_packed:
             self.root.grid(column=0, row=3, sticky="we")
@@ -108,6 +110,5 @@ class LoadingBars(ttk.Frame):
     def set_right(self, *args, **kwargs):
         self.set_bar()
         if not self.right_is_packed:
-            self.right_bar.grid(column=2,row=0, sticky=tk.W)
+            self.right_bar.grid(column=2, row=0, sticky=tk.W)
             self.right_is_packed = True
-

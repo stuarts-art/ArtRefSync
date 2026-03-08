@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from enum import StrEnum, auto
 import tkinter
 import logging
 

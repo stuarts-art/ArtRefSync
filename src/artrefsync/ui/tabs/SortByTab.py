@@ -1,18 +1,8 @@
-import os
-import threading
-import time
 import tkinter as tk
-from sortedcontainers import SortedSet
 import ttkbootstrap as ttk
-from ttkbootstrap.widgets.scrolled import ScrolledText
-from threading import Event
 
-from tkinterdnd2 import COPY, DND_FILES
-from PIL import ImageTk
 
 from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
-from artrefsync.boards.board_handler import PostFile
-from artrefsync.db.post_db import PostDb
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.config import config

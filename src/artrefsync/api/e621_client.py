@@ -33,7 +33,9 @@ class E621_Client:
         return f"{self.website}?limit={self.limit}&tags={tag}&page={page}"
 
     @disk_cache
-    def get_posts(self, tags: str, post_limit=None, stop_event: Event=None) -> list[E621_Post]:
+    def get_posts(
+        self, tags: str, post_limit=None, stop_event: Event = None
+    ) -> list[E621_Post]:
         posts = []
         oldest_id = ""
         for page in range(1, 50):  # handle pagination
@@ -70,4 +72,3 @@ class E621_Client:
 
         logger.info("E621 Client GetPosts for tags=%s len = %s, ", tags, len(posts))
         return posts
-

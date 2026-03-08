@@ -37,8 +37,9 @@ def wrap_line(lines, line_size, border_char="│"):
             wrapped_lines += f"│ {c_line.ljust(inner_line)} │\n"
     return wrapped_lines
 
+
 class Bm(object):
-    def __init__(self, name = "Benchmark", pretty=True, logger=None):
+    def __init__(self, name="Benchmark", pretty=True, logger=None):
         self.name = name
         self.pretty = pretty
         self.logger = logger
@@ -49,8 +50,8 @@ class Bm(object):
         self.caller_frame = inspect.stack()[1]
         self.class_name = None
 
-        if 'self' in self.old_locals:
-            self.class_name = self.old_locals['self'].__class__.__name__
+        if "self" in self.old_locals:
+            self.class_name = self.old_locals["self"].__class__.__name__
 
         return self
 

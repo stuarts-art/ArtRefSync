@@ -495,10 +495,10 @@ class SimplePhotoLabel(tk.Label):
 
     def reset(self, check_viewable=False):
         if check_viewable and not self.bbox:
-            logger.info("Reset Skipped for %s. It is currently in View.", self.pid)
+            logger.debug("Reset Skipped for %s. It is currently in View.", self.pid)
             return
         if self.pid:
-            logger.info("Resetting %s", self.pid)
+            logger.debug("Resetting %s", self.pid)
         self.image = None
         # self.pid = None
         self.photo = None
@@ -553,7 +553,7 @@ class SimplePhotoLabel(tk.Label):
                 self.image = photo
                 self.config(image=photo, height=photo.height(), width=photo.width())
                 self.loading = False
-                logger.info("Setting Image")
+                logger.debug("Setting Image")
             else:
-                logger.info("ERROR Loading %s %s", self.file.id, self.file.file)
+                logger.debug("ERROR Loading %s %s", self.file.id, self.file.file)
         self.reloading = False

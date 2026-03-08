@@ -1,6 +1,5 @@
 import os
 import tempfile
-import time
 import requests
 from artrefsync.config import config
 import logging

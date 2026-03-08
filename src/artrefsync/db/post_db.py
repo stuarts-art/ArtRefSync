@@ -1,13 +1,10 @@
-from dataclasses import dataclass
-import functools
-
 import sqlite3
 import os
 
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
-from artrefsync.constants import APP, BOARD, DB, DB_TABLE, STORE, TABLE
+from artrefsync.constants import APP, BOARD, DB, TABLE
 from artrefsync.db.db_utils import BlobDb, DbUtils
 from artrefsync.db.dataclass_db import Dataclass_DB
 
@@ -36,7 +33,9 @@ class PostDb:
         if not self.connection:
             db_dir = config[TABLE.APP][APP.DB_DIR]
             db_name = config[TABLE.APP][APP.DB_FILE_NAME]
-            logger.debug("Creating connection with dir: %s, dbname: %s", db_dir, db_name)
+            logger.debug(
+                "Creating connection with dir: %s, dbname: %s", db_dir, db_name
+            )
             if db_dir:
                 db_name = DbUtils.resource_path(os.path.join(db_dir, db_name))
                 os.makedirs(os.path.dirname(db_name), exist_ok=True)
@@ -52,10 +51,10 @@ class PostDb:
         else:
             lazy = True
 
-        self.posts = Dataclass_DB(Post, self.connection, lazy = lazy)
-        self.files = Dataclass_DB(PostFile, self.connection, lazy = lazy)
-        self.tag_posts = BlobDb(self.connection, "tag_posts", lazy = lazy)
-        self.artist_tags = BlobDb(self.connection, "artist_tags", lazy = lazy)
+        self.posts = Dataclass_DB(Post, self.connection, lazy=lazy)
+        self.files = Dataclass_DB(PostFile, self.connection, lazy=lazy)
+        self.tag_posts = BlobDb(self.connection, "tag_posts", lazy=lazy)
+        self.artist_tags = BlobDb(self.connection, "artist_tags", lazy=lazy)
         logger.debug("Opening PostDB")
 
     @property
@@ -70,8 +69,10 @@ class PostDb:
                 board_artists_dict[board] = []
             board_artists_dict[board].append(artist)
         return board_artists_dict
-        
-    def get_ids(self, board: BOARD = None, artist_name: str = None, db : Dataclass_DB = None):
+
+    def get_ids(
+        self, board: BOARD = None, artist_name: str = None, db: Dataclass_DB = None
+    ):
         criteria = []
         if board:
             criteria.append(("board", board))
@@ -81,7 +82,7 @@ class PostDb:
             db = self.posts
         if not criteria:
             criteria = None
-        
+
         return db.select_id_list(criteria)
 
     def get_tag_intersection(self, tags):

@@ -10,7 +10,7 @@ from artrefsync.config import config
 class Post:
     id: str  # Centralized App ID
     ext_id: str  # external id (When from Board->BoardID, Store -> StoreID)
-    name: str  = ""
+    name: str = ""
     artist_name: str = ""
     tags: list[str] = None
     board: BOARD | None = None
@@ -69,7 +69,9 @@ class PostFile:
 
 class ImageBoardHandler(ABC):
     @abstractmethod
-    def get_posts(self, tag, post_limit=None, stop_event: Event=None) -> dict[str, Post]:
+    def get_posts(
+        self, tag, post_limit=None, stop_event: Event = None
+    ) -> dict[str, Post]:
         pass
 
     @abstractmethod

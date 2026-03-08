@@ -43,7 +43,7 @@ class __Config:
             datefmt="%I:%M:%S",
             handlers=[
                 logging.StreamHandler(sys.stdout),
-                logging.handlers.TimedRotatingFileHandler(self.log_file)
+                logging.handlers.TimedRotatingFileHandler(self.log_file),
             ],
         )
 

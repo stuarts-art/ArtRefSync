@@ -6,7 +6,6 @@ from artrefsync.api.r34_model import R34_Post, parse_r34_post
 from artrefsync.config import config
 from artrefsync.constants import TABLE, R34
 from artrefsync.disk_cache import disk_cache
-from dataclasses import asdict
 
 import logging
 

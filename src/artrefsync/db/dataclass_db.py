@@ -3,9 +3,8 @@ import logging
 import pickle
 import sqlite3
 from dataclasses import asdict, dataclass
-from enum import Enum, StrEnum
-from types import NoneType, UnionType
-from typing import Generic, Type, TypeVar, get_type_hints
+from enum import StrEnum
+from typing import Generic, Type, TypeVar
 
 import dacite
 

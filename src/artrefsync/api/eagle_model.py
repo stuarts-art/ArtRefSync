@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import json
 from typing import List, Optional
-from dacite import from_dict
 
 
 # API found: https://api.eagle.cool/
@@ -85,7 +84,6 @@ class EagleItem:
         height: int | None
         width: int | None
         # lastModified: int | None
-
 
     @dataclass
     class Metadata:

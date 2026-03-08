@@ -7,9 +7,8 @@ import sqlite3
 import sys
 import time
 from collections.abc import Iterable
-from dataclasses import MISSING,  fields
-from enum import Enum, EnumType, StrEnum
-from pathlib import Path
+from dataclasses import MISSING, fields
+from enum import Enum, StrEnum
 from types import NoneType, UnionType
 from typing import get_args
 
@@ -60,7 +59,7 @@ class DbUtils:
     @functools.cache
     @staticmethod
     def get_sql_fields(cls):
-        logger.info("Getting sql fields for class: %s", cls.__name__)
+        logger.debug("Getting sql fields for class: %s", cls.__name__)
         field_type = {}
         table_fields = []
         primary_key = ""
@@ -110,7 +109,7 @@ class DbUtils:
 
             field_type[name] = field_sql_type
             table_fields.append(f"{name} {field_sql_type}{field_suffix}{default}")
-        
+
         logger.debug("Field Type - %s", field_type)
         logger.debug("Table Fields - %s", table_fields)
         logger.debug("Primary Key - %s", primary_key)
@@ -172,7 +171,7 @@ class BlobDb:
         pass
 
     def create_table(self, table_name):
-        logger.info("Creating Blob table %s", table_name)
+        logger.debug("Creating Blob table %s", table_name)
         create_table_flag = False
         drop_table_flag = False
         if not DbUtils.table_exists(self.connection, table_name):
@@ -182,7 +181,7 @@ class BlobDb:
 
         cursor = self.connection.cursor()
         if create_table_flag:
-            logger.info("Creating Table %s", table_name)
+            logger.debug("Creating Table %s", table_name)
             cursor.execute(
                 f"CREATE TABLE IF NOT EXISTS {table_name} (id TEXT PRIMARY KEY, data BLOB, count INTEGER, updatetime INTEGER)"
             )

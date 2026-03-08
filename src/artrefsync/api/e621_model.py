@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from pydantic import AnyUrl, BaseModel, Field
 
+
 class E621_Post(BaseModel):
     id: int | str
     created_at: datetime
@@ -38,7 +39,7 @@ class E621_Post(BaseModel):
 
 
 class Reason(Enum):
-    Access_Denied = 'Access Denied'
+    Access_Denied = "Access Denied"
 
 
 class AccessDeniedResponse(BaseModel):
@@ -47,7 +48,7 @@ class AccessDeniedResponse(BaseModel):
 
 
 class Reason1(Enum):
-    not_found = 'not found'
+    not_found = "not found"
 
 
 class NotFoundResponse(BaseModel):
@@ -56,10 +57,10 @@ class NotFoundResponse(BaseModel):
 
 
 class RecordType(Enum):
-    unmark = 'unmark'
-    ban = 'ban'
-    record = 'record'
-    warning = 'warning'
+    unmark = "unmark"
+    ban = "ban"
+    record = "record"
+    warning = "warning"
 
 
 class WarningRecordType(BaseModel):
@@ -67,142 +68,142 @@ class WarningRecordType(BaseModel):
 
 
 class ModActionActions(Enum):
-    artist_page_rename = 'artist_page_rename'
-    artist_page_lock = 'artist_page_lock'
-    artist_page_unlock = 'artist_page_unlock'
-    artist_user_linked = 'artist_user_linked'
-    artist_user_unlinked = 'artist_user_unlinked'
-    avoid_posting_create = 'avoid_posting_create'
-    avoid_posting_update = 'avoid_posting_update'
-    avoid_posting_delete = 'avoid_posting_delete'
-    avoid_posting_undelete = 'avoid_posting_undelete'
-    avoid_posting_destroy = 'avoid_posting_destroy'
-    blip_delete = 'blip_delete'
-    blip_hide = 'blip_hide'
-    blip_unhide = 'blip_unhide'
-    blip_update = 'blip_update'
-    comment_delete = 'comment_delete'
-    comment_hide = 'comment_hide'
-    comment_unhide = 'comment_unhide'
-    comment_update = 'comment_update'
-    forum_category_create = 'forum_category_create'
-    forum_category_delete = 'forum_category_delete'
-    forum_category_update = 'forum_category_update'
-    forum_post_delete = 'forum_post_delete'
-    forum_post_hide = 'forum_post_hide'
-    forum_post_unhide = 'forum_post_unhide'
-    forum_post_update = 'forum_post_update'
-    forum_topic_delete = 'forum_topic_delete'
-    forum_topic_hide = 'forum_topic_hide'
-    forum_topic_unhide = 'forum_topic_unhide'
-    forum_topic_lock = 'forum_topic_lock'
-    forum_topic_unlock = 'forum_topic_unlock'
-    forum_topic_stick = 'forum_topic_stick'
-    forum_topic_unstick = 'forum_topic_unstick'
-    forum_topic_update = 'forum_topic_update'
-    help_create = 'help_create'
-    help_delete = 'help_delete'
-    help_update = 'help_update'
-    ip_ban_create = 'ip_ban_create'
-    ip_ban_delete = 'ip_ban_delete'
-    mascot_create = 'mascot_create'
-    mascot_update = 'mascot_update'
-    mascot_delete = 'mascot_delete'
-    pool_delete = 'pool_delete'
-    report_reason_create = 'report_reason_create'
-    report_reason_delete = 'report_reason_delete'
-    report_reason_update = 'report_reason_update'
-    set_update = 'set_update'
-    set_delete = 'set_delete'
-    set_change_visibility = 'set_change_visibility'
-    tag_alias_create = 'tag_alias_create'
-    tag_alias_update = 'tag_alias_update'
-    tag_implication_create = 'tag_implication_create'
-    tag_implication_update = 'tag_implication_update'
-    ticket_claim = 'ticket_claim'
-    ticket_unclaim = 'ticket_unclaim'
-    ticket_update = 'ticket_update'
-    upload_whitelist_create = 'upload_whitelist_create'
-    upload_whitelist_update = 'upload_whitelist_update'
-    upload_whitelist_delete = 'upload_whitelist_delete'
-    user_blacklist_changed = 'user_blacklist_changed'
-    user_text_change = 'user_text_change'
-    user_upload_limit_change = 'user_upload_limit_change'
-    user_flags_change = 'user_flags_change'
-    user_level_change = 'user_level_change'
-    user_name_change = 'user_name_change'
-    user_delete = 'user_delete'
-    user_ban = 'user_ban'
-    user_ban_update = 'user_ban_update'
-    user_unban = 'user_unban'
-    user_feedback_create = 'user_feedback_create'
-    user_feedback_update = 'user_feedback_update'
-    user_feedback_delete = 'user_feedback_delete'
-    user_feedback_undelete = 'user_feedback_undelete'
-    user_feedback_destroy = 'user_feedback_destroy'
-    wiki_page_rename = 'wiki_page_rename'
-    wiki_page_delete = 'wiki_page_delete'
-    wiki_page_lock = 'wiki_page_lock'
-    wiki_page_unlock = 'wiki_page_unlock'
-    mass_update = 'mass_update'
-    nuke_tag = 'nuke_tag'
-    takedown_delete = 'takedown_delete'
-    takedown_process = 'takedown_process'
-    user_flush_favorites = 'user_flush_favorites'
-    post_version_hide = 'post_version_hide'
-    post_version_unhide = 'post_version_unhide'
-    user_uploads_toggle = 'user_uploads_toggle'
-    staff_note_create = 'staff_note_create'
-    staff_note_update = 'staff_note_update'
-    staff_note_delete = 'staff_note_delete'
-    staff_note_undelete = 'staff_note_undelete'
-    created_positive_record = 'created_positive_record'
-    created_neutral_record = 'created_neutral_record'
-    created_negative_record = 'created_negative_record'
-    created_flag_reason = 'created_flag_reason'
-    edited_flag_reason = 'edited_flag_reason'
-    deleted_flag_reason = 'deleted_flag_reason'
-    post_move_favorites = 'post_move_favorites'
-    post_delete = 'post_delete'
-    post_undelete = 'post_undelete'
-    post_destroy = 'post_destroy'
-    post_rating_lock = 'post_rating_lock'
-    post_unapprove = 'post_unapprove'
-    post_replacement_accept = 'post_replacement_accept'
-    post_replacement_reject = 'post_replacement_reject'
-    post_replacement_delete = 'post_replacement_delete'
+    artist_page_rename = "artist_page_rename"
+    artist_page_lock = "artist_page_lock"
+    artist_page_unlock = "artist_page_unlock"
+    artist_user_linked = "artist_user_linked"
+    artist_user_unlinked = "artist_user_unlinked"
+    avoid_posting_create = "avoid_posting_create"
+    avoid_posting_update = "avoid_posting_update"
+    avoid_posting_delete = "avoid_posting_delete"
+    avoid_posting_undelete = "avoid_posting_undelete"
+    avoid_posting_destroy = "avoid_posting_destroy"
+    blip_delete = "blip_delete"
+    blip_hide = "blip_hide"
+    blip_unhide = "blip_unhide"
+    blip_update = "blip_update"
+    comment_delete = "comment_delete"
+    comment_hide = "comment_hide"
+    comment_unhide = "comment_unhide"
+    comment_update = "comment_update"
+    forum_category_create = "forum_category_create"
+    forum_category_delete = "forum_category_delete"
+    forum_category_update = "forum_category_update"
+    forum_post_delete = "forum_post_delete"
+    forum_post_hide = "forum_post_hide"
+    forum_post_unhide = "forum_post_unhide"
+    forum_post_update = "forum_post_update"
+    forum_topic_delete = "forum_topic_delete"
+    forum_topic_hide = "forum_topic_hide"
+    forum_topic_unhide = "forum_topic_unhide"
+    forum_topic_lock = "forum_topic_lock"
+    forum_topic_unlock = "forum_topic_unlock"
+    forum_topic_stick = "forum_topic_stick"
+    forum_topic_unstick = "forum_topic_unstick"
+    forum_topic_update = "forum_topic_update"
+    help_create = "help_create"
+    help_delete = "help_delete"
+    help_update = "help_update"
+    ip_ban_create = "ip_ban_create"
+    ip_ban_delete = "ip_ban_delete"
+    mascot_create = "mascot_create"
+    mascot_update = "mascot_update"
+    mascot_delete = "mascot_delete"
+    pool_delete = "pool_delete"
+    report_reason_create = "report_reason_create"
+    report_reason_delete = "report_reason_delete"
+    report_reason_update = "report_reason_update"
+    set_update = "set_update"
+    set_delete = "set_delete"
+    set_change_visibility = "set_change_visibility"
+    tag_alias_create = "tag_alias_create"
+    tag_alias_update = "tag_alias_update"
+    tag_implication_create = "tag_implication_create"
+    tag_implication_update = "tag_implication_update"
+    ticket_claim = "ticket_claim"
+    ticket_unclaim = "ticket_unclaim"
+    ticket_update = "ticket_update"
+    upload_whitelist_create = "upload_whitelist_create"
+    upload_whitelist_update = "upload_whitelist_update"
+    upload_whitelist_delete = "upload_whitelist_delete"
+    user_blacklist_changed = "user_blacklist_changed"
+    user_text_change = "user_text_change"
+    user_upload_limit_change = "user_upload_limit_change"
+    user_flags_change = "user_flags_change"
+    user_level_change = "user_level_change"
+    user_name_change = "user_name_change"
+    user_delete = "user_delete"
+    user_ban = "user_ban"
+    user_ban_update = "user_ban_update"
+    user_unban = "user_unban"
+    user_feedback_create = "user_feedback_create"
+    user_feedback_update = "user_feedback_update"
+    user_feedback_delete = "user_feedback_delete"
+    user_feedback_undelete = "user_feedback_undelete"
+    user_feedback_destroy = "user_feedback_destroy"
+    wiki_page_rename = "wiki_page_rename"
+    wiki_page_delete = "wiki_page_delete"
+    wiki_page_lock = "wiki_page_lock"
+    wiki_page_unlock = "wiki_page_unlock"
+    mass_update = "mass_update"
+    nuke_tag = "nuke_tag"
+    takedown_delete = "takedown_delete"
+    takedown_process = "takedown_process"
+    user_flush_favorites = "user_flush_favorites"
+    post_version_hide = "post_version_hide"
+    post_version_unhide = "post_version_unhide"
+    user_uploads_toggle = "user_uploads_toggle"
+    staff_note_create = "staff_note_create"
+    staff_note_update = "staff_note_update"
+    staff_note_delete = "staff_note_delete"
+    staff_note_undelete = "staff_note_undelete"
+    created_positive_record = "created_positive_record"
+    created_neutral_record = "created_neutral_record"
+    created_negative_record = "created_negative_record"
+    created_flag_reason = "created_flag_reason"
+    edited_flag_reason = "edited_flag_reason"
+    deleted_flag_reason = "deleted_flag_reason"
+    post_move_favorites = "post_move_favorites"
+    post_delete = "post_delete"
+    post_undelete = "post_undelete"
+    post_destroy = "post_destroy"
+    post_rating_lock = "post_rating_lock"
+    post_unapprove = "post_unapprove"
+    post_replacement_accept = "post_replacement_accept"
+    post_replacement_reject = "post_replacement_reject"
+    post_replacement_delete = "post_replacement_delete"
 
 
 class PostEventActions(Enum):
-    deleted = 'deleted'
-    undeleted = 'undeleted'
-    approved = 'approved'
-    unapproved = 'unapproved'
-    flag_created = 'flag_created'
-    flag_removed = 'flag_removed'
-    favorites_moved = 'favorites_moved'
-    favorites_received = 'favorites_received'
-    rating_locked = 'rating_locked'
-    rating_unlocked = 'rating_unlocked'
-    status_locked = 'status_locked'
-    status_unlocked = 'status_unlocked'
-    note_locked = 'note_locked'
-    note_unlocked = 'note_unlocked'
-    comment_locked = 'comment_locked'
-    comment_unlocked = 'comment_unlocked'
-    replacement_accepted = 'replacement_accepted'
-    replacement_rejected = 'replacement_rejected'
-    replacement_promoted = 'replacement_promoted'
-    replacement_deleted = 'replacement_deleted'
-    expunged = 'expunged'
-    changed_bg_color = 'changed_bg_color'
-    replacement_penalty_changed = 'replacement_penalty_changed'
+    deleted = "deleted"
+    undeleted = "undeleted"
+    approved = "approved"
+    unapproved = "unapproved"
+    flag_created = "flag_created"
+    flag_removed = "flag_removed"
+    favorites_moved = "favorites_moved"
+    favorites_received = "favorites_received"
+    rating_locked = "rating_locked"
+    rating_unlocked = "rating_unlocked"
+    status_locked = "status_locked"
+    status_unlocked = "status_unlocked"
+    note_locked = "note_locked"
+    note_unlocked = "note_unlocked"
+    comment_locked = "comment_locked"
+    comment_unlocked = "comment_unlocked"
+    replacement_accepted = "replacement_accepted"
+    replacement_rejected = "replacement_rejected"
+    replacement_promoted = "replacement_promoted"
+    replacement_deleted = "replacement_deleted"
+    expunged = "expunged"
+    changed_bg_color = "changed_bg_color"
+    replacement_penalty_changed = "replacement_penalty_changed"
 
 
 class Ratings(Enum):
-    s = 's'
-    q = 'q'
-    e = 'e'
+    s = "s"
+    q = "q"
+    e = "e"
 
 
 class TagCategories(IntEnum):
@@ -217,49 +218,49 @@ class TagCategories(IntEnum):
 
 
 class FeedbackCategories(Enum):
-    negative = 'negative'
-    neutral = 'neutral'
-    positive = 'positive'
+    negative = "negative"
+    neutral = "neutral"
+    positive = "positive"
 
 
 class TagRequestStatuses(Enum):
-    active = 'active'
-    deleted = 'deleted'
-    processing = 'processing'
-    queued = 'queued'
-    retired = 'retired'
-    error = 'error'
-    pending = 'pending'
+    active = "active"
+    deleted = "deleted"
+    processing = "processing"
+    queued = "queued"
+    retired = "retired"
+    error = "error"
+    pending = "pending"
 
 
 class WarningTypes(Enum):
-    warning = 'warning'
-    record = 'record'
-    ban = 'ban'
+    warning = "warning"
+    record = "record"
+    ban = "ban"
 
 
 class PoolCategories(Enum):
-    collection = 'collection'
-    series = 'series'
+    collection = "collection"
+    series = "series"
 
 
 class TicketTypes(Enum):
-    blip = 'blip'
-    comment = 'comment'
-    dmail = 'dmail'
-    forum = 'forum'
-    pool = 'pool'
-    post = 'post'
-    set = 'set'
-    user = 'user'
-    wiki = 'wiki'
-    replacement = 'replacement'
+    blip = "blip"
+    comment = "comment"
+    dmail = "dmail"
+    forum = "forum"
+    pool = "pool"
+    post = "post"
+    set = "set"
+    user = "user"
+    wiki = "wiki"
+    replacement = "replacement"
 
 
 class TicketStatuses(Enum):
-    pending = 'pending'
-    partial = 'partial'
-    approved = 'approved'
+    pending = "pending"
+    partial = "partial"
+    approved = "approved"
 
 
 class Artist(BaseModel):
@@ -304,7 +305,7 @@ class AvoidPosting(BaseModel):
     creator_id: int
     updater_id: int
     artist_id: int
-    staff_notes: Optional[str] = Field(None, description='Only visible to Janitor+')
+    staff_notes: Optional[str] = Field(None, description="Only visible to Janitor+")
     details: str
     is_active: bool
     created_at: datetime
@@ -316,7 +317,7 @@ class AvoidPostingVersion(BaseModel):
     updater_id: int
     avoid_posting_id: int
     details: str
-    staff_notes: Optional[str] = Field(None, description='Only visible to Janitor+')
+    staff_notes: Optional[str] = Field(None, description="Only visible to Janitor+")
     is_active: bool
     updated_at: datetime
 
@@ -346,16 +347,16 @@ class Blip(BaseModel):
 
 
 class Status(Enum):
-    approved = 'approved'
-    rejected = 'rejected'
-    pending = 'pending'
+    approved = "approved"
+    rejected = "rejected"
+    pending = "pending"
 
 
 class BulkUpdateRequest(BaseModel):
     id: int
     creator_id: int
     forum_topic_id: int
-    script: str = Field(..., example=['alias a -> b'])
+    script: str = Field(..., example=["alias a -> b"])
     status: Status
     created_at: datetime
     updated_at: datetime
@@ -383,10 +384,10 @@ class Comment(BaseModel):
 
 
 class DefaultImageSize(Enum):
-    large = 'large'
-    fit = 'fit'
-    fitv = 'fitv'
-    original = 'original'
+    large = "large"
+    fit = "fit"
+    fitv = "fitv"
+    original = "original"
 
 
 class DMail(BaseModel):
@@ -498,9 +499,9 @@ class IPBan(BaseModel):
 
 
 class GeneratedSample(Enum):
-    field_720p = '720p'
-    field_480p = '480p'
-    original = 'original'
+    field_720p = "720p"
+    field_480p = "480p"
+    original = "original"
 
 
 class IQDBPost(BaseModel):
@@ -729,9 +730,9 @@ class PostApproval(BaseModel):
 
 
 class Reason2(Enum):
-    borderline_quality = 'borderline_quality'
-    borderline_relevancy = 'borderline_relevancy'
-    other = 'other'
+    borderline_quality = "borderline_quality"
+    borderline_relevancy = "borderline_relevancy"
+    other = "other"
 
 
 class PostDisapproval(BaseModel):
@@ -753,8 +754,8 @@ class PostEvent(BaseModel):
 
 
 class Type(Enum):
-    flag = 'flag'
-    deletion = 'deletion'
+    flag = "flag"
+    deletion = "deletion"
 
 
 class PostFlag(BaseModel):
@@ -763,23 +764,23 @@ class PostFlag(BaseModel):
     post_id: int
     reason: str
     creator_id: Optional[int] = Field(
-        None, description='Only visible to creator and Janitor+'
+        None, description="Only visible to creator and Janitor+"
     )
     is_resolved: bool
     updated_at: datetime
     is_deletion: bool
     type: Type
     note: Optional[str] = Field(
-        None, description='Only visible to creator and Janitor+'
+        None, description="Only visible to creator and Janitor+"
     )
 
 
 class Status1(Enum):
-    prompted = 'prompted'
-    approved = 'approved'
-    rejected = 'rejected'
-    pending = 'pending'
-    original = 'original'
+    prompted = "prompted"
+    approved = "approved"
+    rejected = "rejected"
+    pending = "pending"
+    original = "original"
 
 
 class PostReplacement(BaseModel):
@@ -931,10 +932,10 @@ class TagTypeVersion(BaseModel):
 
 
 class Status2(Enum):
-    approved = 'approved'
-    denied = 'denied'
-    partial = 'partial'
-    pending = 'pending'
+    approved = "approved"
+    denied = "denied"
+    partial = "partial"
+    pending = "pending"
 
 
 class Takedown(BaseModel):
@@ -958,7 +959,7 @@ class Ticket(BaseModel):
     updated_at: datetime
     response: str
     handler_id: int
-    claimant_id: Optional[int] = Field(None, description='Only visible to Moderator+.')
+    claimant_id: Optional[int] = Field(None, description="Only visible to Moderator+.")
     report_reason: str
     accused_id: int
 
@@ -977,11 +978,11 @@ class UploadWhitelist(BaseModel):
 
 
 class Status3(Enum):
-    completed = 'completed'
-    duplicate = 'duplicate'
-    error = 'error'
-    processing = 'processing'
-    pending = 'pending'
+    completed = "completed"
+    duplicate = "duplicate"
+    error = "error"
+    processing = "processing"
+    pending = "pending"
 
 
 class Upload(BaseModel):
@@ -1039,7 +1040,7 @@ class UserFeedback(BaseModel):
 
 
 class Status4(Enum):
-    approved = 'approved'
+    approved = "approved"
 
 
 class UserNameChangeRequest(BaseModel):
@@ -1153,8 +1154,8 @@ class Variants(BaseModel):
 
 
 class Samples(BaseModel):
-    field_480p: Optional[PostSampleAlternate] = Field(None, alias='480p')
-    field_720p: Optional[PostSampleAlternate] = Field(None, alias='720p')
+    field_480p: Optional[PostSampleAlternate] = Field(None, alias="480p")
+    field_720p: Optional[PostSampleAlternate] = Field(None, alias="720p")
 
 
 class Alternates(BaseModel):
@@ -1170,8 +1171,6 @@ class Sample(BaseModel):
     width: int
     url: str | None
     alternates: Alternates
-
-
 
 
 class FullCurrentUser(CurrentUser, FullUser):

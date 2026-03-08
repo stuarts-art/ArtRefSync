@@ -1,14 +1,10 @@
 from threading import Event
-import time
-import requests
-from bs4 import BeautifulSoup
 from artrefsync.api.r34_model import R34_Post
 from artrefsync.api.r34_client import R34_Client
 from artrefsync.stats import stats
 from artrefsync.config import config
 from artrefsync.boards.board_handler import Post, ImageBoardHandler
 from artrefsync.constants import BOARD, R34, STATS
-from artrefsync.disk_cache import disk_cache
 
 import logging
 
@@ -26,7 +22,6 @@ class R34Handler(ImageBoardHandler):
         self.reload()
         config.subscribe_reload(self.reload)
 
-        
     def reload(self):
         self.r34_api_string = config[BOARD.R34][R34.API_KEY]
         self.black_list = config[BOARD.R34][R34.BLACK_LIST]
@@ -40,7 +35,9 @@ class R34Handler(ImageBoardHandler):
     def get_board(self) -> BOARD:
         return BOARD.R34
 
-    def get_posts(self, tag, post_limit=None, stop_event: Event = None) -> dict[str, Post]:
+    def get_posts(
+        self, tag, post_limit=None, stop_event: Event = None
+    ) -> dict[str, Post]:
         posts = {}
 
         r34_posts: list[R34_Post] = self.client.get_posts(tag, post_limit, stop_event)
@@ -55,9 +52,13 @@ class R34Handler(ImageBoardHandler):
             skip_rpost = False
             website = f"https://rule34.xxx/index.php?page=post&s=view&id={rpost.id}"
             post_id = Post.make_storage_id(rpost.id, self.get_board())
-            ext=rpost.file_url.split(".")[-1]
+            ext = rpost.file_url.split(".")[-1]
 
-            tags = rpost.tags + [tag, BOARD.R34.value, ext, ]
+            tags = rpost.tags + [
+                tag,
+                BOARD.R34.value,
+                ext,
+            ]
             tags.append(f"rating_{rpost.rating}")
             for black_listed in self.black_list:
                 if black_listed in rpost.tags:
@@ -81,9 +82,9 @@ class R34Handler(ImageBoardHandler):
                 board_update_str=rpost.change,
                 height=rpost.height,
                 width=rpost.width,
-                ratio=rpost.width / rpost.height
-                if rpost.width and rpost.height
-                else None,
+                ratio=(
+                    rpost.width / rpost.height if rpost.width and rpost.height else None
+                ),
                 sample_link=rpost.sample_url,
                 preview_link=rpost.preview_url,
                 file_link=rpost.file_url,
@@ -101,4 +102,3 @@ class R34Handler(ImageBoardHandler):
 if __name__ == "__main__":
     handler = R34Handler()
     handler.get_posts()
-    

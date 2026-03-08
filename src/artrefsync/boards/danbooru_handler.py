@@ -1,13 +1,9 @@
 from threading import Event
-import time
-import requests
-from bs4 import BeautifulSoup
 from artrefsync.api.danbooru_client import Danbooru_Client
 from artrefsync.stats import stats
 from artrefsync.config import config
 from artrefsync.boards.board_handler import Post, ImageBoardHandler
 from artrefsync.constants import BOARD, STATS, DANBOORU
-from artrefsync.disk_cache import disk_cache
 
 import logging
 
@@ -87,9 +83,11 @@ class Danbooru_Handler(ImageBoardHandler):
                 website=website,
                 height=dpost.image_height,
                 width=dpost.image_width,
-                ratio=dpost.image_width / dpost.image_height
-                if dpost.image_width and dpost.image_height
-                else None,
+                ratio=(
+                    dpost.image_width / dpost.image_height
+                    if dpost.image_width and dpost.image_height
+                    else None
+                ),
                 ext=dpost.file_ext,
                 preview_link=dpost.preview_file_url,
                 sample_link=dpost.large_file_url,

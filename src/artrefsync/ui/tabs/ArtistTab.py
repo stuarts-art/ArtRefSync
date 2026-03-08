@@ -1,12 +1,10 @@
 from artrefsync.config import config
 import logging
-from PIL import Image, ImageTk, ImageDraw
 import ttkbootstrap as ttk
 import tkinter as tk
 from artrefsync.constants import BINDING, BOARD, DANBOORU, E621, R34, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.utils.EventManager import ebinder
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -72,7 +70,9 @@ class ArtistTab(ttk.Frame):
         ebinder.event_generate(BINDING.BOARD_SET, self.board_set)
         self.set_artist_counts()
 
-        for board in ["", ] + list(self.board_artists_map.keys()):
+        for board in [
+            "",
+        ] + list(self.board_artists_map.keys()):
             b = str(board)
             self.board_menu.add_radiobutton(
                 label=b,
@@ -151,7 +151,9 @@ class ArtistTab(ttk.Frame):
                         )
                     except Exception as e:
                         logger.warning(
-                            "Failed to set count for board %s, artist %s. Exception %s.", table, artist, e
+                            "Failed to set count for board %s, artist %s. Exception %s.",
+                            table,
+                            artist,
+                            e,
                         )
                         pass
-

@@ -1,14 +1,16 @@
+import logging
 import threading
 import time
 from PIL import Image, ImageTk, ImageDraw
 import functools
-from venv import logger
 import ttkbootstrap as ttk
 import os
-from PIL import Image, ImageTk, ImageSequence
-from itertools import count, cycle
+from PIL import ImageSequence
 
-from artrefsync.boards.board_handler import PostFile
+from artrefsync.config import config
+
+logger = logging.getLogger(__name__)
+logger.setLevel(config.log_level)
 
 class ImageUtils:
     cache = {}
@@ -39,7 +41,7 @@ class ImageUtils:
                     with ImageUtils._lock:
                         image.thumbnail((height, width))
                 return image
-            except Exception as e:
+            except Exception:
                 logger.error("Loading image %s failed. Retrying", file)
                 time.sleep(0.1 * (retry + 1))
         logger.error("Loading image (%s). failed. Retrying", file)
@@ -54,7 +56,7 @@ class ImageUtils:
                 thumbnail = image.copy()
                 thumbnail.thumbnail(size=size)
             return thumbnail
-        except Exception as e:
+        except Exception:
             return None
 
     @staticmethod
@@ -63,11 +65,11 @@ class ImageUtils:
         image = ImageUtils.getPilImage(file)
         frames = []
         try:
-            duration = image.info['duration']
+            duration = image.info["duration"]
         except:
             duration = 100
         try:
-            for frame in ImageSequence .Iterator(image):
+            for frame in ImageSequence.Iterator(image):
                 compressed_frame = frame.copy()
                 if size:
                     compressed_frame.thumbnail(size=size)
@@ -86,12 +88,12 @@ class ImageUtils:
             frame_copy.thumbnail(size=size)
             photoFrame = ImageTk.PhotoImage(image=frame_copy)
             tkFrames.append(photoFrame)
-        
+
         return (tkFrames, duration)
 
     @staticmethod
     @functools.lru_cache(maxsize=50)
-    def get_tk_thumb(file: str, size = (1080,720), radius=0):
+    def get_tk_thumb(file: str, size=(1080, 720), radius=0):
         image = ImageUtils.getPilImageThumb(file, size=size)
         if radius:
             size = (image.width, image.height)
@@ -121,7 +123,9 @@ class ImageUtils:
 
     @staticmethod
     @functools.lru_cache(maxsize=20)
-    def get_round_colored_rect(width, height, radius, fill="white", as_photoimage = False) -> Image.Image:
+    def get_round_colored_rect(
+        width, height, radius, fill="white", as_photoimage=False
+    ) -> Image.Image:
         scale = 4
         image = Image.new(mode="RGBA", size=(width * scale, height * scale))
         draw = ImageDraw.Draw(image)
@@ -129,6 +133,5 @@ class ImageUtils:
             (0, 0, width * scale, height * scale), fill=fill, radius=radius * scale
         )
         image.thumbnail((width, height), Image.Resampling.LANCZOS)
-       
-        return ImageTk.PhotoImage(image) if as_photoimage else image 
-        
+
+        return ImageTk.PhotoImage(image) if as_photoimage else image

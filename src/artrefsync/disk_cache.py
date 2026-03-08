@@ -6,9 +6,8 @@ import logging
 
 from typing import Callable, ParamSpec, TypeVar
 from artrefsync.config import config
-from artrefsync.constants import STATS, TABLE, APP
+from artrefsync.constants import TABLE, APP
 from artrefsync.db.db_utils import BlobDb, DbUtils
-from artrefsync.stats import stats
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)

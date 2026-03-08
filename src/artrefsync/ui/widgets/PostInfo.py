@@ -10,13 +10,10 @@ from tkinterdnd2 import COPY, DND_FILES
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.constants import BINDING
 from artrefsync.db.post_db import PostDb
-from artrefsync.ui.widgets import InputTreeView
-from artrefsync.ui.widgets.PhotoLabel import PhotoLabel
 from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 from artrefsync.utils.EventManager import ebinder
 from artrefsync.config import config
-from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
 
 import logging
 
@@ -44,17 +41,21 @@ class PostInfo(ttk.Frame):
 
         self.thumbnail = tk.Label(self)
         self.thumbnail.grid(column=0, row=0, sticky=tk.NSEW)
-        self.name = ttk.Label(self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1)
+        self.name = ttk.Label(
+            self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
+        )
         self.name.grid(column=0, row=1, sticky=tk.EW)
         self.artist_frame = ttk.Labelframe(self, text="Artist")
         self.artist_frame.grid(column=0, row=2, sticky=tk.EW, ipady=0)
         self.artist = RoundedIcon.from_text(self.artist_frame, "", self.colors.primary)
         self.artist.pack(side=tk.LEFT)
-        self.score = ttk.Label(self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1)
+        self.score = ttk.Label(
+            self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
+        )
         self.score.grid(column=0, row=3, sticky=tk.EW)
         self.file = ttk.Label(self, cursor="arrow", justify=tk.LEFT, border=1)
         self.file.grid(column=0, row=4, sticky=tk.NSEW)
-        self.file_tooltip = ToolTip(self.file) 
+        self.file_tooltip = ToolTip(self.file)
         self.tags_frame = ttk.Frame(self)
         self.tags_frame.grid(column=0, row=5, sticky=tk.NSEW)
 
@@ -99,7 +100,7 @@ class PostInfo(ttk.Frame):
             self.artist.update_text(post_file.artist_name)
             self.score.configure(text=post.score)
             self.file.configure(text=post.file_link)
-            self.file_tooltip.text=f"{post.file_link}\n-Double Click: Open\n-Middle Click: Open file location"
+            self.file_tooltip.text = f"{post.file_link}\n-Double Click: Open\n-Middle Click: Open file location"
             self.tags.config(state=tk.NORMAL)
             self.tags.delete("1.0", tk.END)
             self.tags.config(state=tk.DISABLED)
@@ -119,7 +120,7 @@ class PostInfo(ttk.Frame):
                 return
             thumbnail = ImageUtils.get_tk_thumb(file_name, (190, 190))
             self.thumbnail.config(image=thumbnail)
-            self.thumbnail.image=thumbnail
+            self.thumbnail.image = thumbnail
 
         self.tags.config(state=tk.NORMAL)
         for tag in post.tags:
@@ -127,7 +128,7 @@ class PostInfo(ttk.Frame):
         self.tags.config(state=tk.DISABLED)
 
     def tags_double(self, event):
-        widget:tk.Text = event.widget
+        widget: tk.Text = event.widget
         try:
             index = widget.index(f"@{event.x},{event.y}")
             word = self.get_word(widget, index).strip()
@@ -136,7 +137,7 @@ class PostInfo(ttk.Frame):
 
         except:
             pass
-        
+
     def get_word(self, widget, index):
         try:
             start = widget.search(" ", index, "1.0", backwards=True)

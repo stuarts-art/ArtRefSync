@@ -1,13 +1,9 @@
-from concurrent.futures import ThreadPoolExecutor
 import json
-import concurrent
-import time
 import dacite
 import requests
 from artrefsync.api.eagle_model import EagleFolder, EagleItem, EagleLibrary
 from artrefsync.constants import *
 from artrefsync.config import config
-from artrefsync.utils.benchmark import Bm
 import threading
 
 

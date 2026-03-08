@@ -4,7 +4,7 @@ from typing import Optional
 
 
 @dataclass
-class EagleItem():
+class EagleItem:
     id: str
     name: str
     size: int
@@ -14,8 +14,9 @@ class EagleItem():
     isDeleted: bool
     url: str
 
+
 @dataclass
-class EagleMetaData():
+class EagleMetaData:
     id: str
     name: str
     size: int
@@ -34,4 +35,4 @@ class EagleMetaData():
     lastModified: Optional[int]
 
     def to_file_str(self):
-        return json.dumps(self.__dict__,separators=(',',':'))
+        return json.dumps(self.__dict__, separators=(",", ":"))

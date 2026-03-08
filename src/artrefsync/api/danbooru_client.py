@@ -66,7 +66,7 @@ class Danbooru_Client:
                 break
         if skipped:
             logger.debug("%i posts skipped.", len(skipped))
-        
+
         logger.info("Returning %i posts for %s", len(posts), tag)
         return posts
 

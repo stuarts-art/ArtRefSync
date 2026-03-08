@@ -1,16 +1,15 @@
 from tkinter.font import nametofont
 import ttkbootstrap as ttk
 import tkinter as tk
-from tkinterdnd2 import DND_FILES, TkinterDnD
-import os
 import logging
 from artrefsync.config import config
-from artrefsync.constants import BINDING, BOARD
+from artrefsync.constants import BINDING
 from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
 from artrefsync.utils.EventManager import ebinder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
+
 
 class ActiveTagsTab(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
@@ -20,14 +19,14 @@ class ActiveTagsTab(ttk.Frame):
         self.artist = None
         self.last_filter = None
         self.stored_grid_info = None
-        self.active_tags: dict[str,ttk.Frame] = {}
+        self.active_tags: dict[str, ttk.Frame] = {}
         self.style = ttk.Style()
         self.colors = self.style.colors
 
         self.tabs_frame = ttk.Frame(self, cursor="star")
-        self.tabs_frame.pack(side = tk.TOP, fill="both", expand=True)
+        self.tabs_frame.pack(side=tk.TOP, fill="both", expand=True)
         self.clear_button = RoundedIcon(self, text="✕", size=(25, 25))
-        self.clear_button.place(relx=1.0, rely= 0.0, anchor=tk.NE)
+        self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
         self.sep = ttk.Separator(self, orient=tk.HORIZONTAL)
         self.sep.pack(side=tk.BOTTOM, fill=tk.X, pady=15)
 
@@ -35,9 +34,9 @@ class ActiveTagsTab(ttk.Frame):
 
     def is_artist(self, artist):
         if (
-            artist in ebinder[BINDING.ARTIST_SET] or
-            artist in ebinder[BINDING.BOARD_SET]
-            ):
+            artist in ebinder[BINDING.ARTIST_SET]
+            or artist in ebinder[BINDING.BOARD_SET]
+        ):
             return True
         else:
             return False
@@ -48,7 +47,7 @@ class ActiveTagsTab(ttk.Frame):
         ebinder.bind(BINDING.ON_TAG_SELECT, self.on_tag, self)
         ebinder.bind(BINDING.ON_TAG_MIDDLE, self.on_tag_middle, self)
 
-    def on_artist(self, artist, middle_click = False):
+    def on_artist(self, artist, middle_click=False):
         logger.info("Artist Recieved: %s, Middle Clicked: %d", artist, middle_click)
         if not artist:
             if self.artist:
@@ -66,7 +65,7 @@ class ActiveTagsTab(ttk.Frame):
 
         if self.artist:
             self.remove_tag(self.artist)
-        
+
         self.add_artist(artist)
         self.update_filter()
 
@@ -85,7 +84,7 @@ class ActiveTagsTab(ttk.Frame):
         if self.active_tags:
 
             tags = [tag for tag in self.active_tags]
-            
+
             for curr_tag in tags:
                 if not self.is_artist(curr_tag):
                     removed = self.remove_tag(curr_tag)
@@ -113,7 +112,7 @@ class ActiveTagsTab(ttk.Frame):
                 ebinder.event_generate(BINDING.ON_ARTIST_SELECT, None, False)
         if not self.active_tags:
             self.forget_self()
-    
+
     def remove_tag(self, tag) -> bool:
         if tag not in self.active_tags:
             return False
@@ -121,11 +120,10 @@ class ActiveTagsTab(ttk.Frame):
         widget.destroy()
         return True
 
-
-    def add_tag(self, tag, color = None):
+    def add_tag(self, tag, color=None):
         if not color:
             color = self.colors.secondary
-            
+
         logger.info("ADDING TAG %s", tag)
         if tag in self.active_tags:
             logger.info(
