@@ -173,7 +173,7 @@ class EagleHandler(ImageStoreHandler):
         return response
 
     def update_post(self, post: Post):
-        eagle_client.item.update(post.ext_id, post.tags, url=post.url)
+        self.client.item.update(post.ext_id, post.tags, url=post.url)
 
     def get_or_create_artist_folder(self):
         folders = self.client.folder.list()

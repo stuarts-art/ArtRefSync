@@ -209,29 +209,27 @@ class SyncCoordinator():
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(self.board, artist)
         inserted_list = []
         with PostDb() as post_db:
-            for pid, store_post in store_posts.items():
-                if pid not in post_db.posts:
-                    continue
-                # if not repair and pid in post_db.files:
-                #     continue
-                post = post_db.posts[pid]
-                post_file = PostFile(
-                    post.id,
-                    store_post.ext_id,
-                    store_post.store,
-                    post.board,
-                    post.artist_name,
-                    post.height,
-                    post.width,
-                    post.ratio,
-                    post.ext,
-                    store_post.preview,
-                    store_post.sample,
-                    store_post.file
-                )
-                inserted = post_db.files.insert(post_file)
-                if inserted:
-                    inserted_list.append(pid)
+            for pid in post_db.posts.select_id_list([("artist_name", artist), ("board", f"self.board")]):
+                if pid in store_posts and pid not in post_db.files:
+                    store_post = store_posts[pid]
+                    post = post_db.posts[pid]
+                    post_file = PostFile(
+                        post.id,
+                        store_post.ext_id,
+                        store_post.store,
+                        post.board,
+                        post.artist_name,
+                        post.height,
+                        post.width,
+                        post.ratio,
+                        post.ext,
+                        store_post.preview,
+                        store_post.sample,
+                        store_post.file
+                    )
+                    inserted = post_db.files.insert(post_file)
+                    if inserted:
+                        inserted_list.append(pid)
         return inserted_list
         
 if __name__ == "__main__":
