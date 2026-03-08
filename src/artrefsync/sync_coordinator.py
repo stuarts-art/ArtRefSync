@@ -207,9 +207,10 @@ class SyncCoordinator():
     def update_post_file_table(self, artist, repair = False):
         logger.info("Updating PostFile Table for %s, %s, %s", self.store, self.board, artist)
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(self.board, artist)
+        logger.debug("store_posts recieved with %s records.", len(store_posts))
         inserted_list = []
         with PostDb() as post_db:
-            for pid in post_db.posts.select_id_list([("artist_name", artist), ("board", f"self.board")]):
+            for pid in post_db.posts.select_id_list([("artist_name", artist), ("board", f"{self.board}")]):
                 if pid in store_posts and pid not in post_db.files:
                     store_post = store_posts[pid]
                     post = post_db.posts[pid]

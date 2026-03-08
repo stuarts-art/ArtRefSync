@@ -36,7 +36,7 @@ class EventManager:
 
     def event_generate(self, sequence: str, *args):
         sequence = str(sequence)
-        logger.info("Generating event for sequence: %s", sequence)
+        logger.debug("Generating event for sequence: %s", sequence)
         if args:
             if len(args) == 1:
                 self[sequence] = args[0]
