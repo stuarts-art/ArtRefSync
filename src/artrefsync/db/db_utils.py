@@ -1,4 +1,5 @@
 import functools
+import inspect
 import logging
 import os
 import pickle
@@ -80,8 +81,9 @@ class DbUtils:
                 logger.debug("Checking %s", type)
                 logger.debug("Checking %s", type.__class__)
                 logger.debug("Checking %s", type.__type_params__)
-                if issubclass(type.__class__, EnumType):
-                    field_sql_type = "TEXT"
+                if not inspect.isclass(type):
+                    if isinstance(type.__class__, StrEnum):
+                        field_sql_type = "TEXT"
                     break
                 for mapped_type in DbUtils._type_map:
                     if issubclass(type, mapped_type):
@@ -108,6 +110,10 @@ class DbUtils:
 
             field_type[name] = field_sql_type
             table_fields.append(f"{name} {field_sql_type}{field_suffix}{default}")
+        
+        logger.debug("Field Type - %s", field_type)
+        logger.debug("Table Fields - %s", table_fields)
+        logger.debug("Primary Key - %s", primary_key)
 
         return field_type, table_fields, primary_key
 
