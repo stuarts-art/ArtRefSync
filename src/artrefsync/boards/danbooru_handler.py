@@ -90,9 +90,10 @@ class Danbooru_Handler(ImageBoardHandler):
                 ratio=dpost.image_width / dpost.image_height
                 if dpost.image_width and dpost.image_height
                 else None,
-                sample_link=dpost.large_file_url,
                 ext=dpost.file_ext,
-                file_link="",
+                preview_link=dpost.preview_file_url,
+                sample_link=dpost.large_file_url,
+                file_link=dpost.file_url,
             )
             stats.add(STATS.TAG_SET, dpost.tag_string)
             stats.add(STATS.TAG_SET, tag)

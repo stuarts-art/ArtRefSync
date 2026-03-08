@@ -38,12 +38,12 @@ def main():
 
 class PlainLocalStorage(ImageStoreHandler):
     def __init__(self):
-        self.artists_base_dir = DbUtils.resource_path(Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR]))
+        self.artists_base_dir = Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR])
         self.dir_base_map = {}
         self.dir_map: dict[DIRS, dict[BOARD, dict[str, str]]]= defaultdict(dict)
         self.update_map: dict = {}
         self.file_map: dict = defaultdict(dict)
-        self.dir_base_map[DIRS.FILE] = DbUtils.resource_path(Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR]))
+        self.dir_base_map[DIRS.FILE] = self.artists_base_dir
         self.dir_base_map[DIRS.PREVIEW] = os.path.join(self.dir_base_map[DIRS.FILE], DIRS.PREVIEW)
         self.dir_base_map[DIRS.SAMPLE] = os.path.join(self.dir_base_map[DIRS.FILE], DIRS.SAMPLE)
 
