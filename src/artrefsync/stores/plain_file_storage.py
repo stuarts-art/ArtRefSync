@@ -75,7 +75,7 @@ class PlainLocalStorage(ImageStoreHandler):
         
     def get_artist_posts(self, dir, board, artist) -> dict[str, str]:
         artist_dir = self.get_artist_dir(dir, board, artist)
-        update_time = os.path.getmtime(self.artists_base_dir)
+        update_time = os.path.getmtime(artist_dir)
         last_updated = self.update_map[artist_dir]  if artist_dir in self.update_map else None
         
         if artist_dir in self.update_map:
