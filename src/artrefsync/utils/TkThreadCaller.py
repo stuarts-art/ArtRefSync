@@ -78,7 +78,7 @@ class TkThreadCaller:
             if future in self.cancel_key_map:
                 on_finish = self.on_finish_map.pop(future)
                 result = future.result()
-                self.root.after(0, on_finish, result)
+                self.root.after_idle(on_finish, result)
                 cancel_key = self.cancel_key_map.pop(future)
                 if cancel_key in self.cancel_map:
                     if future in self.cancel_map[cancel_key]:

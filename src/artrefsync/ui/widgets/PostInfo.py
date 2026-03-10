@@ -26,10 +26,8 @@ logger.setLevel(config.log_level)
 class PostInfo(ttk.Frame):
     def __init__(self, root, thread_caller: TkThreadCaller, **kwargs):
         logger.info("Creating Post Info Tab")
-        # self.width = 100
         super().__init__(root, *kwargs, width=4)
         self.grid(column=0, row=0, sticky=tk.NSEW)
-        print(self.winfo_width())
         self.thread_caller = TkThreadCaller
         text_width = 25
         self.font = nametofont("TkDefaultFont")
@@ -104,7 +102,7 @@ class PostInfo(ttk.Frame):
             self.tags.config(state=tk.NORMAL)
             self.tags.delete("1.0", tk.END)
             self.tags.config(state=tk.DISABLED)
-            self.after(0, self.after_on_post_select(post, post_file))
+            self.after(0, self.after_on_post_select, post, post_file)
 
     def after_on_post_select(self, post: Post, post_file: PostFile):
         if post_file:

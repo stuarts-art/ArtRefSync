@@ -11,7 +11,6 @@ class EagleClient:
     def __init__(self):
         eagle_url = config[STORE.EAGLE][EAGLE.ENDPOINT].strip()
         self.eagle_url = eagle_url if eagle_url else "http://localhost:41595/api"
-        self.eagle_url = eagle_url if eagle_url else "http://localhost:41595/api"
         self.lock = threading.Lock()
         self.folder = self._Folder(self.eagle_url, self.lock)
         self.item = self._Item(self.eagle_url, self.lock)
@@ -68,9 +67,6 @@ class EagleClient:
                     self.folder_url("update"), data=json.dumps(data), timeout=5
                 )
             response = json.loads(response.content)["data"]
-            with open("scratch/eagle_client_testing.json", "w") as f:
-                json.dump(response, f, indent=4)
-
             updated_item = dacite.from_dict(EagleFolder.UpdatedFolder, response)
             return updated_item
 
@@ -81,8 +77,6 @@ class EagleClient:
                 )
             # print(response)
             response = response["data"]
-            with open("scratch/eagle_client_testing_list.json", "w") as f:
-                json.dump(response, f, indent=4)
             folder_list = [
                 dacite.from_dict(EagleFolder.ListFolder, item) for item in response
             ]
@@ -169,10 +163,6 @@ class EagleClient:
                     self.item_url("update"), data=json.dumps(data), timeout=5
                 )
             response = json.loads(response.content)["data"]
-
-            with open("scratch/eagle_client_update_testing.json", "w") as f:
-                json.dump(response, f, indent=4)
-
             updated_item = dacite.from_dict(EagleItem.UpdatedItem, response)
             return updated_item
 

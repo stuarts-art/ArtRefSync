@@ -150,8 +150,8 @@ class ActiveTagsTab(ttk.Frame):
             self.forget_self()
 
     def update_filter(self):
-        logger.info("Updating filter to be: %s")
         tags = list(self.active_tags.keys())
+        logger.info("Updating filter to be: %s", tags)
         if tags == self.last_filter:
             return
         self.last_filter = tags

@@ -365,7 +365,6 @@ class ModernTopBar(ttk.Frame):
         i = 0 if x <= 20 else (1 if x < g[0] - 20 else 2)
         j = 0 if y <= 20 else (1 if y < g[1] - 20 else 2)
 
-        # print(f"({i}, {j}), {cursor_rows[j][i]}")
         self.root.config(cursor=cursor_rows[j][i])
 
     def outer_frame_leave(self, event):

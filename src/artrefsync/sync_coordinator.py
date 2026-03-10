@@ -67,7 +67,7 @@ def sync_config(event: Event = Event()):
             board = Danbooru_Handler()
             sync(board, store, limit, event)
     except Exception as e:
-        print(e)
+        logger.info("Exception raised while syncing: %s", e)
     finally:
         ebinder.event_generate(BINDING.ON_LOADING_DONE)
 
@@ -181,13 +181,14 @@ class SyncCoordinator:
             time.sleep(0.5 * retry)
 
     def update_metadata(self, artist) -> list[Post]:
+        logger.debug("Updating metadata for artist: %s", artist)
 
         updated_posts = []
         artist_tag_count = defaultdict(int)
         posts: dict[str, Post] = self.board_handler.get_posts(
             artist, self.max_per_artist, self.stop_event
         )
-        logger.debug("Recieved %d posts for %s", len(posts), artist)
+        logger.debug("Recieved %d metadata posts for %s from board %s", len(posts), artist, self.board)
         with PostDb() as post_db:
             for pid, post in posts.items():
                 inserted = post_db.posts.insert(post)
@@ -201,6 +202,7 @@ class SyncCoordinator:
                     artist_tag_count[tag] += 1
             post_db.artist_tags.dumps_blob(artist, artist_tag_count)
             post_db.artist_tags.commit()
+        logger.debug("Updated %d metadata posts for %s from board %s", len(updated_posts), artist, self.board)
         return updated_posts
 
     def get_missing_ids(self, artist: str):
@@ -252,7 +254,7 @@ class SyncCoordinator:
         return success_list
 
     def update_post_file_table(self, artist, repair=False):
-        logger.info(
+        logger.debug(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist
         )
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(
@@ -284,6 +286,9 @@ class SyncCoordinator:
                     inserted = post_db.files.insert(post_file)
                     if inserted:
                         inserted_list.append(pid)
+        logger.debug(
+            "Inserted %d PostFile Table for %s, %s, %s", len(inserted_list), self.store, self.board, artist
+        )
         return inserted_list
 
 

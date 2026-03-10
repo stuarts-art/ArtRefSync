@@ -15,9 +15,6 @@ T = TypeVar("T", contravariant=dataclass)
 
 
 class Dataclass_DB(Generic[T]):
-    field_type_map = {}
-    primary_key_map = {}
-
     def __init__(
         self,
         cls: Type[T],
@@ -167,7 +164,6 @@ class Dataclass_DB(Generic[T]):
 
         field_str = "*" if not select_fields else ", ".join(select_fields)
 
-        # query = f'SELECT {field_str} FROM {self.table_name}  WHERE (id) = ?'
         query = f"SELECT {field_str} FROM {self.table_name}  WHERE (id) IN ({', '.join('?' * len(id_list))}) {suffix}"
         cur = self.connection.cursor()
         if not as_tupple:

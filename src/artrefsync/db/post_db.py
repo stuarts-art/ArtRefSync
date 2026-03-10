@@ -33,23 +33,21 @@ class PostDb:
         if not self.connection:
             db_dir = config[TABLE.APP][APP.DB_DIR]
             db_name = config[TABLE.APP][APP.DB_FILE_NAME]
-            logger.debug(
-                "Creating connection with dir: %s, dbname: %s", db_dir, db_name
-            )
             if db_dir:
                 db_name = DbUtils.resource_path(os.path.join(db_dir, db_name))
                 os.makedirs(os.path.dirname(db_name), exist_ok=True)
             else:
                 db_name = DbUtils.resource_path(db_name)
-            logger.info("Creating or connecting to Database: %s", db_name)
+            logger.debug("Connecting to Database: %s", db_name)
             self.connection = sqlite3.connect(db_name)
             self.connection_owner = True
         self.commit = self.connection.commit
-        if not self.tables_initialized:
+        if not PostDb.tables_initialized:
             lazy = False
-            self.tables_initialized = True
+            PostDb.tables_initialized = True
         else:
             lazy = True
+        logger.info("LAZY + %s", lazy)
 
         self.posts = Dataclass_DB(Post, self.connection, lazy=lazy)
         self.files = Dataclass_DB(PostFile, self.connection, lazy=lazy)

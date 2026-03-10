@@ -25,9 +25,9 @@ class ImageUtils:
     def blank():
         return ttk.PhotoImage()
 
-    @staticmethod
+    @classmethod
     @functools.lru_cache(maxsize=100)
-    def getPilImage(file: str, height=None, width=None):
+    def getPilImage(cls, file: str, height=None, width=None):
         logger.info("Cache-Miss, Getting Image")
         if not os.path.exists(file):
             logger.error("Cannot open path: %s", file)
@@ -35,10 +35,10 @@ class ImageUtils:
 
         for retry in range(3):
             try:
-                with ImageUtils._lock:
+                with cls._lock:
                     image = Image.open(file)
                 if height and width:
-                    with ImageUtils._lock:
+                    with cls._lock:
                         image.thumbnail((height, width))
                 return image
             except Exception:

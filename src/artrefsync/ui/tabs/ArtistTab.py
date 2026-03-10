@@ -63,7 +63,6 @@ class ArtistTab(ttk.Frame):
         self.artist_set = set(
             [str(artist) for artist in set().union(*self.board_artists_map.values())]
         )
-        print(self.artist_set)
         self.board_set = set([str(board) for board in BOARD if board != BOARD.OTHER])
 
         ebinder.event_generate(BINDING.ARTIST_SET, self.artist_set)

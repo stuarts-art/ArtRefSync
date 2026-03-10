@@ -82,15 +82,3 @@ class ImageBoardHandler(ABC):
         pass
 
 
-if __name__ == "__main__":
-    print("")
-
-    types_list = Post.__doc__[5:-1].split(", ")
-    types_dict = {}
-    for f in types_list:
-        f_split = f.split(":")
-        types_dict[f_split[0]] = f_split[1].strip().split(" = ")[0].split(" | ")
-
-    print(types_dict)
-
-    p = Post

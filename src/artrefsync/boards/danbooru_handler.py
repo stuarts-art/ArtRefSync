@@ -64,7 +64,7 @@ class Danbooru_Handler(ImageBoardHandler):
             for black_listed in self.black_list:
                 if black_listed in tags:
                     stats.add(STATS.SKIP_COUNT, 1)
-                    print(f"Skipping {post_id} for {black_listed}. ({website})")
+                    logger.debug("Skipping %s for %s. (%s)", post_id, black_listed, website)
                     is_black_listed = True
                     break
             if is_black_listed:
