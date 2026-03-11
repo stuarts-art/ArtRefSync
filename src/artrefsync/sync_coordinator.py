@@ -34,10 +34,11 @@ logger.setLevel(logging.DEBUG)
 
 
 def main():
-    sync_from_store()
+    event = Event()
+    sync_config(event)
 
 
-def sync_config(event: Event = Event()):
+def sync_config(event: Event):
     try:
         limit = int(config[TABLE.APP][APP.LIMIT])
         store = None
@@ -66,13 +67,11 @@ def sync_config(event: Event = Event()):
             logger.info("Syncing %s with store: %s", TABLE.DANBOORU, store.get_store())
             board = Danbooru_Handler()
             sync(board, store, limit, event)
-    except Exception as e:
-        logger.info("Exception raised while syncing: %s", e)
     finally:
         ebinder.event_generate(BINDING.ON_LOADING_DONE)
 
 
-def sync_from_store(event: Event = Event()):
+def sync_from_store(event: Event):
     try:
         store = None
         if config[TABLE.LOCAL][LOCAL.ENABLED]:
@@ -220,6 +219,9 @@ class SyncCoordinator:
 
     def download_missing_ids(self, artist):
         missing_ids = self.get_missing_ids(artist)
+        if not missing_ids:
+            return []
+
         with PostDb() as post_db:
             missing_posts = [post_db.posts[id] for id in missing_ids]
 
@@ -237,20 +239,21 @@ class SyncCoordinator:
             )
             for future in concurrent.futures.as_completed(future_to_pid.keys()):
                 try:
+                    ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
                     result = future.result()
                     success_list.append(future_to_pid[future])
-                    ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
                     if self.stop_event and self.stop_event.is_set():
                         logger.warning("Stop Event Recieved.")
                         executor.shutdown(wait=True, cancel_futures=True)
                         return
                 except Exception as e:
                     failure_list.append(future_to_pid[future])
-                    logger.error(e)
-                    self.stop_event.set()
-                    executor.shutdown(wait=True, cancel_futures=True)
+                    continue
 
         self.download_count += 1
+        if failure_list:
+            logger.error("The following IDs failed to load. %s", failure_list)
+
         return success_list
 
     def update_post_file_table(self, artist, repair=False):
@@ -266,6 +269,7 @@ class SyncCoordinator:
             for pid in post_db.posts.select_id_list(
                 [("artist_name", artist), ("board", f"{self.board}")]
             ):
+                inserted = None
                 if pid in store_posts and pid not in post_db.files:
                     store_post = store_posts[pid]
                     post = post_db.posts[pid]
@@ -284,8 +288,8 @@ class SyncCoordinator:
                         store_post.file,
                     )
                     inserted = post_db.files.insert(post_file)
-                    if inserted:
-                        inserted_list.append(pid)
+                if inserted:
+                    inserted_list.append(pid)
         logger.debug(
             "Inserted %d PostFile Table for %s, %s, %s", len(inserted_list), self.store, self.board, artist
         )

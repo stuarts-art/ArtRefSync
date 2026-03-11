@@ -4,7 +4,7 @@ from enum import StrEnum, auto
 import os
 import shutil
 from typing import Iterable
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from artrefsync.stores.link_cache import Link_Cache
 from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.constants import BOARD, LOCAL, STORE, TABLE
@@ -32,7 +32,7 @@ class PlainLocalStorage(ImageStoreHandler):
     def __init__(self):
         self.artists_base_dir = Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR])
         self.dir_base_map = {}
-        self.dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = defaultdict(dict)
+        self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = defaultdict(dict)
         self.update_map: dict = {}
         self.file_map: dict = defaultdict(dict)
         self.dir_base_map[DIRS.FILE] = self.artists_base_dir
@@ -42,6 +42,8 @@ class PlainLocalStorage(ImageStoreHandler):
         self.dir_base_map[DIRS.SAMPLE] = os.path.join(
             self.dir_base_map[DIRS.FILE], DIRS.SAMPLE
         )
+        self._artist_name_map = {}
+        self._ignore_list = ["(", ")", "[", "]", ",", ";", "<", ">", "="]
 
         prev = 0
         loaded = 0
@@ -53,21 +55,29 @@ class PlainLocalStorage(ImageStoreHandler):
             for board in BOARD:
                 board_path = Path(os.path.join(base_path, board.value))
                 os.makedirs(board_path, exist_ok=True)
-                self.dir_map[dir][board] = {}
-                self.dir_map[dir][board][board] = board_path
+                self._dir_map[dir][board] = {}
+                self._dir_map[dir][board][board] = board_path
 
                 for artist_path in board_path.iterdir():
+                    if artist_path.is_file():
+                        continue
                     update_time = os.path.getmtime(artist_path)
-                    artist = artist_path.name
-                    self.dir_map[dir][board][artist] = artist_path
-                    self.update_map[dir] = update_time
+                    artisttxt = os.path.join(artist_path, "artist.txt")
+                    if os.path.exists(artisttxt):
+                        with open(artisttxt, 'rt') as f:
+                            artist = f.readline()
+                    else:
+                        artist = artist_path.name
+                    self._dir_map[dir][board][artist] = artist_path
+                    self.update_map[artist_path] = update_time
                     for file in artist_path.iterdir():
+                        if not file.is_file() or file.name == "artist.txt":
+                            continue
                         pid = file.name.rsplit(".", maxsplit=1)[0].split("-")[0]
                         if not pid:
                             continue
                         self.file_map[artist_path][pid] = file
                         loaded += 1
-                    prev = loaded
 
     def get_artist_posts(self, dir, board, artist) -> dict[str, str]:
         artist_dir = self.get_artist_dir(dir, board, artist)
@@ -82,20 +92,33 @@ class PlainLocalStorage(ImageStoreHandler):
 
         for file in Path.iterdir(artist_dir):
             pid = file.name.rsplit(".", maxsplit=1)[0].split("-")[0]
-            if not pid:
+            if not pid or pid == "artist":
                 continue
-            self.file_map[artist_dir][pid] = file
+            self.file_map[artist_dir][pid] = file.resolve()
         self.update_map[artist_dir] = update_time
         return self.file_map[artist_dir]
 
     def get_artist_dir(self, dir: DIRS, board: BOARD, artist):
-        if artist in self.dir_map[dir][board]:
-            return self.dir_map[dir][board][artist]
-        else:
-            artist_dir = os.path.join(self.dir_map[dir][board][board], artist)
+        if artist not in self._dir_map[dir][board]:
+            mapped_name = self.get_mapped_artist_name(artist)
+            artist_dir = os.path.join(self._dir_map[dir][board][board], mapped_name)
+            artist_dir = PureWindowsPath(artist_dir).as_posix()
             os.makedirs(artist_dir, exist_ok=True)
-            self.dir_map[dir][board][artist] = artist_dir
-            return artist_dir
+            if mapped_name != artist:
+                artist_txt = os.path.join(artist_dir, "artist.txt")
+                with open(artist_txt, 'w+t') as f:
+                    f.write(artist)
+            self._dir_map[dir][board][artist] = Path(artist_dir)
+        return self._dir_map[dir][board][artist]
+    
+    def get_mapped_artist_name(self, artist_name: str):
+        if artist_name not in self._artist_name_map:
+            mapped_name = artist_name
+            for char in self._ignore_list:
+                mapped_name = mapped_name.replace(char, "")
+            mapped_name.replace("_", "")
+            self._artist_name_map[artist_name] = mapped_name
+        return self._artist_name_map[artist_name]
 
     def get_store(self) -> STORE:
         return STORE.LOCAL

@@ -47,10 +47,28 @@ class PostInfo(ttk.Frame):
         self.artist_frame.grid(column=0, row=2, sticky=tk.EW, ipady=0)
         self.artist = RoundedIcon.from_text(self.artist_frame, "", self.colors.primary)
         self.artist.pack(side=tk.LEFT)
-        self.score = ttk.Label(
-            self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
+
+        self.small_details_frame = ttk.Frame(self)
+        self.small_details_frame.grid(column=0, row=3, sticky=tk.EW)
+        score_frame = ttk.Labelframe(self.small_details_frame, text="Score")
+        ext_frame = ttk.Labelframe(self.small_details_frame, text="Ext")
+        dim_frame = ttk.Labelframe(self.small_details_frame, text="Size")
+        score_frame.pack(side=tk.LEFT, expand=True, fill="x")
+        ext_frame.pack(side=tk.LEFT, expand=True, fill="x")
+        dim_frame.pack(side=tk.LEFT, expand=True, fill="x")
+        self.score_label = ttk.Label(
+            score_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
         )
-        self.score.grid(column=0, row=3, sticky=tk.EW)
+        self.ext_label = ttk.Label(
+            ext_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
+        )
+        self.dim_label = ttk.Label(
+            dim_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
+        )
+        self.score_label.pack()
+        self.ext_label.pack()
+        self.dim_label.pack()
+
         self.file = ttk.Label(self, cursor="arrow", justify=tk.LEFT, border=1)
         self.file.grid(column=0, row=4, sticky=tk.NSEW)
         self.file_tooltip = ToolTip(self.file)
@@ -59,7 +77,7 @@ class PostInfo(ttk.Frame):
 
         self.tags = ttk.Text(
             self.tags_frame, wrap=tk.WORD, width=text_width
-        )  # , bg=self.colors.get('primary'))
+        )
         self.tags.pack(fill="both", expand=True)
         self.grid_propagate(False)
 
@@ -96,11 +114,15 @@ class PostInfo(ttk.Frame):
             post.sample_link = post_file.preview
             self.name.configure(text=post.name)
             self.artist.update_text(post_file.artist_name)
-            self.score.configure(text=post.score)
+            self.score_label.configure(text=post.score)
+            self.ext_label.configure(text=f"{post.ext.upper()}")
+            self.dim_label.configure(text=f"{post.width}x{post.height}")
             self.file.configure(text=post.file_link)
             self.file_tooltip.text = f"{post.file_link}\n-Double Click: Open\n-Middle Click: Open file location"
             self.tags.config(state=tk.NORMAL)
             self.tags.delete("1.0", tk.END)
+            for tag in post.tags:
+                self.tags.insert(tk.END, f"{tag}  ")
             self.tags.config(state=tk.DISABLED)
             self.after(0, self.after_on_post_select, post, post_file)
 
@@ -120,10 +142,6 @@ class PostInfo(ttk.Frame):
             self.thumbnail.config(image=thumbnail)
             self.thumbnail.image = thumbnail
 
-        self.tags.config(state=tk.NORMAL)
-        for tag in post.tags:
-            self.tags.insert(tk.END, f"{tag}  ")
-        self.tags.config(state=tk.DISABLED)
 
     def tags_double(self, event):
         widget: tk.Text = event.widget

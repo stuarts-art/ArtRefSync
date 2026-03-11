@@ -218,3 +218,5 @@ metadata_cache/
 *.db
 LocalTest/
 .log
+media/
+log/

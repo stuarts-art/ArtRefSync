@@ -195,9 +195,6 @@ class ConfigTab(ttk.Frame):
             label="Edit Config", command=lambda: os.startfile(config.path)
         )
 
-    def start_sync_config(self, data):
-        sync_config()
-
 
 if __name__ == "__main__":
     import artrefsync.ui.TagApp as TagApp
