@@ -12,7 +12,10 @@ from enum import Enum, StrEnum
 from types import NoneType, UnionType
 from typing import get_args
 
+from artrefsync.config import config
+
 logger = logging.getLogger()
+logger.setLevel(config.log_level)
 
 
 class DbUtils:
@@ -261,6 +264,12 @@ class BlobDb:
         key: Table Key
         input_set: Input set to union on
         """
+        logger.debug("Starting union_update for %s, %s", key, input_set)
+        if not isinstance(input_set, set):
+            if isinstance(input_set, Iterable):
+                input_set = set(input_set)
+            else:
+                input_set = set((input_set,))
         current_set: set = self.loads_blob(key)
         if current_set:
             if not isinstance(current_set, set):

@@ -90,6 +90,8 @@ class APP(StrEnum):
     DB_DIR = auto()
     DB_FILE_NAME = auto()
     DB_BLOB_NAME = auto()
+    THUMBNAIL_WIDTH = auto()
+    THUMBNAIL_HEIGHT = auto()
 
 
 class BOARD(StrEnum):

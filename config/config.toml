@@ -7,6 +7,8 @@ cache_ttl = 300
 db_dir = ".db"
 db_file_name = "tagapp.db"
 db_blob_name = "blob.db"
+thumbnail_width = 640
+thumbnail_height = 480
 
 [r34]
 enabled = false

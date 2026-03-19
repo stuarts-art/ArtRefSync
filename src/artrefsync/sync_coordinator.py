@@ -30,7 +30,6 @@ from artrefsync.stores.link_cache import Link_Cache
 from artrefsync.utils.EventManager import ebinder
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 def main():
@@ -42,14 +41,14 @@ def sync_config(event: Event):
     try:
         limit = int(config[TABLE.APP][APP.LIMIT])
         store = None
-        if config[TABLE.LOCAL][LOCAL.ENABLED]:
+        if config[TABLE.EAGLE][EAGLE.ENABLED]:
+            store = EagleHandler()
+        elif config[TABLE.LOCAL][LOCAL.ENABLED]:
             store = PlainLocalStorage()
 
         # EAGLE Overrides the normal FS storage.
-        if config[TABLE.EAGLE][EAGLE.ENABLED]:
-            store = EagleHandler()
 
-        if store == None:
+        if store is None:
             logger.warning("NO STORE ENABLED. ENDING SYNC")
             return
 
@@ -74,14 +73,16 @@ def sync_config(event: Event):
 def sync_from_store(event: Event):
     try:
         store = None
-        if config[TABLE.LOCAL][LOCAL.ENABLED]:
-            store = PlainLocalStorage()
-        # EAGLE Overrides the normal FS storage.
         if config[TABLE.EAGLE][EAGLE.ENABLED]:
             store = EagleHandler()
+        elif config[TABLE.LOCAL][LOCAL.ENABLED]:
+            store = PlainLocalStorage()
+        if store is None:
+            logger.warning("NO STORE ENABLED. ENDING SYNC")
+            return
 
         for board in BOARD:
-            match (board):
+            match board:
                 case BOARD.R34:
                     handler = R34Handler()
                 case BOARD.E621:
@@ -100,7 +101,7 @@ def sync_from_store(event: Event):
                 if event.is_set():
                     return
                 updated = sync_coordinator.update_post_file_table(artist=artist)
-                logger.info(
+                logger.debug(
                     "%s, %s, %s, %d",
                     handler.get_board(),
                     store.get_store(),
@@ -127,7 +128,6 @@ def sync(
 
 
 class SyncCoordinator:
-
     def __init__(
         self,
         board_handler: ImageBoardHandler,
@@ -151,22 +151,30 @@ class SyncCoordinator:
             BINDING.ON_LOAD_LEFT_SET, len(self.board_handler.artist_list)
         )
         for artist in self.board_handler.artist_list:
-            if not self.stop_event.is_set():
-                ebinder.event_generate(
-                    BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
-                )
-                self.sync_artist(artist)
+            if self.stop_event.is_set():
+                return
+            ebinder.event_generate(BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}")
+            self.sync_artist(artist)
+            self.update_post_file_table(artist)
 
         with PostDb() as post_db:
             post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_count)
             for tag, posts in self.tag_post_dict.items():
-                if not self.stop_event.is_set():
-                    post_db.tag_posts.union_update(tag, posts)
+                if self.stop_event.is_set():
+                    return
+                post_db.tag_posts.union_update(tag, posts)
+
+        for artist in self.board_handler.artist_list:
+            if self.stop_event.is_set():
+                return
+            self.store_handler.update_thumbnails(self.board, artist)
 
     def sync_artist(self, artist):
+        logger.info("Starting sync artist %s", artist)
         self.update_metadata(artist)
         self.update_post_file_table(artist)
         download_list = self.download_missing_ids(artist)
+
         for retry in range(1, 4):
             inserted_post_files = self.update_post_file_table(artist)
             download_list = [
@@ -174,10 +182,11 @@ class SyncCoordinator:
             ]
             if not download_list:
                 break
-            logger.info(
+            logger.debug(
                 "Waiting for %d files to sync for artist %s", len(download_list), artist
             )
             time.sleep(0.5 * retry)
+        logger.debug("Ending sync artist %s", artist)
 
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
@@ -187,7 +196,12 @@ class SyncCoordinator:
         posts: dict[str, Post] = self.board_handler.get_posts(
             artist, self.max_per_artist, self.stop_event
         )
-        logger.debug("Recieved %d metadata posts for %s from board %s", len(posts), artist, self.board)
+        logger.debug(
+            "Recieved %d metadata posts for %s from board %s",
+            len(posts) if posts else 0,
+            artist,
+            self.board,
+        )
         with PostDb() as post_db:
             for pid, post in posts.items():
                 inserted = post_db.posts.insert(post)
@@ -201,7 +215,12 @@ class SyncCoordinator:
                     artist_tag_count[tag] += 1
             post_db.artist_tags.dumps_blob(artist, artist_tag_count)
             post_db.artist_tags.commit()
-        logger.debug("Updated %d metadata posts for %s from board %s", len(updated_posts), artist, self.board)
+        logger.debug(
+            "Updated %d metadata posts for %s from board %s",
+            len(updated_posts) if updated_posts else 0,
+            artist,
+            self.board,
+        )
         return updated_posts
 
     def get_missing_ids(self, artist: str):
@@ -266,32 +285,52 @@ class SyncCoordinator:
         logger.debug("store_posts recieved with %s records.", len(store_posts))
         inserted_list = []
         with PostDb() as post_db:
-            for pid in post_db.posts.select_id_list(
-                [("artist_name", artist), ("board", f"{self.board}")]
-            ):
+            metadata_ids = post_db.posts.select_id_list(
+                [("board", self.board), ("artist_name", artist)]
+            )
+            for pid, store_post in store_posts.items():
+                if pid not in metadata_ids:
+                    continue
+                post = post_db.posts[pid]
+
+                if pid in post_db.files:
+                    old_file: PostFile = post_db.files[pid]
+                    if (
+                        old_file.file == store_post.file
+                        and old_file.sample == store_post.sample
+                        and old_file.preview == store_post.preview
+                        and old_file.thumbnail == store_post.thumbnail
+                    ):
+                        continue
                 inserted = None
-                if pid in store_posts and pid not in post_db.files:
+
+                if pid in store_posts:
                     store_post = store_posts[pid]
                     post = post_db.posts[pid]
                     post_file = PostFile(
-                        post.id,
-                        store_post.ext_id,
-                        store_post.store,
-                        post.board,
-                        post.artist_name,
-                        post.height,
-                        post.width,
-                        post.ratio,
-                        post.ext,
-                        store_post.preview,
-                        store_post.sample,
-                        store_post.file,
+                        id=post.id,
+                        ext_id=store_post.ext_id,
+                        store=store_post.store,
+                        board=post.board,
+                        artist_name=post.artist_name,
+                        height=post.height,
+                        width=post.width,
+                        ratio=post.ratio,
+                        ext=post.ext,
+                        preview=store_post.preview,
+                        thumbnail=store_post.thumbnail,
+                        sample=store_post.sample,
+                        file=store_post.file,
                     )
                     inserted = post_db.files.insert(post_file)
                 if inserted:
                     inserted_list.append(pid)
         logger.debug(
-            "Inserted %d PostFile Table for %s, %s, %s", len(inserted_list), self.store, self.board, artist
+            "Inserted %d PostFile Table for %s, %s, %s",
+            len(inserted_list),
+            self.store,
+            self.board,
+            artist,
         )
         return inserted_list
 

@@ -45,7 +45,6 @@ class Link_Cache:
 
     def get_file_from_link(self, link: str) -> str:
         if link not in self._link_cache:
-            # print("Downloading {link} to cache")
             suffix = f".{link.split('.')[-1]}"
             temp = tempfile.NamedTemporaryFile(mode="wb", suffix=suffix, delete=False)
             self.download_link_to_file(link, temp)

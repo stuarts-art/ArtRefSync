@@ -47,7 +47,6 @@ class PostDb:
             PostDb.tables_initialized = True
         else:
             lazy = True
-        logger.info("LAZY + %s", lazy)
 
         self.posts = Dataclass_DB(Post, self.connection, lazy=lazy)
         self.files = Dataclass_DB(PostFile, self.connection, lazy=lazy)
@@ -58,7 +57,7 @@ class PostDb:
     @property
     def board_artists(self) -> dict[str : list[str]]:
         board_artists_dict = {}
-        select_result = self.posts.select([], ["DISTINCT artist_name, board"])
+        select_result = self.posts.select([], ["DISTINCT artist_name", "board"])
         for row in select_result:
             # pid = row["id"]
             board = row["board"]
@@ -102,3 +101,9 @@ class PostDb:
         self.connection.commit()
         logger.debug("Closing PostDB")
         self.connection.close()
+
+if __name__ == "__main__":
+    pass
+    # with PostDb() as post_db:
+    #     posts = post_db.posts.select([], ["DISTINCT board"])
+    #     print(posts)

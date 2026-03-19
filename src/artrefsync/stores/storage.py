@@ -19,7 +19,11 @@ class ImageStoreHandler(ABC):
         pass
 
     @abstractmethod
-    def save_post(self, post: Post, link_cache: Link_Cache = None, event: Event = None):
+    def update_thumbnails(self, board: BOARD, artist:str):
+        pass
+
+    @abstractmethod
+    def save_post(self, post: Post, link_cache: Link_Cache, event: Event = None):
         pass
 
     @abstractmethod

@@ -115,18 +115,21 @@ class ArtistTab(ttk.Frame):
             self.tree.set(board, "#1", f" {icon} {board}")
 
     def set_artist_counts(self):
+        logger.debug("Setting BOARD ARTISTS")
         with PostDb() as postdb:
-            for table, artists in postdb.board_artists.items():
-                count = postdb.tag_posts.count(str(table))
+            print(postdb.board_artists.keys())
+            for board, artists in postdb.board_artists.items():
+                board_str = str(board)
+                count = postdb.tag_posts.count(str(board_str))
                 count = count if count else 0
-                if not self.tree.exists(table):
+                if not self.tree.exists(board_str):
                     self.tree.insert(
                         "",
                         "end",
-                        iid=table,
-                        text=table,
+                        iid=board_str,
+                        text=board_str,
                         values=(
-                            f" 🗁 {table}",
+                            f" 🗁 {board_str}",
                             count,
                         ),
                         open=True,
@@ -138,7 +141,7 @@ class ArtistTab(ttk.Frame):
                         count = postdb.tag_posts.count(str(artist))
                         count = count if count else 0
                         self.tree.insert(
-                            table,
+                            board_str,
                             "end",
                             iid=artist,
                             text=artist,
@@ -151,7 +154,7 @@ class ArtistTab(ttk.Frame):
                     except Exception as e:
                         logger.warning(
                             "Failed to set count for board %s, artist %s. Exception %s.",
-                            table,
+                            board_str,
                             artist,
                             e,
                         )

@@ -7,11 +7,13 @@ from tkinter.filedialog import askdirectory
 import ttkbootstrap as ttk
 
 # from PIL import Image, ImageTk
+# from artrefsync.utils.ToggleConsole import toggle_console
 from artrefsync.config import config
 from artrefsync.constants import TABLE, get_table_mapping
 from artrefsync.sync_coordinator import sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -79,13 +81,20 @@ class ConfigTab(ttk.Frame):
             self.start_store_sync_button.grid(
                 row=3, column=1, sticky=("w", "e"), pady=10, padx=5
             )
+            self.console_var = ttk.BooleanVar(value=False)
+            self.console_toggle = ttk.Button(
+                tab_frame, text="Toggle Console", command=self.toggle_console_window
+            )
+            self.console_toggle.grid(
+                row=4, column=1, sticky=("w", "e"), pady=10, padx=5
+            )
 
         self.config_table_tabs[table] = tab_frame
         self.widget_dict[table] = {}
         self.var_dict[table] = {}
 
         for i, table_field in enumerate(
-            get_table_mapping()[table], 4 if table == TABLE.APP else 0
+            get_table_mapping()[table], 5 if table == TABLE.APP else 0
         ):
             label = ttk.Label(
                 # tab_frame, text=f"{table_field.capitalize()}:", width=2
@@ -129,6 +138,13 @@ class ConfigTab(ttk.Frame):
                 entry.grid(row=i, column=1, sticky=("w", "e"), pady=10)
                 widget = entry
             self.widget_dict[table][table_field] = widget
+    
+    def toggle_console_window(self):
+        self.console_var.set(not self.console_var.get())
+        toggle = self.console_var.get()
+        logger.info("Toggling to %s", toggle)
+        # toggle_console(toggle)
+
 
     def select_dir(self, e):
         dir = askdirectory()
@@ -185,7 +201,7 @@ class ConfigTab(ttk.Frame):
         self.sync_running = False
         self.start_sync_button.configure(state="normal", text="Start Sync")
         config.reload_config()
-        self.sync_event = None
+        self.sync_event.clear()
 
     def configure_style(self, root):
         self.style = ttk.Style()

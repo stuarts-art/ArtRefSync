@@ -75,7 +75,6 @@ class EagleClient:
                 response = json.loads(
                     requests.get(self.folder_url("list"), timeout=5).content
                 )
-            # print(response)
             response = response["data"]
             folder_list = [
                 dacite.from_dict(EagleFolder.ListFolder, item) for item in response

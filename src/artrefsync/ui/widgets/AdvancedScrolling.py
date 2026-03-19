@@ -10,8 +10,11 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 
 from artrefsync.utils.image_utils import ImageUtils
+import logging
+from artrefsync.config import config
 
-ImageUtils
+logger = logging.getLogger(__name__)
+logger.setLevel(config.log_level)
 
 
 class AutoScrollbar(ttk.Scrollbar):
@@ -173,7 +176,7 @@ class CanvasImage:
             w = int(h2 * aspect_ratio1)  # band length
         i, j, n = 0, 1, round(0.5 + self.imheight / self.__band_width)
         while i < self.imheight:
-            print("\rOpening image: {j} from {n}".format(j=j, n=n), end="")
+            logger.debug("\rOpening image: {j} from {n}".format(j=j, n=n), end="")
             band = min(self.__band_width, self.imheight - i)  # width of the tile band
             self.__tile[1][3] = band  # set band width
             self.__tile[2] = (
@@ -189,7 +192,7 @@ class CanvasImage:
             )
             i += band
             j += 1
-        print("\r" + 30 * " " + "\r", end="")  # hide printed string
+        logger.debug("\r" + 30 * " " + "\r", end="")  # hide printed string
         return image
 
     def redraw_figures(self):

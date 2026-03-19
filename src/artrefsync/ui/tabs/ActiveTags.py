@@ -48,7 +48,7 @@ class ActiveTagsTab(ttk.Frame):
         ebinder.bind(BINDING.ON_TAG_MIDDLE, self.on_tag_middle, self)
 
     def on_artist(self, artist, middle_click=False):
-        logger.info("Artist Recieved: %s, Middle Clicked: %d", artist, middle_click)
+        logger.debug("Artist Recieved: %s, Middle Clicked: %d", artist, middle_click)
         if not artist:
             if self.artist:
                 self.artist = None
@@ -126,7 +126,7 @@ class ActiveTagsTab(ttk.Frame):
 
         logger.info("ADDING TAG %s", tag)
         if tag in self.active_tags:
-            logger.info(
+            logger.debug(
                 'Tag: "%s" already in active tags. Active Tags: %s',
                 tag,
                 self.active_tags,
@@ -141,7 +141,7 @@ class ActiveTagsTab(ttk.Frame):
 
     def clear_active(self, event=None):
         while self.active_tags and (item := self.active_tags.popitem()):
-            logger.info("Removing %s from active tags", item[0])
+            logger.debug("Removing %s from active tags", item[0])
             if self.is_artist(item[0]):
                 self.artist = None
             item[1].destroy()

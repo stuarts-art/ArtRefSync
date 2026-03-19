@@ -11,6 +11,9 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+def main():
+    pass
+
 
 class R34Handler(ImageBoardHandler):
     """
@@ -46,7 +49,7 @@ class R34Handler(ImageBoardHandler):
 
         if " " in tag:
             tag = tag.split()[0]  # Remove query and metatags
-        logger.info("Recieved %s from client.", len(r34_posts))
+        logger.debug("Recieved %s from client.", len(r34_posts))
 
         for rpost in r34_posts:
             skip_rpost = False
@@ -63,7 +66,7 @@ class R34Handler(ImageBoardHandler):
             for black_listed in self.black_list:
                 if black_listed in rpost.tags:
                     stats.add(STATS.SKIP_COUNT, 1)
-                    print(f"Skipping {post_id} for {black_listed}. ({website})")
+                    logger.debug(f"Skipping {post_id} for {black_listed}. ({website})")
                     skip_rpost = True
                     break
             if skip_rpost:
@@ -95,10 +98,11 @@ class R34Handler(ImageBoardHandler):
             stats.add(STATS.ARTIST_SET, tag)
             posts[post_id] = post
             stats.add(STATS.POST_COUNT)
+
+        logger.info("Returning %d posts for artist %s", len(posts), tag)
         return posts
 
 
 # r34_handler = R34Handler()
 if __name__ == "__main__":
-    handler = R34Handler()
-    handler.get_posts()
+    main()

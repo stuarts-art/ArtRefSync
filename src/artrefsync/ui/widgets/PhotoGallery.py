@@ -91,15 +91,15 @@ class PhotoImageGallery(ttk.Frame):
             order_query = f" ORDER BY {sort_by} {sort_dir}"
             if self.tags:
                 posts = post_db.get_tag_intersection(self.tags)
-                sorted = post_db.posts.get_all(
+                sorted_posts = post_db.posts.get_all(
                     posts, ["id"], as_scalar=True, suffix=order_query
                 )
-                self.simple_frames.change_posts(sorted)
             else:
-                posts = post_db.posts.select_id_list(
+                sorted_posts = post_db.posts.select_id_list(
                     conditions=None, suffix=f"{order_query} LIMIT 1000"
                 )
-                self.simple_frames.change_posts(posts)
+
+            self.simple_frames.change_posts(sorted_posts)
 
 
 class SimpleFrames:
@@ -212,7 +212,7 @@ class SimpleFrames:
         self.text.after(100, lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
 
     def update(self):
-        logger.info("Updating Image Gallery")
+        logger.debug("Updating Image Gallery")
         ImageUtils.get_tk_thumb.cache_clear()
         ImageUtils.getPilImageThumb.cache_clear()
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
@@ -227,7 +227,7 @@ class SimpleFrames:
 
     def add_select_tag(self, e):
         self.text.focus_set()
-        logger.info("Add Select Tag %s", e)
+        logger.debug("Add Select Tag %s", e)
         s = e.state
         ctrl_pressed = (s & 0x4) != 0
         shift_pressed = (s & 0x1) != 0
@@ -238,7 +238,7 @@ class SimpleFrames:
             self.text.tag_add("sel", e.widget)
         elif ctrl_pressed:
             if "sel" in self.text.tag_names(e.widget):
-                logger.info("Removing sel tag from %s", e.widget.pid)
+                logger.debug("Removing sel tag from %s", e.widget.pid)
                 self.text.tag_remove("sel", e.widget)
             else:
                 self.text.tag_add("sel", e.widget)
@@ -276,10 +276,7 @@ class SimpleFrames:
                 photo: SimplePhotoLabel = self.text.nametowidget(name)
                 if "sel" in self.text.tag_names(photo):
                     if photo.file:
-                        if photo.file.ext in ["webm", "mp4"]:
-                            files.append(photo.file.preview)
-                        else:
-                            files.append(photo.file.file)
+                        files.append(photo.file.file)
             if files:
                 data = tuple(file for file in files)
                 dnd_packet = (COPY, DND_FILES, data)
@@ -300,7 +297,7 @@ class SimpleFrames:
             self.focus_on_idx(focused_idx)
 
     def increase_frames(self, target=None):
-        logger.info("CREATING MORE FRAMES")
+        logger.debug("CREATING MORE FRAMES")
         if not target:
             for i in range(50):
                 self.create_frame()
@@ -396,20 +393,20 @@ class SimpleFrames:
             self.update_focus(next.pid)
 
     def set_focus(self, e=None):
-        logger.info("Set Focus on %s", e.widget.pid)
+        logger.debug("Set Focus on %s", e.widget.pid)
         self.focus_on_idx(e.widget.idx)
 
     def on_visibility(self, e):
         widget: SimplePhotoLabel = e.widget
-        logger.info("y %s, rooty %s, bbox %s", widget.winfo_y(), widget.winfo_rooty(), widget.bbox)
+        logger.debug("y %s, rooty %s, bbox %s", widget.winfo_y(), widget.winfo_rooty(), widget.bbox)
         if widget.bbox:
-            logger.info("Visibility TRUE for %s", widget.pid)
+            logger.debug("Visibility TRUE for %s", widget.pid)
             idx = widget.idx
             widget.get_image()
             if len(self.frames) - idx < 10 and len(self.frames) < len(self.post_ids):
                 self.increase_frames(idx + 10)
         else:
-            logger.info("Visibility: FALSE for %s. Resetting.", widget.pid)
+            logger.debug("Visibility: FALSE for %s. Resetting.", widget.pid)
             widget.reset(True)
         return
 
@@ -519,10 +516,8 @@ class SimplePhotoLabel(tk.Label):
         if self.pid:
             logger.debug("Resetting %s", self.pid)
         self.image = None
-        # self.pid = None
         self.photo = None
         self.file = None
-        # self.config(image=None)
         self.loading = False
         self.config(image=None)
 
@@ -548,6 +543,8 @@ class SimplePhotoLabel(tk.Label):
         self.file: PostFile = self.post_file
         if self.file:
             self.image_h = self.height_var.get()
+            if self.file.thumbnail:
+                self.file_name = self.file.thumbnail
             if self.file.preview:
                 self.file_name = self.file.preview
             elif self.file.sample:

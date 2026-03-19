@@ -118,8 +118,7 @@ class Dataclass_DB(Generic[T]):
         Returns True if inserted, false if updated.
         """
         item_dict = asdict(item)
-        exists = item_dict[self.primary_key] in self
-
+        exists = str(item_dict[self.primary_key]) in self
         query_values = tuple(
             pickle.dumps(kv[1]) if self.field_types[kv[0]] == "BLOB" else kv[1]
             for kv in item_dict.items()

@@ -28,7 +28,7 @@ class ImageUtils:
     @classmethod
     @functools.lru_cache(maxsize=100)
     def getPilImage(cls, file: str, height=None, width=None):
-        logger.info("Cache-Miss, Getting Image")
+        logger.debug("Cache-Miss, Getting Image")
         if not os.path.exists(file):
             logger.error("Cannot open path: %s", file)
             return None

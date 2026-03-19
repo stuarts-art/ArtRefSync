@@ -64,6 +64,7 @@ class PostFile:
     ext: str = field(default="")
     preview: str | None = field(default="")
     sample: str | None = field(default="")
+    thumbnail: str | None = field(default="")
     file: str | None = field(default="")
 
 

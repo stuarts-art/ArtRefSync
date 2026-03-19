@@ -67,7 +67,7 @@ class TagTab(ttk.Frame):
 
     def on_key_release(self, e=None):
         text = self.entry.get()
-        logger.info("On Key Release for text = %s", text)
+        logger.debug("On Key Release for text = %s", text)
 
         if self.artist_tag_count_map:
             filtered = fnmatch.filter(self.artist_tags, f"*{text}*")

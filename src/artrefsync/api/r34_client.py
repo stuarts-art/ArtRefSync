@@ -49,7 +49,7 @@ class R34_Client:
             response = requests.get(self._build_url_request(tag, page), timeout=2.0)
             soup = BeautifulSoup(response.content, features="xml")
             found_posts = soup.find_all("post")
-            logger.info("Found %s posts.", len(found_posts))
+            logger.debug("Found %s posts.", len(found_posts))
 
             for p in found_posts:
                 r34_post = parse_r34_post(p.attrs)

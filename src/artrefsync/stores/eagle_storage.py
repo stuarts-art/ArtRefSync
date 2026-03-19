@@ -15,6 +15,8 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+def main():
+    pass
 
 class EagleHandler(ImageStoreHandler):
     """
@@ -113,6 +115,7 @@ class EagleHandler(ImageStoreHandler):
             store=self.get_store(),
             board=None,
             preview=thumbnail,
+            thumbnail=thumbnail,
             file=f"{self.library_path_dict[self.library]}/images/{item.id}.info/{item.name}.{item.ext}",
         )
         return post
@@ -150,11 +153,11 @@ class EagleHandler(ImageStoreHandler):
             post_file = self.eagle_item_to_post(item)
             if post_file:
                 post_files[post_file.id] = post_file
-        logger.info(f"Eagle Items for {board}, {artist} - {len(post_files)}")
+        logger.debug(f"Eagle Items for {board}, {artist} - {len(post_files)}")
         return post_files
 
     def save_post(
-        self, post: Post, link_cache: Link_Cache = None, event: Event = None
+        self, post: Post, link_cache: Link_Cache, event: Event = None
     ) -> str | None:
         if event and event.is_set():
             return
@@ -178,7 +181,6 @@ class EagleHandler(ImageStoreHandler):
     def get_or_create_artist_folder(self):
         folders = self.client.folder.list()
         folder_q = deque((folder for folder in folders))
-        # artists_folder: dict = None
         while folder_q:
             folder = folder_q.popleft()
             if folder.name == self.artists_folder_name:
@@ -206,7 +208,7 @@ class EagleHandler(ImageStoreHandler):
                 response = self.client.library.switch(
                     self.library_path_dict[library_string]
                 )
-                logger.info(
+                logger.debug(
                     "Switch Library to %s response: %s.", library_string, response
                 )
             else:
@@ -216,3 +218,9 @@ class EagleHandler(ImageStoreHandler):
 
     def get_thumbnail(self, post):
         return self.client.item.thumbnail(post.ext_id)
+
+    def update_thumbnails(self, board: BOARD, artist:str):
+        pass
+
+if __name__ == "__main__":
+    main()

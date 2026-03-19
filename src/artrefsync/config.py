@@ -77,6 +77,9 @@ class __Config:
             APP.DB_DIR: ".db",
             APP.DB_FILE_NAME: DB.TAGAPP_DB,
             APP.DB_BLOB_NAME: DB.BLOB_DB,
+            APP.THUMBNAIL_WIDTH: 640,
+            APP.THUMBNAIL_HEIGHT: 480,
+
         },
         TABLE.R34: {
             R34.ENABLED: False,

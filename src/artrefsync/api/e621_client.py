@@ -39,7 +39,7 @@ class E621_Client:
         posts = []
         oldest_id = ""
         for page in range(1, 50):  # handle pagination
-            logger.info(f"{tags} - Page {page}")
+            logger.debug(f"{tags} - Page {page}")
             if stop_event and stop_event.is_set():
                 return None
             # Very minimal rate limiter

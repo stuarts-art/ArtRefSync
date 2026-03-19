@@ -5,9 +5,11 @@ import os
 import shutil
 from typing import Iterable
 from pathlib import Path, PureWindowsPath
+
+from PIL import Image
 from artrefsync.stores.link_cache import Link_Cache
 from artrefsync.stores.storage import ImageStoreHandler
-from artrefsync.constants import BOARD, LOCAL, STORE, TABLE
+from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
 
@@ -21,7 +23,7 @@ class DIRS(StrEnum):
     FILE = auto()
     PREVIEW = ".previews"
     SAMPLE = ".sample"
-
+    THUMBNAIL = ".thumbnail"
 
 def main():
     config[TABLE.LOCAL][LOCAL.ARTIST_DIR] = "artists"
@@ -30,18 +32,13 @@ def main():
 
 class PlainLocalStorage(ImageStoreHandler):
     def __init__(self):
+        logger.info("Plain File Store Handler Init Start")
         self.artists_base_dir = Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR])
         self.dir_base_map = {}
         self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = defaultdict(dict)
         self.update_map: dict = {}
         self.file_map: dict = defaultdict(dict)
         self.dir_base_map[DIRS.FILE] = self.artists_base_dir
-        self.dir_base_map[DIRS.PREVIEW] = os.path.join(
-            self.dir_base_map[DIRS.FILE], DIRS.PREVIEW
-        )
-        self.dir_base_map[DIRS.SAMPLE] = os.path.join(
-            self.dir_base_map[DIRS.FILE], DIRS.SAMPLE
-        )
         self._artist_name_map = {}
         self._ignore_list = ["(", ")", "[", "]", ",", ";", "<", ">", "="]
 
@@ -49,8 +46,9 @@ class PlainLocalStorage(ImageStoreHandler):
         loaded = 0
 
         for dir in DIRS:
+            if dir is not DIRS.FILE:
+                self.dir_base_map[dir] = os.path.join(self.dir_base_map[DIRS.FILE], dir)
             base_path = self.dir_base_map[dir]
-            # print(base_path)
             os.makedirs(base_path, exist_ok=True)
             for board in BOARD:
                 board_path = Path(os.path.join(base_path, board.value))
@@ -78,6 +76,7 @@ class PlainLocalStorage(ImageStoreHandler):
                             continue
                         self.file_map[artist_path][pid] = file
                         loaded += 1
+        logger.info("Plain File Store Handler Init Complete")
 
     def get_artist_posts(self, dir, board, artist) -> dict[str, str]:
         artist_dir = self.get_artist_dir(dir, board, artist)
@@ -134,34 +133,75 @@ class PlainLocalStorage(ImageStoreHandler):
             for dir in DIRS:
                 self.get_artist_dir(dir, board, artist)
 
-    def get_posts(self, board: BOARD, artist: str):
+    def get_posts(self, board: BOARD, artist: str) -> list[PostFile]:
         """
         Returns a partial PostFile Object. Remaining metadata should be added using a Post object.
         """
-        files = self.get_artist_posts(DIRS.FILE, board, artist)
+        files: dict[str, Path] = self.get_artist_posts(DIRS.FILE, board, artist)
         previews = self.get_artist_posts(DIRS.PREVIEW, board, artist)
         samples = self.get_artist_posts(DIRS.SAMPLE, board, artist)
+        thumbnails = self.get_artist_posts(DIRS.THUMBNAIL, board, artist)
         post_files = {}
 
         for pid, file in files.items():
-            preview = previews[pid] if pid in previews else ""
-            sample = samples[pid] if pid in samples else ""
+            preview = previews[pid].resolve() if pid in previews else ""
+            sample = samples[pid].resolve() if pid in samples else ""
+            thumbnail = thumbnails[pid].resolve() if pid in thumbnails else ""
+            ext = str(file.suffix)[1:]
             post_file = PostFile(
                 id=pid,
-                ext_id=str(file),
+                ext_id=str(file.resolve()),
+                ext=ext,
                 store=self.get_store(),
                 board=board,
                 artist_name=artist,
-                file=str(file),
+                file=str(file.resolve()),
                 preview=str(preview),
                 sample=str(sample),
+                thumbnail=str(thumbnail),
             )
             post_files[pid] = post_file
         return post_files
 
+
+    def update_thumbnails(self, board: BOARD, artist:str):
+        logger.debug("Updating thumbnails for %s", artist)
+        thumb_width = float(config[TABLE.APP][APP.THUMBNAIL_WIDTH])
+        thumb_height = float(config[TABLE.APP][APP.THUMBNAIL_HEIGHT])
+        posts = self.get_posts(board, artist)
+        thumb_dir = self.get_artist_dir(DIRS.THUMBNAIL, board, artist)
+        create_thumbnails = []
+        for pid, post in posts.items():
+            thumbnail_flag = False
+            if post.thumbnail == "":
+                thumbnail_flag = True
+            else:
+                try:
+                    with Image.open(post.thumbnail) as img:
+                        if img.width != thumb_width and img.height != thumb_height:
+                            thumbnail_flag = True
+                except:
+                    thumbnail_flag = True
+            if not thumbnail_flag:
+                continue
+
+            file_name = f"{post.id}-thumbnail.{post.ext}"
+            file_path = os.path.join(thumb_dir, file_name)
+            logger.debug("Creating thumbnail for %s. path name: %s", pid, file_path)
+
+            if post.ext == "mp4" or post.ext == "webm":
+                continue
+
+            with Image.open(post.file) as img:
+                img.thumbnail(size=(thumb_width, thumb_height))
+                img.save(file_path)
+        logger.debug("Updating thumbnails FINISHED for %s", artist)
+    
     def save_post(
-        self, post: Post, link_cache: Link_Cache = None, event: Event = None
+        self, post: Post, link_cache: Link_Cache, event: Event = None
     ) -> Post | None:
+        if event and event.is_set():
+            return
         saved_posts = {}
         for dir in DIRS:
             saved_file = self.save_link(post, link_cache, dir)
@@ -206,7 +246,7 @@ class PlainLocalStorage(ImageStoreHandler):
             return ""
         return file_path
 
-    get_thumbnail_order = [DIRS.PREVIEW, DIRS.SAMPLE, DIRS.FILE]
+    get_thumbnail_order = [DIRS.THUMBNAIL, DIRS.PREVIEW, DIRS.SAMPLE, DIRS.FILE]
 
     def get_thumbnail(self, post):
         for dir in self.get_thumbnail_order:

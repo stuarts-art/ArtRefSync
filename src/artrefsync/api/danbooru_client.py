@@ -98,7 +98,7 @@ class Danbooru_Client:
                     time.sleep(0.6 * (retry + 1))
 
         response_content_dict = json.loads(response.content)
-        logger.info(
+        logger.debug(
             f"Artist: {tag}, Page:{page} Response Count: {len(response_content_dict)}"
         )
         for post in response_content_dict:
