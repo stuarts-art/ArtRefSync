@@ -60,16 +60,16 @@ class ImagViewerApp(ttk.Window):
         self.stime = time.time()
         self.thread_caller = TkThreadCaller(self)
 
-        self.bar.mid.columnconfigure(0, weight=0)
-        self.bar.mid.columnconfigure(1, weight=4)
-        self.bar.mid.rowconfigure(0, weight=1)
+        self.bar.mid_mid.columnconfigure(0, weight=0)
+        self.bar.mid_mid.columnconfigure(1, weight=4)
+        self.bar.mid_mid.rowconfigure(0, weight=1)
 
-        self.bar.left.rowconfigure(0, weight=1)
-        self.bar.left.columnconfigure(0, weight=1, minsize=250)
-        self.bar.right.rowconfigure(0, weight=1)
-        self.bar.right.columnconfigure(0, weight=1, minsize=250)
-        self.left_tabs = ttk.Frame(self.bar.left)
-        self.right = ttk.Frame(self.bar.mid)
+        self.bar.mid_left.rowconfigure(0, weight=1)
+        self.bar.mid_left.columnconfigure(0, weight=1, minsize=250)
+        self.bar.mid_right.rowconfigure(0, weight=1)
+        self.bar.mid_right.columnconfigure(0, weight=1, minsize=250)
+        self.left_tabs = ttk.Frame(self.bar.mid_left)
+        self.right = ttk.Frame(self.bar.mid_mid)
 
         self.left_tabs.grid(row=0, column=0, sticky=tk.NSEW)
         self.right.grid(row=0, column=1, sticky=tk.NSEW)
@@ -99,8 +99,8 @@ class ImagViewerApp(ttk.Window):
         self.active_tab = ActiveTagsTab(self.left_tabs)
         self.sort_by_tab = SortByTab(self.left_tabs)
         self.sort_by_tab.grid(column=0, row=4, sticky=tk.E)
-        self.post_info = PostInfo(self.bar.right, self.thread_caller)
-        self.loading_bar = LoadingBars(self.bar.bot)
+        self.post_info = PostInfo(self.bar.mid_right, self.thread_caller)
+        self.loading_bar = LoadingBars(self.bar._bot)
 
     def init_top_bar_vars(self):
         self.top_artist_text = ttk.StringVar()
@@ -114,14 +114,12 @@ class ImagViewerApp(ttk.Window):
             lambda x: self.top_artist_count_text.set(f"({x})"),
             self.bar,
         )
-        # ebinder.bind(BINDING.ON_POST_SELECT, lambda x: self.top_post_text.set(x), self.bar)
-        ttk.Label(self.bar.top_bar_mid, textvariable=self.top_artist_text).pack(
+        ttk.Label(self.bar.top_mid, textvariable=self.top_artist_text).pack(
             side=tk.LEFT
         )
-        ttk.Label(self.bar.top_bar_mid, textvariable=self.top_artist_count_text).pack(
+        ttk.Label(self.bar.top_mid, textvariable=self.top_artist_count_text).pack(
             side=tk.LEFT
         )
-        # ttk.Label(self.bar.top_bar_mid, textvariable=self.top_post_text).pack(side=tk.LEFT)
 
     def init_views(self):
         logger.info("Init Views")
@@ -173,17 +171,17 @@ class ImagViewerApp(ttk.Window):
 
     def toggle_side_bar(self, event):
         logger.info("Toggling Sidebar")
-        left_info = self.bar.left.grid_info()
+        left_info = self.bar.mid_left.grid_info()
         logger.info("Toggling side bar. Pack Info = %s", str(left_info))
 
         if len(left_info) != 0:
             logger.info("Forgetting = %s", str(left_info))
-            self.bar.right.grid_forget()
-            self.bar.left.grid_forget()
+            self.bar.mid_right.grid_forget()
+            self.bar.mid_left.grid_forget()
         else:
             logger.info("Reattaching = %s", str(left_info))
             self.right.grid(column=2, row=2, sticky="nse")
-            self.bar.left.grid(row=2, column=0, sticky="nws")
+            self.bar.mid_left.grid(row=2, column=0, sticky="nws")
 
 
 if __name__ == "__main__":

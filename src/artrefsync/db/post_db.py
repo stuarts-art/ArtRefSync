@@ -11,9 +11,21 @@ from artrefsync.db.dataclass_db import Dataclass_DB
 
 import logging
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+def main():
+    # TODO: Rewrite some queries w/ joins to improve performance.
+    from artrefsync.utils.benchmark import Bm
+    with PostDb() as post_db, Bm():
+        missing_ids = post_db.posts.select_join(
+            select_args= "t1.id, t1.artist_name, t1.board, t1.tags",
+            from_args= f"{Post.__name__} t1",
+            join_str = f"LEFT JOIN {PostFile.__name__} t2 ON t1.id = t2.id",
+            where_str= f"WHERE t2.id IS NULL"
+        )
+    print(missing_ids)
 
 class PostDb:
     tables_initialized = False
@@ -93,6 +105,9 @@ class PostDb:
                 return posts[0].intersection(*posts[1:])
         return posts
 
+
+
+
     def __enter__(self):
         logger.debug("PostDB Enter")
         return self
@@ -103,7 +118,4 @@ class PostDb:
         self.connection.close()
 
 if __name__ == "__main__":
-    pass
-    # with PostDb() as post_db:
-    #     posts = post_db.posts.select([], ["DISTINCT board"])
-    #     print(posts)
+    main()

@@ -55,7 +55,7 @@ class RoundedIcon(ttk.Label):
         style=None,
         **kwargs,
     ):
-        logger.info("Creating Modern Top Bar")
+        logger.info("Round Icon init for text \"%s\"", text)
         if isinstance(size, int):
             self.width = size
             self.height = size
@@ -112,6 +112,7 @@ class RoundedIcon(ttk.Label):
 
 class ModernTopBar(ttk.Frame):
     def __init__(self, root: ttk.Window, override_default_top_bar=False):
+        logger.info("Init ModernTopBar")
         self.root = root
         self.init_style()
         self.init_scafolding()
@@ -140,7 +141,7 @@ class ModernTopBar(ttk.Frame):
 
     def init_menu(self):
         self.sidebar_right_toggle = RoundedIcon(
-            self.top_bar_right,
+            self.top_right,
             text="◨",
             hover_color=self.colors.dark,
             font=("Helvetica", 12),
@@ -148,7 +149,7 @@ class ModernTopBar(ttk.Frame):
             size=30,
         )
         self.menu_button = RoundedIcon(
-            self.top_bar_left,
+            self.top_left,
             text="≡",
             hover_color=self.colors.dark,
             font=("Helvetica", 12),
@@ -156,7 +157,7 @@ class ModernTopBar(ttk.Frame):
             size=30,
         )
         self.sidebar_left_toggle = RoundedIcon(
-            self.top_bar_left,
+            self.top_left,
             text="◧",
             hover_color=self.colors.dark,
             font=("Helvetica", 12),
@@ -173,86 +174,96 @@ class ModernTopBar(ttk.Frame):
         self.sidebar_right_toggle.bind("<ButtonPress-1>", self.toggle_right_sidebar)
 
     def init_scafolding(self):
+        """ UI Structure  
+        - _top: top_bar_left, top_bar_mid, top_bar_right  
+        - _mid: left, mid, right  
+        - _bot:
+        """
+        
+        
+
+        
+
         super().__init__(self.root, padding=5, style=self.top_style)
         self.grid(row=0, column=0, sticky="nswe")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
 
-        self.top = ttk.Frame(self, style=self.top_style, height=34)
-        self.top_sep = ttk.Separator(self)
+        # Top, Mid, Bot, Init and grid placement
+        self._top = ttk.Frame(self, style=self.top_style, height=34)
+        self._top_sep = ttk.Separator(self)
         self._mid = ttk.Frame(self)
-        self.bot = ttk.Frame(self)
-
-        self.left = ttk.Frame(self._mid, padding=5, style=self.side_style)
-        self.left_sep = ttk.Separator(self._mid, orient="vertical")
-        self.mid = ttk.Frame(self._mid)
-        self.right_sep = ttk.Separator(self._mid, orient="vertical")
-        self.right = ttk.Frame(self._mid, padding=5, style=self.side_style)
-
-        self.top.grid(column=0, row=0, sticky="new", columnspan=3)
-
-        self.top_sep.grid(column=0, row=1, sticky="we", columnspan=3)
+        self._bot = ttk.Frame(self)
+        self._top.grid(column=0, row=0, sticky="new", columnspan=3)
+        self._top_sep.grid(column=0, row=1, sticky="we", columnspan=3)
         self._mid.grid(column=0, row=2, sticky="nswe")
-        self.bot.grid(column=0, row=3, sticky="we")
+        self._bot.grid(column=0, row=3, sticky="we")
 
+        # Top, Mid row and column config
+        self._top.rowconfigure(0, weight=1, pad=2)
+        self._top.columnconfigure(0, weight=1)
+        self._top.columnconfigure(1, weight=1)
+        self._top.columnconfigure(2, weight=1)
         self._mid.rowconfigure(0, weight=2)
         self._mid.columnconfigure(2, weight=1, minsize=300)
 
-        self.left.grid(column=0, row=0, sticky="nws")
-        self.left_sep.grid(column=1, row=0, sticky="ns")
-        self.mid.grid(column=2, row=0, sticky="nswe")
-        self.right_sep.grid(column=3, row=0, sticky="ns")
-        self.right.grid(column=4, row=0, sticky="nes")
+        # Top sub_frames init and grid placement
+        self.top_left = ttk.Frame(self._top, style=self.top_style)
+        self.top_mid = ttk.Frame(self._top, style=self.top_style)
+        self.top_right = ttk.Frame(self._top, style=self.top_style)
+        self.top_left.grid(row=0, column=0, sticky="w")
+        self.top_mid.grid(row=0, column=1, sticky="we")
+        self.top_right.grid(row=0, column=2, sticky="e")
+        self._top.grid_propagate(False)
 
-        # Top Grid: L,M,R rows
-        self.top.rowconfigure(0, weight=1, pad=2)
-        self.top.columnconfigure(0, weight=1)
-        self.top.columnconfigure(1, weight=1)
-        self.top.columnconfigure(2, weight=1)
-        self.top_bar_left = ttk.Frame(self.top, style=self.top_style)
-        self.top_bar_mid = ttk.Frame(self.top, style=self.top_style)
-        self.top_bar_right = ttk.Frame(self.top, style=self.top_style)
-        self.top_bar_left.grid(row=0, column=0, sticky="w")
-        self.top_bar_mid.grid(row=0, column=1, sticky="we")
-        self.top_bar_right.grid(row=0, column=2, sticky="e")
-        self.top.grid_propagate(False)
+        # Mid sub_frames init and grid placement
+        self.mid_left = ttk.Frame(self._mid, padding=5, style=self.side_style)
+        self.mid_left_sep = ttk.Separator(self._mid, orient="vertical")
+        self.mid_mid = ttk.Frame(self._mid)
+        self.mid_right_sep = ttk.Separator(self._mid, orient="vertical")
+        self.mid_right = ttk.Frame(self._mid, padding=5, style=self.side_style)
+        self.mid_left.grid(column=0, row=0, sticky="nws")
+        self.mid_left_sep.grid(column=1, row=0, sticky="ns")
+        self.mid_mid.grid(column=2, row=0, sticky="nswe")
+        self.mid_right_sep.grid(column=3, row=0, sticky="ns")
+        self.mid_right.grid(column=4, row=0, sticky="nes")
 
     def init_modern_bar(self):
         button_style = "TLabel"
         close_label = RoundedIcon(
-            self.top_bar_right,
+            self.top_right,
             text="✕",
             hover_color=self.colors.danger,
             style=button_style,
         )
         box_label = RoundedIcon(
-            self.top_bar_right,
+            self.top_right,
             text="☐",
             hover_color=self.colors.dark,
             style=button_style,
         )
         dash_label = RoundedIcon(
-            self.top_bar_right,
+            self.top_right,
             text="🗕",
             hover_color=self.colors.dark,
             style=button_style,
         )
         self.sidebar_right_toggle = RoundedIcon(
-            self.top_bar_right,
+            self.top_right,
             text="◨",
             hover_color=self.colors.dark,
             font=("Helvetica", 14),
             style=button_style,
         )
         self.menu_button = RoundedIcon(
-            self.top_bar_left,
+            self.top_left,
             text="≡",
             hover_color=self.colors.dark,
             font=("Helvetica", 14),
             style=button_style,
         )
         self.sidebar_left_toggle = RoundedIcon(
-            self.top_bar_left,
+            self.top_left,
             text="◧",
             hover_color=self.colors.dark,
             font=("Helvetica", 14),
@@ -274,9 +285,9 @@ class ModernTopBar(ttk.Frame):
         self.menu_button.bind("<ButtonPress-1>", self.create_menu_settings_event)
         self.sidebar_left_toggle.bind("<ButtonPress-1>", self.toggle_left_sidebar)
         self.sidebar_right_toggle.bind("<ButtonPress-1>", self.toggle_right_sidebar)
-        self.top.bind("<ButtonPress-1>", self.start_move)
-        self.top.bind("<ButtonRelease-1>", self.end_move)
-        self.top.bind("<Double-1>", lambda e: self.on_zoom())
+        self._top.bind("<ButtonPress-1>", self.start_move)
+        self._top.bind("<ButtonRelease-1>", self.end_move)
+        self._top.bind("<Double-1>", lambda e: self.on_zoom())
         dash_label.bind("<ButtonRelease-1>", lambda e: self.minimize_window())
         box_label.bind("<ButtonRelease-1>", lambda e: self.on_zoom())
         # close_label.bind("<ButtonRelease-1>", lambda e: self.root.destroy())
@@ -291,22 +302,22 @@ class ModernTopBar(ttk.Frame):
         # raise Exception()
 
     def toggle_left_sidebar(self, event=None):
-        left_info = self.left.grid_info()
+        left_info = self.mid_left.grid_info()
         if left_info:
-            self.left.grid_forget()
-            self.left_sep.grid_forget()
+            self.mid_left.grid_forget()
+            self.mid_left_sep.grid_forget()
         else:
-            self.left.grid(column=0, row=0, sticky="nws")
-            self.left_sep.grid(column=1, row=0, sticky="ns")
+            self.mid_left.grid(column=0, row=0, sticky="nws")
+            self.mid_left_sep.grid(column=1, row=0, sticky="ns")
 
     def toggle_right_sidebar(self, event=None):
-        right_info = self.right.grid_info()
+        right_info = self.mid_right.grid_info()
         if right_info:
-            self.right.grid_forget()
-            self.right_sep.grid_forget()
+            self.mid_right.grid_forget()
+            self.mid_right_sep.grid_forget()
         else:
-            self.right_sep.grid(column=3, row=0, sticky="ns")
-            self.right.grid(column=4, row=0, sticky="nes")
+            self.mid_right_sep.grid(column=3, row=0, sticky="ns")
+            self.mid_right.grid(column=4, row=0, sticky="nes")
 
     def start_drag(self, event):
         g = [int(g) for g in self.root.winfo_geometry().replace("x", "+").split("+")]
@@ -495,12 +506,12 @@ if __name__ == "__main__":
     window = ttk.Window(themename="darkly", size=(1080, 1080))
     bar = ModernTopBar(window)
     bar.pack(fill="both", expand=True)
-    ttk.Label(bar.left, text="Left", style="danger.TLabel").pack()
+    ttk.Label(bar.mid_left, text="Left", style="danger.TLabel").pack()
     ttk.Label(
-        bar.mid,
+        bar.mid_mid,
         text="Test",
     ).pack()
-    ttk.Label(bar.right, text="Right", style="danger.TLabel").pack()
+    ttk.Label(bar.mid_right, text="Right", style="danger.TLabel").pack()
     style = ttk.Style()
 
     window.mainloop()

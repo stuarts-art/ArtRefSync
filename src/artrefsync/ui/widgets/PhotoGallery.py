@@ -120,7 +120,6 @@ class SimpleFrames:
         self.post_ids = []
         self.focused = None
         self.focused_idx = None
-        self.reloading = False
         self.last_selected = None
         self.zooming = False
         self.scrolled_text = scrolled_text
@@ -206,7 +205,6 @@ class SimpleFrames:
         self.text.focus_set()
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts
-        SimplePhotoLabel.photos = [None for photo in SimplePhotoLabel.photos]
         self.text.see(self.frames[0])
         self.update()
         self.text.after(100, lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
@@ -221,9 +219,6 @@ class SimpleFrames:
             frame.reset()
             if frame.bbox:
                 frame.get_image()
-            else:
-                if frame.photo == None:
-                    continue
 
     def add_select_tag(self, e):
         self.text.focus_set()
@@ -398,32 +393,56 @@ class SimpleFrames:
 
     def on_visibility(self, e):
         widget: SimplePhotoLabel = e.widget
-        logger.debug("y %s, rooty %s, bbox %s", widget.winfo_y(), widget.winfo_rooty(), widget.bbox)
         if widget.bbox:
             logger.debug("Visibility TRUE for %s", widget.pid)
             idx = widget.idx
-            widget.get_image()
             if len(self.frames) - idx < 10 and len(self.frames) < len(self.post_ids):
                 self.increase_frames(idx + 10)
+            for i in range(idx, idx + 8):
+                try:
+                    SimpleFrames.frames[i].get_image()
+                except:
+                    break
         else:
             logger.debug("Visibility: FALSE for %s. Resetting.", widget.pid)
             widget.reset(True)
         return
+    
 
+class ImageCache:
+    def __init__(self, max_size = 50):
+        self.cache = {}
+        self.deque = deque()
+        self.max_size = 50
+    
+    def __contains__(self, item):
+        self.cache.__contains__(item)
+
+    def __len__(self):
+        return self.cache.__len__()
+    
+    def __getitem__(self, key):
+        if key in self.cache:
+            self.deque.remove(key)
+            self.deque.append(key)
+        return self.cache.get(key, None)
+    
+    def __setitem__(self, key, value):
+        if key in self:
+            self.cache.move_to_end(key, last=False)
+        self.cache[key] = value
+        while(len(self.deque) > self.max_size):
+            rkey = self.deque.pop()
+            self.cache.pop(rkey)
+            logger.info("Popping id: %s", rkey)
 
 class SimplePhotoLabel(tk.Label):
     post_ids = list()
     post_files: dict[str, PostFile] = {}
-    photos = []
-    id_deque = deque
-    load_target = 0
-    load_idx = 0
-
+    photos = ImageCache()
     text: ttk.Text = None
-
     default_height = 15
     default_width = 20
-    reloading = False
     get_image_cancel_key = "photo_label_get_image"
 
     @staticmethod
@@ -436,14 +455,11 @@ class SimplePhotoLabel(tk.Label):
 
     def __init__(self, root, idx, height_var: ttk.IntVar, width_var: ttk.IntVar):
         self.idx = idx
-        self.photo = None
         self.width_var = width_var
         self.height_var = height_var
         super().__init__(
             root, height=self.default_height, width=self.default_width, padx=5, pady=5
         )
-        while self.idx >= len(SimplePhotoLabel.photos):
-            SimplePhotoLabel.photos.append(None)
         self.image_h = None
 
     @property
@@ -515,8 +531,6 @@ class SimplePhotoLabel(tk.Label):
             return
         if self.pid:
             logger.debug("Resetting %s", self.pid)
-        self.image = None
-        self.photo = None
         self.file = None
         self.loading = False
         self.config(image=None)
@@ -536,8 +550,11 @@ class SimplePhotoLabel(tk.Label):
 
     def get_image(self):
         if self.pid is None or not self.post_file:
-            self.image = None
             self.config(image=None)
+            return
+        if self.pid in SimplePhotoLabel.photos:
+            photo = SimplePhotoLabel.photos[self.pid]
+            self.config(image=photo, height=photo.height(), width=photo.width())
             return
 
         self.file: PostFile = self.post_file
@@ -553,18 +570,14 @@ class SimplePhotoLabel(tk.Label):
                 self.file_name = self.file.file
             self.config(image=None)
             self.thumbsize = (self.width_var.get(), self.height_var.get()),
-            if self.pid in SimplePhotoLabel.photos:
-                photo = SimplePhotoLabel.photos[self.idx]
-                self.config(image=photo, height=photo.height(), width=photo.width())
-            else:
 
-                thread_caller.add(
-                    ImageUtils.getPilImageThumb,
-                    self.set_image,
-                    self.get_image_cancel_key,
-                    self.file_name,
-                    (self.width_var.get(), self.height_var.get()),
-                )
+            thread_caller.add(
+                ImageUtils.getPilImageThumb,
+                self.set_image,
+                self.get_image_cancel_key,
+                self.file_name,
+                (self.width_var.get(), self.height_var.get()),
+            )
 
     def set_image(self, image):
         if not image:
@@ -572,14 +585,7 @@ class SimplePhotoLabel(tk.Label):
         photo = ImageTk.PhotoImage(image)
         if not photo:
             return None
-        SimplePhotoLabel.photos[self.idx] = photo
-        # self.image = photo
+        SimplePhotoLabel.photos[self.pid] = photo
         self.config(image=photo, height=photo.height(), width=photo.width())
         self.loading = False
-        self.reloading = False
         logger.debug("Setting Image")
-
-    # def has_photo(self):
-    #     while(len(SimplePhotoLabel.photos))
-        
-

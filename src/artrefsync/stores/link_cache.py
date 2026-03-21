@@ -1,18 +1,31 @@
 import os
 import tempfile
 import requests
+import shutil
 from artrefsync.config import config
 import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+def link_cache() -> "Link_Cache":
+    global _link_cache
+    if _link_cache is None:
+        _link_cache = Link_Cache()
 
 class Link_Cache:
+    _instance = None
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
         self._link_cache: dict[str, tempfile.NamedTemporaryFile] = {}
         self.store_count = {}
         self.store_missing = {}
+        self.temp_dir = tempfile.TemporaryDirectory()
+        logger.info("Link Cache Initialized with dir: %s", self.temp_dir)
 
     def __enter__(self):
         return self
@@ -46,7 +59,8 @@ class Link_Cache:
     def get_file_from_link(self, link: str) -> str:
         if link not in self._link_cache:
             suffix = f".{link.split('.')[-1]}"
-            temp = tempfile.NamedTemporaryFile(mode="wb", suffix=suffix, delete=False)
+            temp = tempfile.NamedTemporaryFile(mode="wb", suffix=suffix, dir= self.temp_dir.name, delete=False)
+            self.temp_dir
             self.download_link_to_file(link, temp)
             self._link_cache[link] = temp.name
         return self._link_cache[link]
@@ -55,5 +69,5 @@ class Link_Cache:
         self.close()
 
     def close(self):
-        for file in self._link_cache.values():
-            os.remove(file)
+        logger.info("Cleaning up Link Cache. Removing temp dir: %s.", self.temp_dir)
+        self.temp_dir.cleanup()

@@ -13,6 +13,8 @@ from artrefsync.config import config
 
 T = TypeVar("T", contravariant=dataclass)
 
+def main():
+    pass
 
 class Dataclass_DB(Generic[T]):
     def __init__(
@@ -51,6 +53,20 @@ class Dataclass_DB(Generic[T]):
         )
         if not lazy:
             self.create_or_update_table(cls)
+        
+    def select_join(self, select_args, from_args, join_str ="", where_str ="", suffix_str ="", as_tupple = False):
+        query = f"SELECT {select_args} FROM {from_args} {join_str} {where_str} {suffix_str};"
+        self.logger.info("Running Query %s", query)
+        cur = self.connection.cursor()
+        if not as_tupple:
+            cur.row_factory = DbUtils.dict_factory
+        cur.execute(query)
+        rows = cur.fetchall()
+
+        if not rows:
+            return []
+        else:
+            return rows
 
     def create_or_update_table(self, cls):
         self.logger.info("Creating table for class %s", cls)
@@ -316,3 +332,6 @@ class Dataclass_DB(Generic[T]):
         if self.connection_owner:
             self.connection.close()
         pass
+
+if __name__ == "__main__":
+    main()

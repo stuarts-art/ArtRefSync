@@ -37,7 +37,7 @@ class __Config:
 
         self.log_file = "log/art_sink.log"
         os.makedirs(os.path.dirname(self.log_file), exist_ok=True)
-        log_file_handler = logging.handlers.TimedRotatingFileHandler(self.log_file)
+        log_file_handler = logging.handlers.TimedRotatingFileHandler(self.log_file, encoding="utf-8")
         log_file_handler.suffix = "%Y-%m-%d.log"
         logging.basicConfig(
             level=self.log_level,
