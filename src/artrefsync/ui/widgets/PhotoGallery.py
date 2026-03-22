@@ -76,7 +76,7 @@ class PhotoImageGallery(ttk.Frame):
                 if last_bboxed and i - last_bboxed > 3:
                     break
 
-    def change_tags(self, tags = None):
+    def change_tags(self, tags=None):
         if self.tags == tags:
             return
         self.tags = tags
@@ -85,7 +85,12 @@ class PhotoImageGallery(ttk.Frame):
     def update_posts(self, *args, **kwargs):
         sort_by = ebinder.get_or_default(BINDING.SORT_BY, "id")
         sort_dir = ebinder.get_or_default(BINDING.SORT_DIR, "DESC")
-        logger.debug("Displaying image gallery, sorted by: %s %s, with tags: %s", sort_by, sort_dir, self.tags)
+        logger.debug(
+            "Displaying image gallery, sorted by: %s %s, with tags: %s",
+            sort_by,
+            sort_dir,
+            self.tags,
+        )
 
         with PostDb() as post_db:
             order_query = f" ORDER BY {sort_by} {sort_dir}"
@@ -214,7 +219,6 @@ class SimpleFrames:
         ImageUtils.get_tk_thumb.cache_clear()
         ImageUtils.getPilImageThumb.cache_clear()
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
-        max_visible = 0
         for i, frame in enumerate(self.frames):
             frame.reset()
             if frame.bbox:
@@ -263,7 +267,6 @@ class SimpleFrames:
     def drag_binding(self, event):
         try:
             files = []
-            ranges = self.text.tag_ranges("sel")
             first = self.text.index("sel.first")
             last = self.text.index("sel.last")
             for text_char in self.text.dump(first, last, window=True):
@@ -401,40 +404,41 @@ class SimpleFrames:
             for i in range(idx, idx + 8):
                 try:
                     SimpleFrames.frames[i].get_image()
-                except:
+                except Exception:
                     break
         else:
             logger.debug("Visibility: FALSE for %s. Resetting.", widget.pid)
             widget.reset(True)
         return
-    
+
 
 class ImageCache:
-    def __init__(self, max_size = 50):
+    def __init__(self, max_size=50):
         self.cache = {}
         self.deque = deque()
         self.max_size = 50
-    
+
     def __contains__(self, item):
         self.cache.__contains__(item)
 
     def __len__(self):
         return self.cache.__len__()
-    
+
     def __getitem__(self, key):
         if key in self.cache:
             self.deque.remove(key)
             self.deque.append(key)
         return self.cache.get(key, None)
-    
+
     def __setitem__(self, key, value):
         if key in self:
             self.cache.move_to_end(key, last=False)
         self.cache[key] = value
-        while(len(self.deque) > self.max_size):
+        while len(self.deque) > self.max_size:
             rkey = self.deque.pop()
             self.cache.pop(rkey)
             logger.info("Popping id: %s", rkey)
+
 
 class SimplePhotoLabel(tk.Label):
     post_ids = list()
@@ -468,7 +472,7 @@ class SimplePhotoLabel(tk.Label):
             return None
         else:
             return SimplePhotoLabel.post_ids[self.idx]
-    
+
     @property
     def post_file(self):
         if not self.pid:
@@ -547,7 +551,6 @@ class SimplePhotoLabel(tk.Label):
 
         self.config(height=int(height), width=int(width))
 
-
     def get_image(self):
         if self.pid is None or not self.post_file:
             self.config(image=None)
@@ -569,7 +572,7 @@ class SimplePhotoLabel(tk.Label):
             else:
                 self.file_name = self.file.file
             self.config(image=None)
-            self.thumbsize = (self.width_var.get(), self.height_var.get()),
+            self.thumbsize = ((self.width_var.get(), self.height_var.get()),)
 
             thread_caller.add(
                 ImageUtils.getPilImageThumb,

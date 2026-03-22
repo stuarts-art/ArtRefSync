@@ -150,8 +150,7 @@ class PostInfo(ttk.Frame):
             word = self.get_word(widget, index).strip()
             if word:
                 self.query_by_tag(word)
-
-        except:
+        except Exception:
             pass
 
     def get_word(self, widget, index):
@@ -159,7 +158,7 @@ class PostInfo(ttk.Frame):
             start = widget.search(" ", index, "1.0", backwards=True)
             end = widget.search(" ", index, tk.END)
             return widget.get(start, end)
-        except:
+        except Exception:
             return ""
 
     def query_by_tag(self, tag):

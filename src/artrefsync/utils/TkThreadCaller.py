@@ -40,7 +40,6 @@ class TkThreadCaller:
     def add(
         self, task: callable, on_finish: callable, cancel_key="key", *args, **kwargs
     ) -> None:
-        new_kwargs = {"task": task, "on_finish": on_finish, "old_kwargs": kwargs}
         future = self.executor.submit(task, *args, **kwargs)
         self.on_finish_map[future] = on_finish
         future.add_done_callback(self.call_on_finish)

@@ -145,7 +145,7 @@ class ActiveTagsTab(ttk.Frame):
             if self.is_artist(item[0]):
                 self.artist = None
             item[1].destroy()
-        if event != None:  # If called by normal bind interface
+        if event is not None:  # If called by normal bind interface
             self.update_filter()
             self.forget_self()
 

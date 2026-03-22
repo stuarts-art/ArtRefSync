@@ -2,7 +2,7 @@ import json
 import dacite
 import requests
 from artrefsync.api.eagle_model import EagleFolder, EagleItem, EagleLibrary
-from artrefsync.constants import *
+from artrefsync.constants import STORE, EAGLE
 from artrefsync.config import config
 import threading
 

@@ -265,7 +265,7 @@ class SyncCoordinator:
                         logger.warning("Stop Event Recieved.")
                         executor.shutdown(wait=True, cancel_futures=True)
                         return
-                except Exception as e:
+                except Exception:
                     failure_list.append(future_to_pid[future])
                     continue
 

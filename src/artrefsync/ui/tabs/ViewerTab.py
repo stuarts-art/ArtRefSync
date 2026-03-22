@@ -190,7 +190,7 @@ class GifViewer:
             self.raw_frames = []
             try:
                 self.delay = self.image.info["duration"]
-            except:
+            except Exception:
                 self.delay = 100
             try:
                 for frame in ImageSequence.Iterator(self.image):

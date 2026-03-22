@@ -1,16 +1,20 @@
-from threading import Event
 import base64
+import logging
+from threading import Event
+
 from artrefsync.api.e621_client import E621_Client
 from artrefsync.api.e621_model import E621_Post
+from artrefsync.boards.board_handler import ImageBoardHandler, Post
 from artrefsync.config import config
+from artrefsync.constants import BOARD, E621, STATS
 from artrefsync.stats import stats
-from artrefsync.boards.board_handler import Post, ImageBoardHandler
-from artrefsync.constants import STATS, BOARD, E621
-
-import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
+
+
+def main():
+    pass
 
 
 class E621Handler(ImageBoardHandler):
@@ -80,6 +84,19 @@ class E621Handler(ImageBoardHandler):
                 + pools
             )
 
+            try:
+                created_datetime = e_post.created_at
+                create_timestamp = int(created_datetime.timestamp())
+                tags.append(str(created_datetime.year))
+            except Exception:
+                create_timestamp = 0
+
+            try:
+                updated_datetime = e_post.updated_at
+                update_timestamp = int(updated_datetime.timestamp())
+            except Exception:
+                update_timestamp = 0
+
             pid = Post.make_storage_id(e_post.id, self.get_board())
             name = f"{pid}-{tag}"
             url = e_post.file.url
@@ -114,7 +131,8 @@ class E621Handler(ImageBoardHandler):
                 tags=tags,
                 score=e_post.score.up,
                 url=url,
-                board_update_str=e_post.updated_at,
+                update_timestamp=update_timestamp,
+                create_timestamp=create_timestamp,
                 website=website,
                 height=height,
                 width=width,
@@ -135,3 +153,7 @@ class E621Handler(ImageBoardHandler):
             post_dict[pid] = post
             stats.add(STATS.POST_COUNT)
         return post_dict
+
+
+if __name__ == "__main__":
+    main()

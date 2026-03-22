@@ -1,15 +1,17 @@
-from threading import Event
-from artrefsync.api.r34_model import R34_Post
-from artrefsync.api.r34_client import R34_Client
-from artrefsync.stats import stats
-from artrefsync.config import config
-from artrefsync.boards.board_handler import Post, ImageBoardHandler
-from artrefsync.constants import BOARD, R34, STATS
-
 import logging
+from datetime import datetime
+from threading import Event
+
+from artrefsync.api.r34_client import R34_Client
+from artrefsync.api.r34_model import R34_Post
+from artrefsync.boards.board_handler import ImageBoardHandler, Post
+from artrefsync.config import config
+from artrefsync.constants import BOARD, R34, STATS
+from artrefsync.stats import stats
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
+
 
 def main():
     pass
@@ -72,6 +74,21 @@ class R34Handler(ImageBoardHandler):
             if skip_rpost:
                 continue
 
+            try:
+                created_datetime = datetime.strptime(
+                    rpost.created_at, "%a %b %d %H:%M:%S %z %Y"
+                )
+                create_timestamp = int(created_datetime.timestamp())
+                tags.append(str(created_datetime.year))
+            except Exception:
+                create_timestamp = 0
+
+            try:
+                updated_datetime = datetime.fromtimestamp(rpost.change)
+                update_timestamp = int(updated_datetime.timestamp())
+            except Exception:
+                update_timestamp = 0
+
             post = Post(
                 id=post_id,
                 ext_id=rpost.id,
@@ -82,7 +99,8 @@ class R34Handler(ImageBoardHandler):
                 score=rpost.score,
                 url=rpost.file_url,
                 website=website,
-                board_update_str=rpost.change,
+                update_timestamp=update_timestamp,
+                create_timestamp=create_timestamp,
                 height=rpost.height,
                 width=rpost.width,
                 ratio=(

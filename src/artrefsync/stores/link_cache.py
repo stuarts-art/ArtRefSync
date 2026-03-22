@@ -1,7 +1,5 @@
-import os
 import tempfile
 import requests
-import shutil
 from artrefsync.config import config
 import logging
 

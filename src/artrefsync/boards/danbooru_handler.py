@@ -1,14 +1,19 @@
-from threading import Event
-from artrefsync.api.danbooru_client import Danbooru_Client
-from artrefsync.stats import stats
-from artrefsync.config import config
-from artrefsync.boards.board_handler import Post, ImageBoardHandler
-from artrefsync.constants import BOARD, STATS, DANBOORU
-
 import logging
+from datetime import datetime
+from threading import Event
+
+from artrefsync.api.danbooru_client import Danbooru_Client
+from artrefsync.boards.board_handler import ImageBoardHandler, Post
+from artrefsync.config import config
+from artrefsync.constants import BOARD, DANBOORU, STATS
+from artrefsync.stats import stats
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
+
+
+def main():
+    pass
 
 
 class Danbooru_Handler(ImageBoardHandler):
@@ -56,6 +61,19 @@ class Danbooru_Handler(ImageBoardHandler):
             is_black_listed = False
             tags = dpost.tag_string
 
+            try:
+                created_datetime = datetime.fromisoformat(dpost.created_at)
+                create_timestamp = int(created_datetime.timestamp())
+                tags.append(str(created_datetime.year))
+            except Exception:
+                create_timestamp = 0
+
+            try:
+                updated_datetime = datetime.fromisoformat(dpost.updated_at)
+                update_timestamp = int(updated_datetime.timestamp())
+            except Exception:
+                update_timestamp = 0
+
             tags.append(f"rating_{dpost.rating}")
             tags.append(f"{self.get_board().value}")
             tags.append(dpost.file_ext)
@@ -64,7 +82,9 @@ class Danbooru_Handler(ImageBoardHandler):
             for black_listed in self.black_list:
                 if black_listed in tags:
                     stats.add(STATS.SKIP_COUNT, 1)
-                    logger.debug("Skipping %s for %s. (%s)", post_id, black_listed, website)
+                    logger.debug(
+                        "Skipping %s for %s. (%s)", post_id, black_listed, website
+                    )
                     is_black_listed = True
                     break
             if is_black_listed:
@@ -77,7 +97,8 @@ class Danbooru_Handler(ImageBoardHandler):
                 artist_name=tag,
                 tags=tags,
                 board=self.board,
-                board_update_str=dpost.updated_at,
+                update_timestamp=update_timestamp,
+                create_timestamp=create_timestamp,
                 score=dpost.score,
                 url=dpost.file_url,
                 website=website,
@@ -99,3 +120,7 @@ class Danbooru_Handler(ImageBoardHandler):
             posts[post_id] = post
             stats.add(STATS.POST_COUNT)
         return posts
+
+
+if __name__ == "__main__":
+    main()

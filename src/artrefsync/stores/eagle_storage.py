@@ -146,7 +146,6 @@ class EagleHandler(ImageStoreHandler):
         if self.make_board_artist_dir(board, artist):
             return {}
 
-        limit = 10000
         data = self.get_list_items(folders=self.board_artist_dict[board][artist])
         post_files = {}
         for item in data:
@@ -179,6 +178,8 @@ class EagleHandler(ImageStoreHandler):
         self.client.item.update(post.ext_id, post.tags, url=post.url)
 
     def get_or_create_artist_folder(self):
+        if self.artists_id:
+            return
         folders = self.client.folder.list()
         folder_q = deque((folder for folder in folders))
         while folder_q:
@@ -194,7 +195,7 @@ class EagleHandler(ImageStoreHandler):
         logger.info("Artist Folder ID: %s", artists_folder.id)
 
         for board in artists_folder.children:
-            board_name = board.name
+            board_name = BOARD(board.name)
             self.board_dict[board_name] = board.id
             self.board_artist_dict[board_name] = {}
             for artist in board.children:

@@ -23,7 +23,7 @@ def main():
             select_args= "t1.id, t1.artist_name, t1.board, t1.tags",
             from_args= f"{Post.__name__} t1",
             join_str = f"LEFT JOIN {PostFile.__name__} t2 ON t1.id = t2.id",
-            where_str= f"WHERE t2.id IS NULL"
+            where_str= "WHERE t2.id IS NULL"
         )
     print(missing_ids)
 

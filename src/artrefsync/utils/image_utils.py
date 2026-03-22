@@ -12,6 +12,7 @@ from artrefsync.config import config
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+
 class ImageUtils:
     cache = {}
 
@@ -66,7 +67,7 @@ class ImageUtils:
         frames = []
         try:
             duration = image.info["duration"]
-        except:
+        except Exception:
             duration = 100
         try:
             for frame in ImageSequence.Iterator(image):

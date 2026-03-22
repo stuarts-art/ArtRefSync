@@ -9,7 +9,6 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 
-from artrefsync.utils.image_utils import ImageUtils
 import logging
 from artrefsync.config import config
 

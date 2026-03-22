@@ -64,6 +64,10 @@ class Danbooru_Client:
             if response_count < self.limit:
                 logger.debug(f"Page {page} Breaking Loop")
                 break
+            if post_limit is not None and len(posts) > post_limit:
+                posts = posts[:post_limit]
+                break
+
         if skipped:
             logger.debug("%i posts skipped.", len(skipped))
 

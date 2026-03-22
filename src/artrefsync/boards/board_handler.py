@@ -17,7 +17,8 @@ class Post:
     score: int | None = 0
     url: str | None = ""
     website: str = ""
-    board_update_str: str = ""
+    update_timestamp: int | None = 0
+    create_timestamp: int | None = 0
     height: int | None = 0
     width: int | None = 0
     ratio: float | None = 0.0

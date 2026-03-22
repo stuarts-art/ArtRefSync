@@ -94,7 +94,14 @@ class SortByTab(ttk.Frame):
         ).pack(side=tk.RIGHT)
         RoundedDropDown(
             self,
-            ["id", "board_update_str", "artist_name", "board", "score"],
+            [
+                "id",
+                "artist_name",
+                "board",
+                "score",
+                "update_timestamp",
+                "create_timestamp",
+            ],
             self.update_posts,
             self.sort_var,
             radius=10,

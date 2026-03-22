@@ -5,20 +5,8 @@ import humanize
 import inspect
 from pympler import asizeof
 
-
-def main():
-    with Bm("Test"):
-        test = "Hello World"
-        test2 = "I don't know?"
-
-    with Bm("Test 2"):
-        test3 = "Hello World"
-        test4 = "I don't know?"
-
-
 def obj_size(obj) -> str:
     return humanize.naturalsize(asizeof.asizeof(obj))
-
 
 def wrap_line(lines, line_size, border_char="│"):
     wrapped_lines = ""
@@ -82,7 +70,3 @@ class Bm(object):
             else:
                 print(time_line + size_lines)
         return False
-
-
-if __name__ == "__main__":
-    main()

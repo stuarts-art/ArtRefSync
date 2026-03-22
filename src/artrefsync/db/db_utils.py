@@ -176,11 +176,8 @@ class BlobDb:
     def create_table(self, table_name):
         logger.debug("Creating Blob table %s", table_name)
         create_table_flag = False
-        drop_table_flag = False
         if not DbUtils.table_exists(self.connection, table_name):
             create_table_flag = True
-        elif DbUtils.table_columns(self.connection, self.table_name) != self.cols:
-            drop_table_flag = True
 
         cursor = self.connection.cursor()
         if create_table_flag:

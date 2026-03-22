@@ -26,8 +26,7 @@ class DIRS(StrEnum):
     THUMBNAIL = ".thumbnail"
 
 def main():
-    config[TABLE.LOCAL][LOCAL.ARTIST_DIR] = "artists"
-    plain_storage = PlainLocalStorage()
+    pass
 
 
 class PlainLocalStorage(ImageStoreHandler):
@@ -41,9 +40,6 @@ class PlainLocalStorage(ImageStoreHandler):
         self.dir_base_map[DIRS.FILE] = self.artists_base_dir
         self._artist_name_map = {}
         self._ignore_list = ["(", ")", "[", "]", ",", ";", "<", ">", "="]
-
-        prev = 0
-        loaded = 0
 
         for dir in DIRS:
             if dir is not DIRS.FILE:
@@ -75,7 +71,6 @@ class PlainLocalStorage(ImageStoreHandler):
                         if not pid:
                             continue
                         self.file_map[artist_path][pid] = file
-                        loaded += 1
         logger.info("Plain File Store Handler Init Complete")
 
     def get_artist_posts(self, dir, board, artist) -> dict[str, str]:
@@ -170,7 +165,6 @@ class PlainLocalStorage(ImageStoreHandler):
         thumb_height = float(config[TABLE.APP][APP.THUMBNAIL_HEIGHT])
         posts = self.get_posts(board, artist)
         thumb_dir = self.get_artist_dir(DIRS.THUMBNAIL, board, artist)
-        create_thumbnails = []
         for pid, post in posts.items():
             thumbnail_flag = False
             if post.thumbnail == "":
@@ -180,7 +174,7 @@ class PlainLocalStorage(ImageStoreHandler):
                     with Image.open(post.thumbnail) as img:
                         if img.width != thumb_width and img.height != thumb_height:
                             thumbnail_flag = True
-                except:
+                except Exception:
                     thumbnail_flag = True
             if not thumbnail_flag:
                 continue
@@ -242,7 +236,7 @@ class PlainLocalStorage(ImageStoreHandler):
         try:
             temp_thumbnail = link_cache.get_file_from_link(link)
             shutil.copy2(temp_thumbnail, file_path)
-        except:
+        except Exception:
             return ""
         return file_path
 
