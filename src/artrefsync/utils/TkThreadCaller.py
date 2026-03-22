@@ -1,5 +1,5 @@
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
 import ttkbootstrap as ttk
 from threading import Event
 from artrefsync.config import config
@@ -72,18 +72,20 @@ class TkThreadCaller:
                     self.cancel_key_map.pop(future)
         return
 
-    def call_on_finish(self, future):
+    def call_on_finish(self, future:Future):
         try:
-            if future in self.cancel_key_map:
-                on_finish = self.on_finish_map.pop(future)
-                result = future.result()
-                self.root.after_idle(on_finish, result)
-                cancel_key = self.cancel_key_map.pop(future)
-                if cancel_key in self.cancel_map:
-                    if future in self.cancel_map[cancel_key]:
-                        self.cancel_map[cancel_key].discard(future)
+            result = future.result()
         except Exception as e:
             logger.error(e)
+
+        if future in self.cancel_key_map:
+            on_finish = self.on_finish_map.pop(future)
+            result = future.result()
+            self.root.after_idle(on_finish, result)
+            cancel_key = self.cancel_key_map.pop(future)
+            if cancel_key in self.cancel_map:
+                if future in self.cancel_map[cancel_key]:
+                    self.cancel_map[cancel_key].discard(future)
 
     def stop(self):
         logger.info("Stopping active threads...")

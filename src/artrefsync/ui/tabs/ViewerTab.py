@@ -69,6 +69,9 @@ class ViewerTab(ttk.Frame):
             self.gif_top = True
 
     def close_image_viewer(self, _=None):
+        if self.gif_top:
+            self.gif_viewer.unload()
+            
         if self.grid_info():
             logger.info("Closing Image Viewer")
             self.grid_forget()

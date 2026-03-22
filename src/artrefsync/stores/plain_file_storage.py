@@ -12,6 +12,7 @@ from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
+from artrefsync.utils.str_dict import str_dict
 
 import logging
 
@@ -34,7 +35,7 @@ class PlainLocalStorage(ImageStoreHandler):
         logger.info("Plain File Store Handler Init Start")
         self.artists_base_dir = Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR])
         self.dir_base_map = {}
-        self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = defaultdict(dict)
+        self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = str_dict(str_dict)
         self.update_map: dict = {}
         self.file_map: dict = defaultdict(dict)
         self.dir_base_map[DIRS.FILE] = self.artists_base_dir
