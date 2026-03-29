@@ -1,6 +1,7 @@
 # Config Related setup
 import os
 import sys
+from diskcache import Cache
 from simple_toml_configurator import Configuration
 from artrefsync.constants import (
     DB,
@@ -67,6 +68,15 @@ class __Config:
     ) -> dict[R34 | E621 | EAGLE | LOCAL,]:
         return self.settings.config[field]
 
+    def get(
+        self, table: TABLE, field: TABLE | STORE | BOARD, default
+    ) -> dict[R34 | E621 | EAGLE | LOCAL,]:
+
+        try:
+            return self.settings.config[table][field]
+        except KeyError:
+            return default
+
     default_config = {
         TABLE.APP: {
             APP.LIMIT: 30000,
@@ -79,6 +89,7 @@ class __Config:
             APP.DB_BLOB_NAME: DB.BLOB_DB,
             APP.THUMBNAIL_WIDTH: 640,
             APP.THUMBNAIL_HEIGHT: 480,
+            APP.ONLY_RECENT_ENABLED: True
 
         },
         TABLE.R34: {
@@ -115,3 +126,4 @@ class __Config:
 
 
 config = __Config()
+cache:Cache = Cache(config[TABLE.APP][APP.CACHE_DIR])

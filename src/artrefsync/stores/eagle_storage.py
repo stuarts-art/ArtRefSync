@@ -9,7 +9,7 @@ from artrefsync.api.eagle_model import EagleFolder, EagleItem
 from artrefsync.boards.board_handler import PostFile
 from artrefsync.config import config
 from artrefsync.constants import BOARD, EAGLE, STORE, TABLE
-from artrefsync.stores.link_cache import Link_Cache
+from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler, Post
 from artrefsync.utils.str_dict import str_dict
 
@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 def main():
-    handler = EagleHandler()
+    EagleHandler()
+
 
 
 class EagleHandler(ImageStoreHandler):
@@ -31,8 +32,10 @@ class EagleHandler(ImageStoreHandler):
         config.subscribe_reload(self.reload_config)
 
     def reload_config(self):
-        self.library = config.get(TABLE.EAGLE,EAGLE.LIBRARY)
-        self.artists_folder_name = config.get(TABLE.EAGLE, EAGLE.ARTIST_FOLDER, "artists").strip()
+        # self.library = config.get(TABLE.EAGLE,EAGLE.LIBRARY)
+        # self.artists_folder_name = config.get(TABLE.EAGLE, EAGLE.ARTIST_FOLDER, "artists").strip()
+        self.library = config[TABLE.EAGLE][EAGLE.LIBRARY]
+        self.artists_folder_name = config[TABLE.EAGLE][EAGLE.ARTIST_FOLDER]
 
         self.client = EagleClient()
         self._artist_folder: EagleFolder.ListFolder= None
@@ -54,11 +57,12 @@ class EagleHandler(ImageStoreHandler):
     def get_store(self):
         return STORE.EAGLE
 
-    def post_add_from_path(self, post: Post, path: str):
+    def post_add_from_path(self, post: Post, path: str) -> str:
         if (
             post.board not in self.board_artist_id_map
             or post.artist_name not in self.board_artist_id_map[post.board]
         ):
+            logger.info("Creating Artist Folder for %s, %s", post.board, post.artist_name)
             self.create_board_and_artist_folders(
                 post.board,
                 [
@@ -90,14 +94,14 @@ class EagleHandler(ImageStoreHandler):
                 break
         return data
 
-    def eagle_item_to_post(
+    def eagle_item_to_postfile(
         self, item: EagleItem.Item, artist_name=None, artist_board=BOARD.OTHER
     ) -> Post | None:
         pid = Post.parse_id(item.name)
         lib = self.library_path_dict[self.library]
         board_path = Path(os.path.join(lib, "images", f"{item.id}.info"))
         thumbnail = ""
-        file = f"{self.library_path_dict[self.library]}/images/{item.id}.info/{item.name}.{item.ext}"
+        f"{self.library_path_dict[self.library]}/images/{item.id}.info/{item.name}.{item.ext}"
         for path in board_path.iterdir():
             strpath = str(path)
             if "metadata.json" in strpath:
@@ -105,18 +109,25 @@ class EagleHandler(ImageStoreHandler):
             if "thumbnail" in strpath:
                 thumbnail = strpath
             else:
-                file = strpath
+                pass
 
-        post = PostFile(
+        height = item.height
+        width = item.height
+        ratio = item.height / item.width if item.height and item.width else None
+
+        postfile = PostFile(
             id=pid,
             ext_id=item.id,  # External ID
             store=self.get_store(),
             board=None,
             preview=thumbnail,
             thumbnail=thumbnail,
+            height=height,
+            width=width,
+            ratio=ratio,
             file=f"{self.library_path_dict[self.library]}/images/{item.id}.info/{item.name}.{item.ext}",
         )
-        return post
+        return postfile
 
     def create_board_and_artist_folders(self, board: BOARD, artists: list[str]):
         self.get_artists_folder()
@@ -147,30 +158,29 @@ class EagleHandler(ImageStoreHandler):
         data = self.get_list_items(folders=self.board_artist_id_map[board][artist])
         post_files = {}
         for item in data:
-            post_file = self.eagle_item_to_post(item)
+            post_file = self.eagle_item_to_postfile(item)
             if post_file:
                 post_files[post_file.id] = post_file
         logger.debug(f"Eagle Items for {board}, {artist} - {len(post_files)}")
         return post_files
 
     def save_post(
-        self, post: Post, link_cache: Link_Cache, event: Event = None
+        self, post: Post, link_cache: LinkCache, event: Event = None
     ) -> str | None:
         if event and event.is_set():
             return
-
         if link_cache:
             # loading(link_cache.increment_store_count(self.get_store())/link_cache.get_store_missing(self.get_store()))
-            response = self.post_add_from_path(
+            eagle_id = self.post_add_from_path(
                 post, link_cache.get_file_from_link(post.url)
             )
         else:
             suffix = f".{post.url.split('.')[-1]}"
             with tempfile.NamedTemporaryFile(mode="wb", suffix=suffix) as f:
-                Link_Cache.download_link_to_file(post.url, tempfile)
-                response = self.post_add_from_path(post, f.name)
-        response.raise_for_status()
-        return response
+                LinkCache.download_link_to_file(post.url, tempfile)
+                eagle_id = self.post_add_from_path(post, f.name)
+        eagle_item = self.client.item.info(eagle_id)
+        return self.eagle_item_to_postfile(eagle_item, post.artist_name, post.board)
 
     def update_post(self, post: Post):
         self.client.item.update(post.ext_id, post.tags, url=post.url)

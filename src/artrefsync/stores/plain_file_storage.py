@@ -7,7 +7,7 @@ from typing import Iterable
 from pathlib import Path, PureWindowsPath
 
 from PIL import Image
-from artrefsync.stores.link_cache import Link_Cache
+from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
 from artrefsync.boards.board_handler import Post, PostFile
@@ -37,7 +37,7 @@ class PlainLocalStorage(ImageStoreHandler):
         self.dir_base_map = {}
         self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = str_dict(str_dict)
         self.update_map: dict = {}
-        self.file_map: dict = defaultdict(dict)
+        self.folder_id_file_map: dict = defaultdict(dict)
         self.dir_base_map[DIRS.FILE] = self.artists_base_dir
         self._artist_name_map = {}
         self._ignore_list = ["(", ")", "[", "]", ",", ";", "<", ">", "="]
@@ -71,8 +71,9 @@ class PlainLocalStorage(ImageStoreHandler):
                         pid = file.name.rsplit(".", maxsplit=1)[0].split("-")[0]
                         if not pid:
                             continue
-                        self.file_map[artist_path][pid] = file
+                        self.folder_id_file_map[artist_path][pid] = file
         logger.info("Plain File Store Handler Init Complete")
+
 
     def get_artist_posts(self, dir, board, artist) -> dict[str, str]:
         artist_dir = self.get_artist_dir(dir, board, artist)
@@ -83,15 +84,15 @@ class PlainLocalStorage(ImageStoreHandler):
 
         if artist_dir in self.update_map:
             if update_time == last_updated:
-                return self.file_map[artist_dir]
+                return self.folder_id_file_map[artist_dir]
 
         for file in Path.iterdir(artist_dir):
             pid = file.name.rsplit(".", maxsplit=1)[0].split("-")[0]
             if not pid or pid == "artist":
                 continue
-            self.file_map[artist_dir][pid] = file.resolve()
+            self.folder_id_file_map[artist_dir][pid] = file.resolve()
         self.update_map[artist_dir] = update_time
-        return self.file_map[artist_dir]
+        return self.folder_id_file_map[artist_dir]
 
     def get_artist_dir(self, dir: DIRS, board: BOARD, artist):
         if artist not in self._dir_map[dir][board]:
@@ -193,16 +194,31 @@ class PlainLocalStorage(ImageStoreHandler):
         logger.debug("Updating thumbnails FINISHED for %s", artist)
     
     def save_post(
-        self, post: Post, link_cache: Link_Cache, event: Event = None
+        self, post: Post, link_cache: LinkCache, event: Event = None
     ) -> Post | None:
         if event and event.is_set():
             return
         saved_posts = {}
         for dir in DIRS:
-            saved_file = self.save_link(post, link_cache, dir)
-            if saved_file:
-                saved_posts[dir] = saved_file
-        return saved_posts
+            saved_posts[dir] = self.save_link(post, link_cache, dir)
+
+        post_file = PostFile(
+            id=post.id,
+            ext_id=post.ext,
+            store=self.get_store(),
+            board=post.board,
+            artist_name=post.artist_name,
+            height=post.height,
+            width=post.width,
+            ratio=post.ratio,
+            ext=post.ext,
+            preview=saved_posts.get(DIRS.PREVIEW, ""),
+            thumbnail=saved_posts.get(DIRS.THUMBNAIL, ""),
+            sample=saved_posts.get(DIRS.SAMPLE, ""),
+            file=saved_posts.get(DIRS.FILE, "")
+        )
+        return post_file
+
 
     def save_link(self, post: Post, link_cache, dir=DIRS) -> bool:
         pid = post.id
@@ -239,6 +255,8 @@ class PlainLocalStorage(ImageStoreHandler):
             shutil.copy2(temp_thumbnail, file_path)
         except Exception:
             return ""
+
+        self.folder_id_file_map[file_dir][post.id] = file_path
         return file_path
 
     get_thumbnail_order = [DIRS.THUMBNAIL, DIRS.PREVIEW, DIRS.SAMPLE, DIRS.FILE]

@@ -2,18 +2,26 @@ import base64
 import json
 from threading import Event
 import time
+from dacite import DaciteError
+from ratelimit import limits
 import requests
 from dacite.exceptions import MissingValueError
+from tenacity import retry
 from artrefsync.api.danbooru_model import Danbooru_Post, parse_danbooru_post
-from artrefsync.config import config
+from artrefsync.config import config, cache
 from artrefsync.constants import DANBOORU, TABLE
 
 import logging
 
+from artrefsync.db.post_db import PostDb
 from artrefsync.disk_cache import disk_cache
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
+
+def main():
+    client = Danbooru_Client(only_recent=True)
+    pass
 
 
 class Danbooru_Client:
@@ -21,7 +29,7 @@ class Danbooru_Client:
     Class to handle requesting and handling messages from the image board E621
     """
 
-    def __init__(self, username=None, api_key=None):
+    def __init__(self, username=None, api_key=None, only_recent = False):
         logger.info("Creating Danbooru Client")
         self.website_headers = None
         if not username:
@@ -33,89 +41,78 @@ class Danbooru_Client:
             self.website_headers = {
                 "Authorization": f"Basic {base64.b64encode(user_string.encode('utf-8')).decode('utf-8')}",
             }
+        self.only_recent = only_recent
         self.base_url = "https://danbooru.donmai.us/posts.json?tags="
         self.hostname = "danbooru.domai.us"
         self.limit = 200
         self.retries = 3
-        self.last_run = 0
 
-    def _build_url_request(self, tag, page) -> str:
-        return f"{self.base_url}&limit={self.limit}&tags={tag}&page={page}"
+    def _build_url_request(self, tag, page, last_id) -> str:
+        url_request =  f"{self.base_url}&limit={self.limit}&tags={tag}{f"+id:>{last_id}" if last_id else ""}&page={page}"
+        print(url_request)
+        return url_request
 
-    @disk_cache
     def get_posts(
-        self, tag, post_limit=None, stop_event: Event = None
+        self, tag, post_limit=10000, stop_event: Event = None
     ) -> list[Danbooru_Post]:
-        logger.info("Getting posts for %s", tag)
-        if time.time() - self.last_run < 0.6:
-            time.sleep(time.time() - self.last_run)
-        self.last_run = time.time()
+        logger.debug("Getting posts for %s", tag)
 
         posts: list[Danbooru_Post] = []
-        self.last_run = time.time() - 1
         failed = []
         skipped = []
 
+        last_id = None
+        if self.only_recent:
+            with PostDb() as post_db:
+                last_id = post_db.get_last_id(tag, TABLE.DANBOORU)
         # Starts at index 1 (Index 0 returns page 1)
+        posts_data = []
         for page in range(1, 20):
             if stop_event and stop_event.is_set():
                 return None
-            response_count = self.get_page(tag, page, posts, failed, skipped)
-            if response_count < self.limit:
+            page_data = self.get_page(tag, page, last_id)
+            posts_data.extend(page_data)
+            logger.debug("%s - Page %d, %d", tag, page, len(page_data))
+            if len(page_data) < self.limit:
                 logger.debug(f"Page {page} Breaking Loop")
                 break
-            if post_limit is not None and len(posts) > post_limit:
-                posts = posts[:post_limit]
+            if len(posts) > post_limit:
+                break
+        for post_data in posts_data:
+            try:
+                post = parse_danbooru_post(post_data)
+                if post.is_deleted:
+                    skipped.append(post_data["id"])
+                    continue
+                else:
+                    posts.append(post)
+            except DaciteError as e:
+                logger.debug(e)
+                failed = post_data
+            if len(posts) >= post_limit:
                 break
 
         if skipped:
             logger.debug("%i posts skipped.", len(skipped))
+        if failed:
+            logger.debug("%i posts failed.", len(failed))
 
-        logger.info("Returning %i posts for %s", len(posts), tag)
         return posts
 
-    def get_page(self, tag: str, page: int, posts: list, failed: list, skipped: list):
-        if time.time() - self.last_run < 1:
-            time.sleep(1 - (time.time() - self.last_run))
-        self.last_run = time.time()
-        for retry in range(1, 4):
-            try:
-                response = requests.get(
-                    self._build_url_request(tag, page),
-                    headers=self.website_headers,
-                    timeout=5.0,
-                )
-                response.raise_for_status()
-                break
-            except Exception as e:
-                logger.warning(
-                    "Request (%i / %i) for %s page %s Failed. Exception: ",
-                    retry,
-                    3,
-                    tag,
-                    page,
-                    e,
-                )
-                if retry == 3:
-                    raise e
-                else:
-                    time.sleep(0.6 * (retry + 1))
 
-        response_content_dict = json.loads(response.content)
-        logger.debug(
-            f"Artist: {tag}, Page:{page} Response Count: {len(response_content_dict)}"
+
+    @cache.memoize(expire=300)
+    @retry
+    @limits(calls=10, period=1)
+    def get_page(self, tag: str, page: int, last_id):
+        response = requests.get(
+            self._build_url_request(tag, page, last_id),
+            headers=self.website_headers,
+            timeout=5.0,
         )
-        for post in response_content_dict:
-            try:
-                parsed = parse_danbooru_post(post)
-                if parsed.is_deleted:
-                    skipped.append(post["id"])
-                    continue
+        response.raise_for_status()
+        post_data = json.loads(response.content)
+        return post_data
 
-                # page_posts.append(parsed)
-                posts.append(parsed)
-            except (TypeError, MissingValueError):
-                logger.debug("Failed to translate %s", post["id"])
-                skipped.append(post["id"])
-
-        return len(response_content_dict)
+if __name__ == "__main__":
+    main()

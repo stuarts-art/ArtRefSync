@@ -117,7 +117,6 @@ class ArtistTab(ttk.Frame):
     def set_artist_counts(self):
         logger.debug("Setting BOARD ARTISTS")
         with PostDb() as postdb:
-            print(postdb.board_artists.keys())
             for board, artists in postdb.board_artists.items():
                 board_str = str(board)
                 count = postdb.tag_posts.count(str(board_str))

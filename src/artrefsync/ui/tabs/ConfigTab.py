@@ -6,8 +6,6 @@ from tkinter.filedialog import askdirectory
 
 import ttkbootstrap as ttk
 
-# from PIL import Image, ImageTk
-# from artrefsync.utils.ToggleConsole import toggle_console
 from artrefsync.config import config
 from artrefsync.constants import TABLE, get_table_mapping
 from artrefsync.sync_coordinator import sync_config, sync_from_store

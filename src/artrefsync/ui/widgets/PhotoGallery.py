@@ -1,7 +1,7 @@
-from collections import deque
 import logging
 import time
 import tkinter as tk
+from collections import deque
 from threading import Event
 
 import ttkbootstrap as ttk
@@ -216,8 +216,6 @@ class SimpleFrames:
 
     def update(self):
         logger.debug("Updating Image Gallery")
-        ImageUtils.get_tk_thumb.cache_clear()
-        ImageUtils.getPilImageThumb.cache_clear()
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
         for i, frame in enumerate(self.frames):
             frame.reset()
@@ -571,8 +569,11 @@ class SimplePhotoLabel(tk.Label):
                 self.file_name = self.file.sample
             else:
                 self.file_name = self.file.file
+
             self.config(image=None)
-            self.thumbsize = ((self.width_var.get(), self.height_var.get()),)
+            self.thumbsize = (self.width_var.get(), self.height_var.get())
+            if self.file.ext not in ["webm", "mp4"] and self.image_h > 400:
+                self.file_name = self.file.file
 
             thread_caller.add(
                 ImageUtils.getPilImageThumb,
@@ -580,6 +581,7 @@ class SimplePhotoLabel(tk.Label):
                 self.get_image_cancel_key,
                 self.file_name,
                 (self.width_var.get(), self.height_var.get()),
+                True,
             )
 
     def set_image(self, image):

@@ -6,12 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
-def link_cache() -> "Link_Cache":
-    global _link_cache
-    if _link_cache is None:
-        _link_cache = Link_Cache()
-
-class Link_Cache:
+class LinkCache:
     _instance = None
     def __new__(cls):
         if cls._instance is None:

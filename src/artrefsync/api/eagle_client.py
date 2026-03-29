@@ -1,10 +1,16 @@
 import json
 import dacite
 import requests
+from tenacity import retry
 from artrefsync.api.eagle_model import EagleFolder, EagleItem, EagleLibrary
 from artrefsync.constants import STORE, EAGLE
 from artrefsync.config import config
 import threading
+
+
+def main():
+    EagleClient()
+    pass
 
 
 class EagleClient:
@@ -24,6 +30,7 @@ class EagleClient:
         def folder_url(self, folder_path) -> str:
             return f"{self.eagle_url}/folder/{folder_path}"
 
+        @retry
         def create(
             self, folderName: str, parent: str = None
         ) -> EagleFolder.CreatedFolder:
@@ -36,14 +43,13 @@ class EagleClient:
                 response = requests.post(
                     self.folder_url("create"), data=json.dumps(data)
                 )
-
             created_file = dacite.from_dict(
                 EagleFolder.CreatedFolder, json.loads(response.content)["data"]
             )
-
             return created_file
 
         # If no args given, returns info on folder id
+        @retry
         def update(
             self,
             folderId: str,
@@ -66,18 +72,18 @@ class EagleClient:
                 response = requests.post(
                     self.folder_url("update"), data=json.dumps(data), timeout=5
                 )
-            response = json.loads(response.content)["data"]
-            updated_item = dacite.from_dict(EagleFolder.UpdatedFolder, response)
+            response.raise_for_status()
+            data = json.loads(response.content)["data"]
+            updated_item = dacite.from_dict(EagleFolder.UpdatedFolder, data)
             return updated_item
 
+        @retry
         def list(self) -> list[EagleFolder.ListFolder]:
             with self.lock:
-                response = json.loads(
-                    requests.get(self.folder_url("list"), timeout=5).content
-                )
-            response = response["data"]
+                response = requests.get(self.folder_url("list"), timeout=5).content
+            data = json.loads(response)["data"]
             folder_list = [
-                dacite.from_dict(EagleFolder.ListFolder, item) for item in response
+                dacite.from_dict(EagleFolder.ListFolder, item) for item in data
             ]
             return folder_list
 
@@ -91,28 +97,34 @@ class EagleClient:
         def library_url(self, library_path):
             return f"{self._library_url}/{library_path}"
 
+        @retry
         def info(self) -> EagleLibrary.Info:
             with self.lock:
                 response = requests.get(self.library_url("info"), timeout=5)
-            dict_response = json.loads(response.content)["data"]
-            return dacite.from_dict(EagleLibrary.Info, dict_response)
+            response.raise_for_status()
+            data = json.loads(response.content)["data"]
+            return dacite.from_dict(EagleLibrary.Info, data)
 
+        @retry
         def history(self) -> list[str]:
             with self.lock:
                 response = requests.get(self.library_url("history"), timeout=5)
+            response.raise_for_status()
             # data = json.loads(response.content)["data"]
             data = json.loads(response.content)["data"]
             data = [x.replace("\\", "/").removesuffix("/") for x in data]
             return data
 
+        @retry
         def switch(self, library_path: str) -> str:
             data = {"libraryPath": library_path}
             with self.lock:
                 response = requests.post(
                     self.library_url("switch"), data=json.dumps(data), timeout=5
                 )
-            # print(response)
-            return json.loads(response.content)
+            response.raise_for_status()
+            content = json.loads(response.content)
+            return content
 
     class _Item:
         def __init__(self, eagle_url, lock):
@@ -122,21 +134,25 @@ class EagleClient:
         def item_url(self, item_path) -> str:
             return f"{self._item_url}/{item_path}"
 
+        @retry
         def thumbnail(self, pid) -> EagleItem.UpdatedItem:
             with self.lock:
                 response = requests.get(
                     f"{self.item_url('thumbnail')}?id={pid}", timeout=5
                 )
-            response = json.loads(response.content)["data"]
-            return response
+            data = json.loads(response.content)["data"]
+            return data
 
+        @retry
         def info(self, pid) -> EagleItem.UpdatedItem:
             with self.lock:
                 response = requests.get(f"{self.item_url('info')}?id={pid}", timeout=5)
-            response = json.loads(response.content)["data"]
-            info = dacite.from_dict(EagleItem.UpdatedItem, response)
+            response.raise_for_status()
+            data = json.loads(response.content)["data"]
+            info = dacite.from_dict(EagleItem.UpdatedItem, data)
             return info
 
+        @retry
         def update(
             self,
             pid: str,
@@ -161,8 +177,9 @@ class EagleClient:
                 response = requests.post(
                     self.item_url("update"), data=json.dumps(data), timeout=5
                 )
-            response = json.loads(response.content)["data"]
-            updated_item = dacite.from_dict(EagleItem.UpdatedItem, response)
+            response.raise_for_status()
+            data = json.loads(response.content)["data"]
+            updated_item = dacite.from_dict(EagleItem.UpdatedItem, data)
             return updated_item
 
         def post_add_from_path(
@@ -191,7 +208,9 @@ class EagleClient:
                 response = requests.post(
                     self.item_url("addFromPath"), data=json.dumps(data), timeout=5
                 )
-            return response
+            response.raise_for_status()
+            data = json.loads(response.content)["data"]
+            return data
 
         def moveToTrash(self, trash_id_list: list[str]) -> requests.Response:
             data = {"itemIds": trash_id_list}
@@ -201,7 +220,8 @@ class EagleClient:
                     data=json.dumps(data),
                     timeout=5,
                 )
-            return response
+            response.raise_for_status()
+            return response.status_code
 
         def list_items(
             self,
@@ -230,6 +250,10 @@ class EagleClient:
 
             with self.lock:
                 response = requests.get(request, timeout=5)
-            response = json.loads(response.content)["data"]
-            list_items = [dacite.from_dict(EagleItem.Item, item) for item in response]
+            response.raise_for_status()
+            data = json.loads(response.content)["data"]
+            list_items = [dacite.from_dict(EagleItem.Item, item) for item in data]
             return list_items
+
+if __name__ == "__main__":
+    main()

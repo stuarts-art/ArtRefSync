@@ -92,6 +92,7 @@ class APP(StrEnum):
     DB_BLOB_NAME = auto()
     THUMBNAIL_WIDTH = auto()
     THUMBNAIL_HEIGHT = auto()
+    ONLY_RECENT_ENABLED = auto()
 
 
 class BOARD(StrEnum):

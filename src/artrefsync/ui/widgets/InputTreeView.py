@@ -88,7 +88,7 @@ class InputTreeviewFrame(ttk.Frame):
             self.tree.delete(row_id)
 
     def on_tree_rclick(self, event):
-        selection = self.tree.selection()
+        self.tree.selection()
         self.tree.detach()
 
 

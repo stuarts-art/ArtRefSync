@@ -1,74 +1,104 @@
 import base64
-import logging
 import json
-from threading import Event
+import logging
 import time
+from datetime import datetime
+from threading import Event
+
 import requests
-from artrefsync.api.e621_model import E621_Post
-from artrefsync.disk_cache import disk_cache
-from artrefsync.config import config
+from dacite import DaciteError
+
+# from diskcache import Cache
+from ratelimit import limits
+from tenacity import retry
+
+from artrefsync.api.e621_model import E621_Post, parse_e621_post
+from artrefsync.config import cache, config
+from artrefsync.constants import APP, E621, TABLE
+from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 
+def main():
+    pass
+
+
 class E621_Client:
-    def __init__(self, username, api_key):
-        if username and api_key:
-            user_string = f"{username}:{api_key}"
-            self.website_headers = {
-                "Authorization": f"Basic {base64.b64encode(user_string.encode('utf-8')).decode('utf-8')}",
-                "User-Agent": f"MyProject/1.0 (by {username} on e621)",
-            }
-        else:
-            user_string = None
-            self.website_headers = None
+    def __init__(self, username: str = None, api_key: str = None, only_recent=False):
+        logger.info("E621 Client Init")
+        if not username:
+            username = config[TABLE.E621][E621.USERNAME]
+        if not api_key:
+            api_key = config[TABLE.E621][E621.API_KEY]
+        user_string = f"{username}:{api_key}"
+        self.website_headers = {
+            "Authorization": f"Basic {base64.b64encode(user_string.encode('utf-8')).decode('utf-8')}",
+            "User-Agent": f"MyProject/1.0 (by {username} on e621)",
+        }
+        self.only_recent = only_recent
 
         self.website = "https://e621.net/posts.json"
         self.hostname = "e621.net"
         self.limit = 320
-        self.last_run = 0
+        logger.info("E621 Client Complete")
+        self.last_run = time.time()
 
-    def _build_website_parameters(self, page, tag) -> str:
-        return f"{self.website}?limit={self.limit}&tags={tag}&page={page}"
+    def _build_website_parameters(self, page, tag, last_id=None) -> str:
+        return f"{self.website}?limit={self.limit}&tags={tag}{f'+id:>{last_id}' if last_id else ''}&page={page}"
 
-    @disk_cache
     def get_posts(
-        self, tags: str, post_limit=None, stop_event: Event = None
+        self, tags: str, post_limit=10000, stop_event: Event = None
     ) -> list[E621_Post]:
+        # logger.info("Getting Posts")
+
+        last_id = None
+        if self.only_recent:
+            with PostDb() as post_db:
+                last_id = post_db.get_last_id(tags, "e621")
+
         posts = []
-        oldest_id = ""
+        posts_data = []
         for page in range(1, 50):  # handle pagination
-            logger.debug(f"{tags} - Page {page}")
+            page_data = self.get_page(tags, page, last_id)
+            logger.info(f"{tags}, Page: {page}, Count: {len(page_data)}")
+            posts_data.extend(page_data)
+            if len(page_data) < self.limit or len(posts_data) >= post_limit:
+                break
             if stop_event and stop_event.is_set():
                 return None
-            # Very minimal rate limiter
-            if time.time() - self.last_run < 0.6:
-                time.sleep(time.time() - self.last_run)
-            self.last_run = time.time()
 
-            response = requests.get(
-                self._build_website_parameters(page, tags),
-                headers=self.website_headers,
-                timeout=10,
-            )
-            response.raise_for_status()
-            page_data = json.loads(response.content)["posts"]
+        logger.info(len(posts_data))
+        for post_data in posts_data:
+            try:
+                if (post := parse_e621_post(post_data)) is not None:
+                    posts.append(post)
+            except DaciteError as e:
+                logger.info(e)
 
-            if len(page_data) == 0:
-                break
-            if page != 1:
-                if len(page_data) < self.limit or (oldest_id == page_data[-1]["id"]):
-                    break
-            oldest_id = page_data[-1]["id"]
-
-            for post_data in page_data:
-                post = E621_Post(**post_data)
-                posts.append(post)
-                if post_limit and post_limit < len(posts):
-                    break
-            if post_limit and post_limit < len(posts):
+            if len(posts) >= post_limit:
                 break
 
         logger.info("E621 Client GetPosts for tags=%s len = %s, ", tags, len(posts))
         return posts
+
+    @cache.memoize(expire=300)
+    @retry
+    @limits(calls=2, period=1)
+    def get_page(self, tags, page, last_id=None):
+
+        logger.info("CACHE MISS")
+        request_params = self._build_website_parameters(page, tags, last_id=last_id)
+        response = requests.get(
+            request_params,
+            headers=self.website_headers,
+            timeout=10,
+        )
+        response.raise_for_status()
+        page_data = json.loads(response.content)["posts"]
+        return page_data
+
+
+if __name__ == "__main__":
+    main()

@@ -4,17 +4,21 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum, IntEnum
+from enum import Enum, StrEnum
 from typing import List, Optional
 
-from pydantic import AnyUrl, BaseModel, Field
+import dacite
 
 
-class E621_Post(BaseModel):
+@dataclass
+class E621_Post:
     id: int | str
     created_at: datetime
     updated_at: datetime
+    # created_at: str
+    # updated_at: str
     file: File
     preview: Preview
     sample: Sample
@@ -38,641 +42,25 @@ class E621_Post(BaseModel):
     uploader_name: str
 
 
-class Reason(Enum):
-    Access_Denied = "Access Denied"
+config = dacite.Config(cast=[int, str], type_hooks={
+    # List[str]: (lambda x: x.split()),
+    datetime: datetime.fromisoformat
+    })
 
 
-class AccessDeniedResponse(BaseModel):
-    success: bool
-    reason: Reason
+def parse_e621_post(post_dict) -> E621_Post:
+    return dacite.from_dict(E621_Post, post_dict, config=config)
+    
 
 
-class Reason1(Enum):
-    not_found = "not found"
-
-
-class NotFoundResponse(BaseModel):
-    success: bool
-    reason: Reason1
-
-
-class RecordType(Enum):
-    unmark = "unmark"
-    ban = "ban"
-    record = "record"
-    warning = "warning"
-
-
-class WarningRecordType(BaseModel):
-    record_type: RecordType
-
-
-class ModActionActions(Enum):
-    artist_page_rename = "artist_page_rename"
-    artist_page_lock = "artist_page_lock"
-    artist_page_unlock = "artist_page_unlock"
-    artist_user_linked = "artist_user_linked"
-    artist_user_unlinked = "artist_user_unlinked"
-    avoid_posting_create = "avoid_posting_create"
-    avoid_posting_update = "avoid_posting_update"
-    avoid_posting_delete = "avoid_posting_delete"
-    avoid_posting_undelete = "avoid_posting_undelete"
-    avoid_posting_destroy = "avoid_posting_destroy"
-    blip_delete = "blip_delete"
-    blip_hide = "blip_hide"
-    blip_unhide = "blip_unhide"
-    blip_update = "blip_update"
-    comment_delete = "comment_delete"
-    comment_hide = "comment_hide"
-    comment_unhide = "comment_unhide"
-    comment_update = "comment_update"
-    forum_category_create = "forum_category_create"
-    forum_category_delete = "forum_category_delete"
-    forum_category_update = "forum_category_update"
-    forum_post_delete = "forum_post_delete"
-    forum_post_hide = "forum_post_hide"
-    forum_post_unhide = "forum_post_unhide"
-    forum_post_update = "forum_post_update"
-    forum_topic_delete = "forum_topic_delete"
-    forum_topic_hide = "forum_topic_hide"
-    forum_topic_unhide = "forum_topic_unhide"
-    forum_topic_lock = "forum_topic_lock"
-    forum_topic_unlock = "forum_topic_unlock"
-    forum_topic_stick = "forum_topic_stick"
-    forum_topic_unstick = "forum_topic_unstick"
-    forum_topic_update = "forum_topic_update"
-    help_create = "help_create"
-    help_delete = "help_delete"
-    help_update = "help_update"
-    ip_ban_create = "ip_ban_create"
-    ip_ban_delete = "ip_ban_delete"
-    mascot_create = "mascot_create"
-    mascot_update = "mascot_update"
-    mascot_delete = "mascot_delete"
-    pool_delete = "pool_delete"
-    report_reason_create = "report_reason_create"
-    report_reason_delete = "report_reason_delete"
-    report_reason_update = "report_reason_update"
-    set_update = "set_update"
-    set_delete = "set_delete"
-    set_change_visibility = "set_change_visibility"
-    tag_alias_create = "tag_alias_create"
-    tag_alias_update = "tag_alias_update"
-    tag_implication_create = "tag_implication_create"
-    tag_implication_update = "tag_implication_update"
-    ticket_claim = "ticket_claim"
-    ticket_unclaim = "ticket_unclaim"
-    ticket_update = "ticket_update"
-    upload_whitelist_create = "upload_whitelist_create"
-    upload_whitelist_update = "upload_whitelist_update"
-    upload_whitelist_delete = "upload_whitelist_delete"
-    user_blacklist_changed = "user_blacklist_changed"
-    user_text_change = "user_text_change"
-    user_upload_limit_change = "user_upload_limit_change"
-    user_flags_change = "user_flags_change"
-    user_level_change = "user_level_change"
-    user_name_change = "user_name_change"
-    user_delete = "user_delete"
-    user_ban = "user_ban"
-    user_ban_update = "user_ban_update"
-    user_unban = "user_unban"
-    user_feedback_create = "user_feedback_create"
-    user_feedback_update = "user_feedback_update"
-    user_feedback_delete = "user_feedback_delete"
-    user_feedback_undelete = "user_feedback_undelete"
-    user_feedback_destroy = "user_feedback_destroy"
-    wiki_page_rename = "wiki_page_rename"
-    wiki_page_delete = "wiki_page_delete"
-    wiki_page_lock = "wiki_page_lock"
-    wiki_page_unlock = "wiki_page_unlock"
-    mass_update = "mass_update"
-    nuke_tag = "nuke_tag"
-    takedown_delete = "takedown_delete"
-    takedown_process = "takedown_process"
-    user_flush_favorites = "user_flush_favorites"
-    post_version_hide = "post_version_hide"
-    post_version_unhide = "post_version_unhide"
-    user_uploads_toggle = "user_uploads_toggle"
-    staff_note_create = "staff_note_create"
-    staff_note_update = "staff_note_update"
-    staff_note_delete = "staff_note_delete"
-    staff_note_undelete = "staff_note_undelete"
-    created_positive_record = "created_positive_record"
-    created_neutral_record = "created_neutral_record"
-    created_negative_record = "created_negative_record"
-    created_flag_reason = "created_flag_reason"
-    edited_flag_reason = "edited_flag_reason"
-    deleted_flag_reason = "deleted_flag_reason"
-    post_move_favorites = "post_move_favorites"
-    post_delete = "post_delete"
-    post_undelete = "post_undelete"
-    post_destroy = "post_destroy"
-    post_rating_lock = "post_rating_lock"
-    post_unapprove = "post_unapprove"
-    post_replacement_accept = "post_replacement_accept"
-    post_replacement_reject = "post_replacement_reject"
-    post_replacement_delete = "post_replacement_delete"
-
-
-class PostEventActions(Enum):
-    deleted = "deleted"
-    undeleted = "undeleted"
-    approved = "approved"
-    unapproved = "unapproved"
-    flag_created = "flag_created"
-    flag_removed = "flag_removed"
-    favorites_moved = "favorites_moved"
-    favorites_received = "favorites_received"
-    rating_locked = "rating_locked"
-    rating_unlocked = "rating_unlocked"
-    status_locked = "status_locked"
-    status_unlocked = "status_unlocked"
-    note_locked = "note_locked"
-    note_unlocked = "note_unlocked"
-    comment_locked = "comment_locked"
-    comment_unlocked = "comment_unlocked"
-    replacement_accepted = "replacement_accepted"
-    replacement_rejected = "replacement_rejected"
-    replacement_promoted = "replacement_promoted"
-    replacement_deleted = "replacement_deleted"
-    expunged = "expunged"
-    changed_bg_color = "changed_bg_color"
-    replacement_penalty_changed = "replacement_penalty_changed"
-
-
-class Ratings(Enum):
+class Ratings(StrEnum):
     s = "s"
     q = "q"
     e = "e"
 
 
-class TagCategories(IntEnum):
-    integer_0 = 0
-    integer_1 = 1
-    integer_3 = 3
-    integer_4 = 4
-    integer_5 = 5
-    integer_6 = 6
-    integer_7 = 7
-    integer_8 = 8
-
-
-class FeedbackCategories(Enum):
-    negative = "negative"
-    neutral = "neutral"
-    positive = "positive"
-
-
-class TagRequestStatuses(Enum):
-    active = "active"
-    deleted = "deleted"
-    processing = "processing"
-    queued = "queued"
-    retired = "retired"
-    error = "error"
-    pending = "pending"
-
-
-class WarningTypes(Enum):
-    warning = "warning"
-    record = "record"
-    ban = "ban"
-
-
-class PoolCategories(Enum):
-    collection = "collection"
-    series = "series"
-
-
-class TicketTypes(Enum):
-    blip = "blip"
-    comment = "comment"
-    dmail = "dmail"
-    forum = "forum"
-    pool = "pool"
-    post = "post"
-    set = "set"
-    user = "user"
-    wiki = "wiki"
-    replacement = "replacement"
-
-
-class TicketStatuses(Enum):
-    pending = "pending"
-    partial = "partial"
-    approved = "approved"
-
-
-class Artist(BaseModel):
-    id: int
-    name: str
-    updated_at: datetime
-    is_active: bool
-    other_names: List[str]
-    group_name: str
-    linked_user_id: int
-    created_at: datetime
-    creator_id: int
-    is_locked: bool
-    notes: str
-
-
-class ArtistURL(BaseModel):
-    id: int
-    artist_id: int
-    url: AnyUrl
-    normalized_url: AnyUrl
-    created_at: datetime
-    updated_at: datetime
-    is_active: bool
-
-
-class ArtistVersion(BaseModel):
-    id: int
-    artist_id: int
-    name: str
-    updater_id: int
-    created_at: datetime
-    updated_at: datetime
-    is_active: bool
-    other_names: List[str]
-    notes_changed: bool
-    urls: List[AnyUrl]
-
-
-class AvoidPosting(BaseModel):
-    id: int
-    creator_id: int
-    updater_id: int
-    artist_id: int
-    staff_notes: Optional[str] = Field(None, description="Only visible to Janitor+")
-    details: str
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-
-
-class AvoidPostingVersion(BaseModel):
-    id: int
-    updater_id: int
-    avoid_posting_id: int
-    details: str
-    staff_notes: Optional[str] = Field(None, description="Only visible to Janitor+")
-    is_active: bool
-    updated_at: datetime
-
-
-class Ban(BaseModel):
-    id: int
-    user_id: int
-    reason: str
-    expires_at: datetime
-    banner_id: int
-    created_at: datetime
-    updated_at: datetime
-
-
-class Blip(BaseModel):
-    id: int
-    creator_id: int
-    body: str
-    response_to: int
-    created_at: datetime
-    updated_at: datetime
-    is_hidden: bool
-    warning_type: WarningTypes
-    warning_user_id: int
-    updater_id: int
-    creator_name: str
-
-
-class Status(Enum):
-    approved = "approved"
-    rejected = "rejected"
-    pending = "pending"
-
-
-class BulkUpdateRequest(BaseModel):
-    id: int
-    creator_id: int
-    forum_topic_id: int
-    script: str = Field(..., example=["alias a -> b"])
-    status: Status
-    created_at: datetime
-    updated_at: datetime
-    approver_id: int
-    forum_post_id: int
-    title: str
-
-
-class Comment(BaseModel):
-    id: int
-    created_at: datetime
-    post_id: int
-    creator_id: int
-    body: str
-    score: int
-    updated_at: datetime
-    updater_id: int
-    do_not_bump_post: bool
-    is_hidden: bool
-    is_sticky: bool
-    warning_type: WarningTypes
-    warning_user_id: int
-    creator_name: str
-    updater_name: str
-
-
-class DefaultImageSize(Enum):
-    large = "large"
-    fit = "fit"
-    fitv = "fitv"
-    original = "original"
-
-
-class DMail(BaseModel):
-    id: int
-    owner_id: int
-    from_id: int
-    to_id: int
-    title: str
-    body: str
-    is_read: bool
-    is_deleted: bool
-    created_at: datetime
-    updated_at: datetime
-    to_name: str
-    from_name: str
-
-
-class DeferredPost(BaseModel):
-    id: int
-    flags: str
-    tags: str
-    rating: Ratings
-    file_ext: str
-    width: int
-    height: int
-    size: int
-    created_at: datetime
-    uploader: str
-    uploader_id: int
-    score: int
-    fav_count: int
-    is_favorited: bool
-    pools: List[int]
-    md5: str
-    preview_url: str
-    large_url: str
-    file_url: str
-    preview_width: int
-    preview_height: int
-
-
-class DTextResponse(BaseModel):
-    html: str
-    posts: DeferredPost
-
-
-class EmailBlacklist(BaseModel):
-    id: int
-    created_at: str
-    updated_at: str
-    domain: str
-    creator_id: str
-    reason: str
-
-
-class ForumPost(BaseModel):
-    id: int
-    topic_id: int
-    creator_id: int
-    updater_id: int
-    body: str
-    is_hidden: bool
-    created_at: datetime
-    updated_at: datetime
-    warning_type: WarningTypes
-    warning_user_id: int
-
-
-class ForumPostVote(BaseModel):
-    id: int
-    forum_post_id: int
-    creator_id: int
-    score: int
-    created_at: datetime
-    updated_at: datetime
-    creator_name: str
-
-
-class ForumTopic(BaseModel):
-    id: int
-    creator_id: int
-    updater_id: int
-    title: str
-    response_count: int
-    is_sticky: bool
-    is_locked: bool
-    is_hidden: bool
-    created_at: datetime
-    updated_at: datetime
-    category_id: int
-
-
-class Help(BaseModel):
-    id: int
-    name: str
-    title: str
-    wiki_page: str
-    related: str
-    created_at: datetime
-    updated_at: datetime
-
-
-class IPBan(BaseModel):
-    id: int
-    creator_id: int
-    reason: str
-    created_at: datetime
-    updated_at: datetime
-
-
-class GeneratedSample(Enum):
-    field_720p = "720p"
-    field_480p = "480p"
-    original = "original"
-
-
-class IQDBPost(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    up_score: int
-    down_score: int
-    score: int
-    source: str
-    md5: str
-    rating: Ratings
-    is_note_locked: bool
-    is_rating_locked: bool
-    is_status_locked: bool
-    is_pending: bool
-    is_flagged: bool
-    is_deleted: bool
-    uploader_id: int
-    approver_id: int
-    last_noted_at: datetime
-    last_comment_bumped_at: datetime
-    fav_count: int
-    tag_string: str
-    tag_count: int
-    tag_count_general: int
-    tag_count_artist: int
-    tag_count_character: int
-    tag_count_copyright: int
-    file_ext: str
-    file_size: int
-    image_width: int
-    image_height: int
-    parent_id: int
-    has_children: bool
-    last_commented_at: datetime
-    has_active_children: bool
-    bit_flags: float
-    tag_count_meta: int
-    locked_tags: str
-    tag_count_species: int
-    tag_count_invalid: int
-    description: str
-    comment_count: int
-    change_seq: int
-    tag_count_lore: int
-    bg_color: str
-    generated_samples: List[GeneratedSample]
-    duration: str
-    is_comment_disabled: bool
-    is_comment_locked: bool
-    has_large: bool
-    has_visible_children: bool
-    children_ids: str
-    pool_ids: List[int]
-    is_favorited: bool
-    file_url: Optional[str] = None
-    large_file_url: Optional[str] = None
-    preview_file_url: Optional[str] = None
-
-
-# class Post(BaseModel):
-#     posts: IQDBPost
-
-
-# class IQDBResponse(BaseModel):
-#     hash: str
-#     post_id: int
-#     score: int
-#     post: Post
-
-
-class Mascot(BaseModel):
-    id: int
-    creator_id: int
-    display_name: str
-    md5: str
-    file_ext: str
-    background_color: str
-    artist_url: AnyUrl
-    artist_name: str
-    active: bool
-    created_at: datetime
-    updated_at: datetime
-    available_on: List[str]
-    url_path: AnyUrl
-
-
-class ModAction(BaseModel):
-    id: int
-    creator_id: int
-    created_at: datetime
-    updated_at: datetime
-    action: ModActionActions
-
-
-class NewsUpdate(BaseModel):
-    id: int
-    message: str
-    creator_id: int
-    updater_id: int
-    created_at: datetime
-    updated_at: datetime
-
-
-class Note(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    creator_id: int
-    x: int
-    y: int
-    width: int
-    height: int
-    version: float
-    is_active: bool
-    post_id: int
-    body: str
-    creator_name: str
-
-
-class NoteVersion(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    x: int
-    y: int
-    width: int
-    height: int
-    body: str
-    version: float
-    is_active: bool
-    note_id: int
-    post_id: int
-    updater_id: int
-
-
-class Pool(BaseModel):
-    id: int
-    name: str
-    updated_at: datetime
-    creator_id: int
-    description: str
-    is_active: bool
-    category: PoolCategories
-    post_ids: List[int]
-    created_at: datetime
-    creator_name: str
-    post_count: int
-
-
-class PoolVersion(BaseModel):
-    id: int
-    pool_id: int
-    post_ids: List[int]
-    created_at: datetime
-    updated_at: datetime
-    updater_id: int
-    name: str
-    name_changed: bool
-    description: str
-    description_changed: bool
-    is_active: bool
-    is_locked: bool
-    category: PoolCategories
-    version: float
-    added_post_ids: List[int]
-    removed_post_ids: List[int]
-
-
-class File(BaseModel):
+@dataclass
+class File:
     width: int | None
     height: int | None
     ext: str | None
@@ -681,19 +69,22 @@ class File(BaseModel):
     url: str | None
 
 
-class Preview(BaseModel):
+@dataclass
+class Preview:
     width: int | None
     height: int | None
     url: str | None
 
 
-class Score(BaseModel):
+@dataclass
+class Score:
     up: int
     down: int
     total: int
 
 
-class Tags(BaseModel):
+@dataclass
+class Tags:
     general: List[str]
     artist: List[str]
     copyright: List[str]
@@ -705,7 +96,8 @@ class Tags(BaseModel):
     contributor: List[str]
 
 
-class Flags(BaseModel):
+@dataclass
+class Flags:
     pending: bool
     flagged: bool
     note_locked: bool
@@ -714,43 +106,12 @@ class Flags(BaseModel):
     deleted: bool
 
 
-class Relationships(BaseModel):
+@dataclass
+class Relationships:
     parent_id: int | str | None
     has_children: bool
     has_active_children: bool
     children: List[int]
-
-
-class PostApproval(BaseModel):
-    id: int
-    user_id: int
-    post_id: int
-    created_at: datetime
-    updated_at: datetime
-
-
-class Reason2(Enum):
-    borderline_quality = "borderline_quality"
-    borderline_relevancy = "borderline_relevancy"
-    other = "other"
-
-
-class PostDisapproval(BaseModel):
-    id: int
-    user_id: int
-    post_id: int
-    reason: Reason2
-    message: str
-    created_at: datetime
-    updated_at: datetime
-
-
-class PostEvent(BaseModel):
-    id: int
-    creator_id: int
-    post_id: int
-    action: PostEventActions
-    created_at: datetime
 
 
 class Type(Enum):
@@ -758,420 +119,40 @@ class Type(Enum):
     deletion = "deletion"
 
 
-class PostFlag(BaseModel):
-    id: int
-    created_at: datetime
-    post_id: int
-    reason: str
-    creator_id: Optional[int] = Field(
-        None, description="Only visible to creator and Janitor+"
-    )
-    is_resolved: bool
-    updated_at: datetime
-    is_deletion: bool
-    type: Type
-    note: Optional[str] = Field(
-        None, description="Only visible to creator and Janitor+"
-    )
-
-
-class Status1(Enum):
-    prompted = "prompted"
-    approved = "approved"
-    rejected = "rejected"
-    pending = "pending"
-    original = "original"
-
-
-class PostReplacement(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    post_id: int
-    creator_id: int
-    approver_id: int
-    file_ext: str
-    file_size: int
-    image_height: int
-    image_width: int
-    md5: str
-    source: str
-    file_name: str
-    status: Status1
-    reason: str
-
-
-class PostSampleAlternate(BaseModel):
+@dataclass
+class PostSampleAlternate:
     fps: float
     codec: str
     size: int
     width: int
     height: int
-    url: AnyUrl
+    url: str
 
 
-class PostSet(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    creator_id: int
-    is_public: bool
-    name: str
-    shortname: str
-    description: str
-    post_count: int
-    transfer_on_delete: bool
-    post_ids: List[int]
-
-
-class PostVersion(BaseModel):
-    id: int
-    post_id: int
-    tags: str
-    updater_id: int
-    updated_at: datetime
-    rating: Ratings
-    parent_id: int
-    source: str
-    description: str
-    reason: str
-    locked_tags: str
-    added_tags: List[str]
-    removed_tags: List[str]
-    added_locked_tags: List[str]
-    removed_locked_tags: List[str]
-    rating_changed: bool
-    parent_changed: bool
-    source_changed: bool
-    description_changed: bool
-    version: float
-    obsolete_added_tags: str
-    obsolete_removed_tags: str
-    unchanged_tags: str
-    updater_name: str
-    is_hidden: bool
-
-
-class RelatedTag(BaseModel):
-    name: str
-    category_id: TagCategories
-
-
-class StaffNote(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    user_id: int
-    creator_id: int
-    body: str
-    is_deleted: bool
-    updater_id: int
-
-
-class Tag(BaseModel):
-    id: int
-    name: str
-    post_count: int
-    related_tags: List[str]
-    related_tags_updated_at: datetime
-    category: TagCategories
-    is_locked: bool
-    created_at: datetime
-    updated_at: datetime
-
-
-class TagAlias(BaseModel):
-    id: int
-    antecedent_name: str
-    reason: str
-    creator_id: int
-    created_at: datetime
-    forum_post_id: int
-    updated_at: datetime
-    forum_topic_id: int
-    consequent_name: str
-    status: TagRequestStatuses
-    post_count: int
-    approver_id: int
-
-
-class TagImplication(BaseModel):
-    id: int
-    reason: str
-    creator_id: int
-    created_at: datetime
-    forum_post_id: int
-    antecedent_name: str
-    consequent_name: str
-    status: TagRequestStatuses
-    forum_topic_id: int
-    updated_at: datetime
-    descendant_names: List[str]
-    approver_id: int
-
-
-class TagPreview(BaseModel):
-    id: Optional[int] = None
-    name: str
-    resolved: Optional[str] = None
-    category: Optional[TagCategories] = None
-    post_count: Optional[int] = None
-    alias: Optional[str] = None
-    implies: Optional[List[str]] = None
-
-
-class TagTypeVersion(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    old_type: TagCategories
-    new_type: TagCategories
-    is_locked: bool
-    tag_id: int
-    creator_id: int
-
-
-class Status2(Enum):
-    approved = "approved"
-    denied = "denied"
-    partial = "partial"
-    pending = "pending"
-
-
-class Takedown(BaseModel):
-    id: int
-    status: Status2
-    approver_id: int
-    reason_hidden: bool
-    created_at: datetime
-    updated_at: datetime
-    post_count: int
-
-
-class Ticket(BaseModel):
-    id: int
-    creator_id: int
-    reason: str
-    disp_id: float
-    qtype: TicketTypes
-    status: TicketStatuses
-    created_at: datetime
-    updated_at: datetime
-    response: str
-    handler_id: int
-    claimant_id: Optional[int] = Field(None, description="Only visible to Moderator+.")
-    report_reason: str
-    accused_id: int
-
-
-class UploadWhitelist(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    pattern: str
-    note: str
-    hidden: bool
-    allowed: bool
-    reason: str
-    domain: str
-    path: str
-
-
-class Status3(Enum):
-    completed = "completed"
-    duplicate = "duplicate"
-    error = "error"
-    processing = "processing"
-    pending = "pending"
-
-
-class Upload(BaseModel):
-    id: int
-    source: str
-    rating: Ratings
-    uploader_id: int
-    tag_string: str
-    status: Status3 = Field(
-        ...,
-        description='Note: The "error" status will be proceeded by an error, ex: "error: RuntimeError - No file or source URL provided"\n',
-    )
-    backtrace: str
-    post_id: int
-    md5_confirmation: str
-    created_at: datetime
-    updated_at: datetime
-    parent_id: int
-    md5: str
-    file_ext: str
-    file_size: int
-    image_width: int
-    image_height: int
-    description: str
-    uploader_name: str
-
-
-class User(BaseModel):
-    id: int
-    created_at: datetime
-    name: str
-    level: int
-    base_upload_limit: int
-    post_upload_count: int
-    post_update_count: int
-    note_update_count: int
-    is_banned: bool
-    can_approve_posts: bool
-    can_upload_free: bool
-    level_string: str
-    avatar_id: int
-    is_verified: Optional[bool] = None
-
-
-class UserFeedback(BaseModel):
-    id: int
-    user_id: int
-    creator_id: int
-    category: FeedbackCategories
-    body: str
-    created_at: datetime
-    updated_at: datetime
-    updater_id: int
-    is_deleted: bool
-
-
-class Status4(Enum):
-    approved = "approved"
-
-
-class UserNameChangeRequest(BaseModel):
-    id: int
-    approver_id: int
-    user_id: int
-    original_name: str
-    desired_name: str
-    change_reason: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-    status: Status4
-
-
-class WikiPage(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    title: str
-    body: str
-    creator_id: int
-    is_locked: bool
-    updater_id: int
-    is_deleted: bool
-    other_names: List[str]
-    parent: str
-    creator_name: str
-    category_id: TagCategories
-
-
-class WikiPageVersion(BaseModel):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    title: str
-    body: str
-    updater_id: int
-    wiki_page_id: int
-    is_locked: bool
-    other_names: List[str]
-    is_deleted: bool
-    reason: str
-    parent: str
-
-
-class BulkRelatedTag(RelatedTag):
-    count: int
-
-
-class CurrentUser(User):
-    blacklist_users: bool
-    description_collapsed_initially: bool
-    hide_comments: bool
-    show_hidden_comments: bool
-    show_post_statistics: bool
-    receive_email_notifications: bool
-    enable_keyboard_navigation: bool
-    enable_privacy_mode: bool
-    style_usernames: bool
-    enable_auto_complete: bool
-    can_approve_posts: Optional[bool] = None
-    disable_cropped_thumbnails: bool
-    enable_safe_mode: bool
-    disable_responsive_mode: bool
-    no_flagging: bool
-    disable_user_dmails: bool
-    enable_compact_uploader: bool
-    replacements_beta: bool
-    updated_at: datetime
-    email: str
-    last_logged_in_at: str
-    last_forum_read_at: str
-    recent_tags: str
-    comment_threshold: int
-    default_image_size: DefaultImageSize
-    favorite_tags: str
-    blacklisted_tags: str
-    time_zone: str
-    per_page: int
-    custom_style: str
-    favorite_count: int
-    api_regen_multiplier: int
-    api_burst_limit: int
-    remaining_api_limit: int
-    statement_timeout: int
-    favorite_limit: int
-    tag_query_limit: int
-    has_mail: bool
-    forum_notification_dot: bool
-
-
-class FullUser(User):
-    wiki_page_version_count: int
-    artist_version_count: int
-    pool_version_count: int
-    forum_post_count: int
-    comment_count: int
-    flag_count: int
-    favorite_count: int
-    positive_feedback_count: int
-    neutral_feedback_count: int
-    negative_feedback_count: int
-    upload_limit: int
-    profile_about: str
-    profile_artinfo: str
-
-
-class Variants(BaseModel):
+@dataclass
+class Variants:
     webm: Optional[PostSampleAlternate] = None
     mp4: Optional[PostSampleAlternate] = None
 
 
-class Samples(BaseModel):
-    field_480p: Optional[PostSampleAlternate] = Field(None, alias="480p")
-    field_720p: Optional[PostSampleAlternate] = Field(None, alias="720p")
+@dataclass
+class Samples:
+    field_480p: Optional[PostSampleAlternate] = None
+    field_720p: Optional[PostSampleAlternate] = None
 
 
-class Alternates(BaseModel):
+@dataclass
+class Alternates:
     has: Optional[bool] = None
     original: Optional[PostSampleAlternate] = None
     variants: Optional[Variants] = None
     samples: Optional[Samples] = None
 
 
-class Sample(BaseModel):
+@dataclass
+class Sample:
     has: bool
     height: int
     width: int
     url: str | None
     alternates: Alternates
-
-
-class FullCurrentUser(CurrentUser, FullUser):
-    pass

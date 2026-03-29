@@ -21,7 +21,8 @@ class Danbooru_Handler(ImageBoardHandler):
     Class to handle requesting and handling messages from the image board E621
     """
 
-    def __init__(self):
+    def __init__(self, only_recent=False):
+        self.only_recent = only_recent
         logger.info("Initialize Danbooru Handler")
         self.reload()
         config.subscribe_reload(self.reload)
@@ -32,7 +33,9 @@ class Danbooru_Handler(ImageBoardHandler):
         self.black_list = config[BOARD.DANBOORU][DANBOORU.BLACK_LIST]
         self.artist_list = list(set(config[BOARD.DANBOORU][DANBOORU.ARTISTS]))
         self.client = Danbooru_Client(
-            self.danbooru_username, api_key=self.danbooru_api_key
+            self.danbooru_username,
+            api_key=self.danbooru_api_key,
+            only_recent=self.only_recent,
         )
         self.board = BOARD.DANBOORU
 

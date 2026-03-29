@@ -5,7 +5,6 @@ import dacite
 
 config = dacite.Config(cast=[int], type_hooks={List[str]: (lambda x: x.split())})
 
-
 @dataclass
 class R34_Post:
     height: int | None

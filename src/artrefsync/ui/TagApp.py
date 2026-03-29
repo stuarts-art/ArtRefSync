@@ -107,7 +107,7 @@ class ImagViewerApp(ttk.Window):
         self.top_artist_count_text = ttk.StringVar()
         self.top_post_text = ttk.StringVar()
         ebinder.bind(
-            BINDING.ON_ARTIST_SELECT, lambda x: self.top_artist_text.set(x), self.bar
+            BINDING.ON_ARTIST_SELECT, self.on_artist_select, self.bar
         )
         ebinder.bind(
             BINDING.ON_POST_COUNT,
@@ -120,6 +120,9 @@ class ImagViewerApp(ttk.Window):
         ttk.Label(self.bar.top_mid, textvariable=self.top_artist_count_text).pack(
             side=tk.LEFT
         )
+    
+    def on_artist_select(self, artist, *nargs):
+        self.top_artist_text.set(artist)
 
     def init_views(self):
         logger.info("Init Views")

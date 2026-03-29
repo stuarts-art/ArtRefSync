@@ -20,8 +20,9 @@ def main():
 class E621Handler(ImageBoardHandler):
     """Class to handle messages from the image board E621"""
 
-    def __init__(self):
+    def __init__(self, only_recent = False):
         logger.info("Initialize E621 Handler")
+        self.only_recent = only_recent
         self.reload()
         config.subscribe_reload(self.reload)
 
@@ -31,7 +32,7 @@ class E621Handler(ImageBoardHandler):
         self.black_list = config[BOARD.E621][E621.BLACK_LIST]
         self.artist_list = list(set(config[BOARD.E621][E621.ARTISTS]))
 
-        self.client = E621_Client(username, api_key)
+        self.client = E621_Client(username, api_key, self.only_recent)
         self.website = "https://e621.net/posts.json"
         self.hostname = "e621.net"
         self.limit = 320

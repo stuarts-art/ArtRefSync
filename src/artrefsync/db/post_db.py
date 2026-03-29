@@ -1,31 +1,21 @@
-import sqlite3
+import logging
 import os
-
+import sqlite3
+from datetime import datetime
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
 from artrefsync.constants import APP, BOARD, DB, TABLE
-from artrefsync.db.db_utils import BlobDb, DbUtils
 from artrefsync.db.dataclass_db import Dataclass_DB
-
-
-import logging
-
+from artrefsync.db.db_utils import BlobDb, DbUtils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+
 def main():
-    # TODO: Rewrite some queries w/ joins to improve performance.
-    from artrefsync.utils.benchmark import Bm
-    with PostDb() as post_db, Bm():
-        missing_ids = post_db.posts.select_join(
-            select_args= "t1.id, t1.artist_name, t1.board, t1.tags",
-            from_args= f"{Post.__name__} t1",
-            join_str = f"LEFT JOIN {PostFile.__name__} t2 ON t1.id = t2.id",
-            where_str= "WHERE t2.id IS NULL"
-        )
-    print(missing_ids)
+    pass
+
 
 class PostDb:
     tables_initialized = False
@@ -66,6 +56,15 @@ class PostDb:
         self.artist_tags = BlobDb(self.connection, "artist_tags", lazy=lazy)
         logger.debug("Opening PostDB")
 
+    def get_last_id(self, artist, board):
+        max_id = self.posts.select_freeform(
+            select_args="ext_id, MAX(create_timestamp)",
+            from_args="Post",
+            where_str=f'WHERE board = "{board}" AND artist_name = "{artist}"',
+            as_tupple=True,
+        )
+        return max_id[0][0]
+
     @property
     def board_artists(self) -> dict[str : list[str]]:
         board_artists_dict = {}
@@ -105,8 +104,14 @@ class PostDb:
                 return posts[0].intersection(*posts[1:])
         return posts
 
-
-
+    def get_missing_post_file_ids(self):
+        missing_ids = self.posts.select_freeform(
+            select_args="t1.id, t1.artist_name, t1.board",
+            from_args=f"{Post.__name__} t1",
+            join_str=f"LEFT JOIN {PostFile.__name__} t2 ON t1.id = t2.id",
+            where_str="WHERE t2.id IS NULL",
+        )
+        return missing_ids
 
     def __enter__(self):
         logger.debug("PostDB Enter")
@@ -116,6 +121,7 @@ class PostDb:
         self.connection.commit()
         logger.debug("Closing PostDB")
         self.connection.close()
+
 
 if __name__ == "__main__":
     main()

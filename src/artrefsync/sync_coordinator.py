@@ -1,15 +1,16 @@
+import concurrent
+import logging
 from asyncio import Event
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
-import concurrent
-import logging
-import time
+from tenacity import retry
 
-from artrefsync.boards.danbooru_handler import Danbooru_Handler
-from artrefsync.boards.rule34_handler import R34Handler
-from artrefsync.boards.e621_handler import E621Handler
 from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile
+from artrefsync.boards.danbooru_handler import Danbooru_Handler
+from artrefsync.boards.e621_handler import E621Handler
+from artrefsync.boards.rule34_handler import R34Handler
+from artrefsync.config import config
 from artrefsync.constants import (
     APP,
     BINDING,
@@ -22,19 +23,18 @@ from artrefsync.constants import (
     TABLE,
 )
 from artrefsync.db.post_db import PostDb
+from artrefsync.stores.eagle_storage import EagleHandler
+from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.plain_file_storage import PlainLocalStorage
 from artrefsync.stores.storage import ImageStoreHandler
-from artrefsync.stores.eagle_storage import EagleHandler
-from artrefsync.config import config
-from artrefsync.stores.link_cache import Link_Cache
 from artrefsync.utils.EventManager import ebinder
 
 logger = logging.getLogger(__name__)
 
 
 def main():
-    event = Event()
-    sync_config(event)
+    coordinator = SyncCoordinator(E621Handler(), EagleHandler())
+    coordinator.sync()
 
 
 def sync_config(event: Event):
@@ -46,6 +46,8 @@ def sync_config(event: Event):
         elif config[TABLE.LOCAL][LOCAL.ENABLED]:
             store = PlainLocalStorage()
 
+        only_recent = config[TABLE.APP][APP.ONLY_RECENT_ENABLED]
+
         # EAGLE Overrides the normal FS storage.
 
         if store is None:
@@ -54,17 +56,17 @@ def sync_config(event: Event):
 
         if config[TABLE.E621][E621.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.E621, store.get_store())
-            board = E621Handler()
+            board = E621Handler(only_recent)
             sync(board, store, limit, event)
 
         if config[TABLE.R34][R34.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.R34, store.get_store())
-            board = R34Handler()
+            board = R34Handler(only_recent)
             sync(board, store, limit, event)
 
         if config[TABLE.DANBOORU][DANBOORU.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.DANBOORU, store.get_store())
-            board = Danbooru_Handler()
+            board = Danbooru_Handler(only_recent)
             sync(board, store, limit, event)
     finally:
         ebinder.event_generate(BINDING.ON_LOADING_DONE)
@@ -133,7 +135,7 @@ class SyncCoordinator:
         board_handler: ImageBoardHandler,
         store_handler: ImageStoreHandler,
         max_per_artist: int = None,
-        stop_event: Event = None,
+        stop_event: Event = Event(),
     ):
         self.board_handler = board_handler
         self.store_handler = store_handler
@@ -142,8 +144,8 @@ class SyncCoordinator:
         self.store = store_handler.get_store()
         self.board = board_handler.get_board()
         self.tag_post_dict = defaultdict(set)
-        self.board_tag_count = defaultdict(int)
-        self.cache = Link_Cache()
+        self.board_tag_counts = defaultdict(int)
+        self.cache = LinkCache()
         self.download_count = 0
 
     def sync(self):
@@ -155,10 +157,9 @@ class SyncCoordinator:
                 return
             ebinder.event_generate(BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}")
             self.sync_artist(artist)
-            self.update_post_file_table(artist)
 
         with PostDb() as post_db:
-            post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_count)
+            post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_counts)
             for tag, posts in self.tag_post_dict.items():
                 if self.stop_event.is_set():
                     return
@@ -167,27 +168,16 @@ class SyncCoordinator:
         for artist in self.board_handler.artist_list:
             if self.stop_event.is_set():
                 return
-            self.store_handler.update_thumbnails(self.board, artist)
 
     def sync_artist(self, artist):
         logger.info("Starting sync artist %s", artist)
         self.update_metadata(artist)
         self.update_post_file_table(artist)
-        download_list = self.download_missing_ids(artist)
-
-        for retry in range(1, 4):
-            inserted_post_files = self.update_post_file_table(artist)
-            download_list = [
-                pid for pid in download_list if pid not in inserted_post_files
-            ]
-            if not download_list:
-                break
-            logger.debug(
-                "Waiting for %d files to sync for artist %s", len(download_list), artist
-            )
-            time.sleep(0.5 * retry)
+        self.download_missing_ids(artist)
+        self.update_post_file_table(artist=artist)
         logger.debug("Ending sync artist %s", artist)
 
+    @retry
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
 
@@ -211,7 +201,7 @@ class SyncCoordinator:
                 post.tags.append(post.artist_name)
                 for tag in post.tags:
                     self.tag_post_dict[tag].add(pid)
-                    self.board_tag_count[tag] += 1
+                    self.board_tag_counts[tag] += 1
                     artist_tag_count[tag] += 1
             post_db.artist_tags.dumps_blob(artist, artist_tag_count)
             post_db.artist_tags.commit()
@@ -224,23 +214,21 @@ class SyncCoordinator:
         return updated_posts
 
     def get_missing_ids(self, artist: str):
+        storeposts = self.store_handler.get_posts(self.board, artist)
         with PostDb() as post_db:
             post_ids = post_db.posts.select_id_list(
                 [("artist_name", artist), ("board", self.board)]
             )
-            post_file_ids = post_db.files.select_id_list(
-                [("artist_name", artist), ("board", self.board)]
-            )
-            missing_ids = [
-                post_id for post_id in post_ids if post_id not in post_file_ids
-            ]
+            missing_ids = [post_id for post_id in post_ids if post_id not in storeposts]
             return missing_ids
 
+    @retry
     def download_missing_ids(self, artist):
         missing_ids = self.get_missing_ids(artist)
+        failure_list = []
+        success_list = []
         if not missing_ids:
             return []
-
         with PostDb() as post_db:
             missing_posts = [post_db.posts[id] for id in missing_ids]
 
@@ -251,30 +239,33 @@ class SyncCoordinator:
                 ): post.id
                 for post in missing_posts
             }
-            failure_list = []
-            success_list = []
             ebinder.event_generate(
                 BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
             )
             for future in concurrent.futures.as_completed(future_to_pid.keys()):
                 try:
-                    ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
                     result = future.result()
-                    success_list.append(future_to_pid[future])
+                    ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
                     if self.stop_event and self.stop_event.is_set():
                         logger.warning("Stop Event Recieved.")
                         executor.shutdown(wait=True, cancel_futures=True)
                         return
+                    if isinstance(result, PostFile):
+                        success_list.append(result)
                 except Exception:
                     failure_list.append(future_to_pid[future])
                     continue
-
-        self.download_count += 1
         if failure_list:
             logger.error("The following IDs failed to load. %s", failure_list)
 
+        logger.info("Adding Entries to PostFile Table.")
+        with PostDb() as post_db:
+            for post_file in success_list:
+                post_db.files.insert(post_file)
+
         return success_list
 
+    @retry
     def update_post_file_table(self, artist, repair=False):
         logger.debug(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist

@@ -22,7 +22,8 @@ class R34Handler(ImageBoardHandler):
     Class to handle requesting and handling messages from the image board E621
     """
 
-    def __init__(self):
+    def __init__(self, only_recent):
+        self.only_recent = only_recent
         logger.info("Initialize R34 Handler")
         self.reload()
         config.subscribe_reload(self.reload)
@@ -31,7 +32,7 @@ class R34Handler(ImageBoardHandler):
         self.r34_api_string = config[BOARD.R34][R34.API_KEY]
         self.black_list = config[BOARD.R34][R34.BLACK_LIST]
         self.artist_list = list(set(config[BOARD.R34][R34.ARTISTS]))
-        self.client = R34_Client(self.r34_api_string)
+        self.client = R34_Client(api_string=self.r34_api_string, only_recent=self.only_recent)
         self.board = BOARD.R34
 
     def get_artist_list(self):

@@ -1,11 +1,11 @@
-import logging
-import threading
-import time
-from PIL import Image, ImageTk, ImageDraw
 import functools
-import ttkbootstrap as ttk
+import logging
 import os
-from PIL import ImageSequence
+import threading
+
+import ttkbootstrap as ttk
+from PIL import Image, ImageDraw, ImageSequence, ImageTk
+from tenacity import retry
 
 from artrefsync.config import config
 
@@ -27,6 +27,7 @@ class ImageUtils:
         return ttk.PhotoImage()
 
     @classmethod
+    @retry
     @functools.lru_cache(maxsize=100)
     def getPilImage(cls, file: str, height=None, width=None):
         logger.debug("Cache-Miss, Getting Image")
@@ -34,34 +35,36 @@ class ImageUtils:
             logger.error("Cannot open path: %s", file)
             return None
 
-        for retry in range(3):
-            try:
-                with cls._lock:
-                    image = Image.open(file)
-                if height and width:
-                    with cls._lock:
-                        image.thumbnail((height, width))
-                return image
-            except Exception:
-                logger.error("Loading image %s failed. Retrying", file)
-                time.sleep(0.1 * (retry + 1))
-        logger.error("Loading image (%s). failed. Retrying", file)
-        raise Exception("Failed to load PIL image %s.")
+        with cls._lock:
+            image = Image.open(file)
+        if height and width:
+            with cls._lock:
+                image.thumbnail((height, width))
+        return image
 
     @staticmethod
     @functools.lru_cache(maxsize=100)
-    def getPilImageThumb(file: str, size: tuple):
+    @retry
+    def getPilImageThumb(file: str, size: tuple, upscale=False):
+
         try:
             image = ImageUtils.getPilImage(file)
             with ImageUtils._thumblock:
-                thumbnail = image.copy()
-                thumbnail.thumbnail(size=size)
+                if not upscale or image.height > size[1]:
+                    thumbnail = image.copy()
+                    thumbnail.thumbnail(size=size)
+                else:
+                    resize = (int((size[1] / image.height) * image.width), size[1])
+                    thumbnail = image.resize(
+                        size=resize, resample=Image.Resampling.LANCZOS
+                    )
             return thumbnail
-        except Exception:
-            return None
+        except Exception as e:
+            print(e)
 
     @staticmethod
     @functools.lru_cache(maxsize=3)
+    @retry
     def getPilFrames(file, size=(1440, 1440)):
         image = ImageUtils.getPilImage(file)
         frames = []
@@ -79,6 +82,7 @@ class ImageUtils:
             return (None, None)
         return (frames, duration)
 
+    @retry
     def getTkFrames(file, size=(1440, 1440)):
         frames, duration = ImageUtils.getPilFrames(file)
         if not frames:
@@ -93,6 +97,7 @@ class ImageUtils:
         return (tkFrames, duration)
 
     @staticmethod
+    @retry
     @functools.lru_cache(maxsize=50)
     def get_tk_thumb(file: str, size=(1080, 720), radius=0):
         image = ImageUtils.getPilImageThumb(file, size=size)
@@ -103,6 +108,7 @@ class ImageUtils:
             return ImageTk.PhotoImage(image=image)
 
     @staticmethod
+    @retry
     @functools.lru_cache
     def getrounded_rect(size, radius) -> Image.Image:
         """
@@ -123,6 +129,7 @@ class ImageUtils:
         return image
 
     @staticmethod
+    @retry
     @functools.lru_cache(maxsize=20)
     def get_round_colored_rect(
         width, height, radius, fill="white", as_photoimage=False
