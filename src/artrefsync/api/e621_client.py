@@ -42,7 +42,6 @@ class E621_Client:
         self.hostname = "e621.net"
         self.limit = 320
         logger.info("E621 Client Complete")
-        self.last_run = time.time()
 
     def _build_website_parameters(self, page, tag, last_id=None) -> str:
         return f"{self.website}?limit={self.limit}&tags={tag}{f'+id:>{last_id}' if last_id else ''}&page={page}"
@@ -50,7 +49,6 @@ class E621_Client:
     def get_posts(
         self, tags: str, post_limit=10000, stop_event: Event = None
     ) -> list[E621_Post]:
-        # logger.info("Getting Posts")
         if "+limit:" in tags:
             limit = int(re.split("\rD+", tags.split("limit:")[-1])[0])
             if limit:
@@ -65,20 +63,19 @@ class E621_Client:
         posts_data = []
         for page in range(1, 50):  # handle pagination
             page_data = self.get_page(tags, page, last_id)
-            logger.info(f"{tags}, Page: {page}, Count: {len(page_data)}")
+            logger.debug(f"{tags}, Page: {page}, Count: {len(page_data)}")
             posts_data.extend(page_data)
             if len(page_data) < self.limit or len(posts_data) >= post_limit:
                 break
             if stop_event and stop_event.is_set():
                 return None
 
-        logger.info(len(posts_data))
         for post_data in posts_data:
             try:
                 if (post := parse_e621_post(post_data)) is not None:
                     posts.append(post)
             except DaciteError as e:
-                logger.info(e)
+                logger.error(e)
 
             if len(posts) >= post_limit:
                 break
@@ -91,7 +88,7 @@ class E621_Client:
     @limits(calls=2, period=1)
     def get_page(self, tags, page, last_id=None):
 
-        logger.info("CACHE MISS")
+        logger.debug("CACHE MISS")
         request_params = self._build_website_parameters(page, tags, last_id=last_id)
         response = requests.get(
             request_params,

@@ -77,6 +77,10 @@ class __Config:
         except KeyError:
             return default
 
+    def cache_ttl(self):
+        return int(self.get(TABLE.APP, APP.CACHE_TTL, 300))
+
+
     default_config = {
         TABLE.APP: {
             APP.LIMIT: 30000,

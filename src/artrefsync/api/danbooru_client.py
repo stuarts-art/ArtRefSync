@@ -50,7 +50,6 @@ class Danbooru_Client:
 
     def _build_url_request(self, tag, page, last_id) -> str:
         url_request =  f"{self.base_url}&limit={self.limit}&tags={tag}{f"+id:>{last_id}" if last_id else ""}&page={page}"
-        print(url_request)
         return url_request
 
     def get_posts(

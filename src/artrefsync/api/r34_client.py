@@ -27,6 +27,7 @@ class R34_Client:
     """
 
     def __init__(self, api_string=None, only_recent=False):
+        logger.info("R34 Init Start")
         self.r34_api_string = (
             api_string if api_string else config[TABLE.R34][R34.API_KEY]
         )
@@ -37,6 +38,7 @@ class R34_Client:
         self.retries = 3
         self.last_run = 0
         self.black_list = [f" -{x}" for x in config[TABLE.R34][R34.BLACK_LIST]]
+        logger.info("R34 Init Complete")
 
     def _build_url_request(self, tag, page, last_id=None) -> str:
         return f"{self.base_url}{self.r34_api_string}&limit={self.limit}&tags={tag}{f'+id:>{last_id}' if last_id else ''}&pid={page}"
@@ -60,7 +62,7 @@ class R34_Client:
                 return None
             page_data = self.get_page(tag, page, last_id)
             posts_data.extend(page_data)
-            logger.info("%s - Page %d, %d", tag, page, len(page_data))
+            logger.debug("%s - Page %d, %d", tag, page, len(page_data))
             if len(page_data) < self.limit:
                 break
         for post_data in posts_data:
