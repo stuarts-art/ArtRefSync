@@ -22,7 +22,7 @@ class R34Handler(ImageBoardHandler):
     Class to handle requesting and handling messages from the image board E621
     """
 
-    def __init__(self, only_recent):
+    def __init__(self, only_recent=False):
         self.only_recent = only_recent
         logger.info("Initialize R34 Handler")
         self.reload()

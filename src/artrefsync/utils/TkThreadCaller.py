@@ -25,7 +25,7 @@ class TkThreadCaller:
         return TkThreadCaller._instance
 
     def __init__(self, root: ttk.Frame, event_name=None):
-        self.executor = ThreadPoolExecutor(max_workers=2)
+        self.executor = ThreadPoolExecutor(max_workers=4)
         self.root = root
         self.on_finish_map = {}
         self.cancel_map = defaultdict(set)

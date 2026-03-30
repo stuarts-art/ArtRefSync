@@ -1,11 +1,12 @@
 import logging
 import time
 from threading import Event
+import re
 
 import requests
 from bs4 import BeautifulSoup
 from ratelimit import limits
-from tenacity import retry
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.r34_model import R34_Post, parse_r34_post
 from artrefsync.config import cache, config
@@ -46,6 +47,11 @@ class R34_Client:
         posts = []
         posts_data = []
         last_id = None
+        if "+limit:" in tag:
+            limit = int(re .split("\rD+", tag.split("limit:")[-1])[0])
+            if limit:
+                post_limit = limit
+
         if self.only_recent:
             with PostDb() as post_db:
                 last_id = post_db.get_last_id(tag, "r34")
@@ -68,8 +74,8 @@ class R34_Client:
                 break
         return posts
 
-    @cache.memoize(expire=300)
-    @retry
+    @cache.memoize(expire=config.cache_ttl())
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     @limits(calls=5, period=1)
     def get_page(self, tag, page, last_id=None):
         response = requests.get(

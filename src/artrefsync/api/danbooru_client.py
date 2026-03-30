@@ -1,4 +1,5 @@
 import base64
+import re
 import json
 from threading import Event
 import time
@@ -6,7 +7,7 @@ from dacite import DaciteError
 from ratelimit import limits
 import requests
 from dacite.exceptions import MissingValueError
-from tenacity import retry
+from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.api.danbooru_model import Danbooru_Post, parse_danbooru_post
 from artrefsync.config import config, cache
 from artrefsync.constants import DANBOORU, TABLE
@@ -57,6 +58,11 @@ class Danbooru_Client:
     ) -> list[Danbooru_Post]:
         logger.debug("Getting posts for %s", tag)
 
+        if "+limit:" in tag:
+            limit = int(re .split("\rD+", tag.split("limit:")[-1])[0])
+            if limit:
+                post_limit = limit
+
         posts: list[Danbooru_Post] = []
         failed = []
         skipped = []
@@ -101,8 +107,8 @@ class Danbooru_Client:
 
 
 
-    @cache.memoize(expire=300)
-    @retry
+    @cache.memoize(expire=config.cache_ttl())
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     @limits(calls=10, period=1)
     def get_page(self, tag: str, page: int, last_id):
         response = requests.get(

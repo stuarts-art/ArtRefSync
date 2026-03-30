@@ -1,20 +1,19 @@
 import base64
 import json
 import logging
+import re
 import time
-from datetime import datetime
 from threading import Event
 
 import requests
 from dacite import DaciteError
 
-# from diskcache import Cache
 from ratelimit import limits
-from tenacity import retry
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.e621_model import E621_Post, parse_e621_post
 from artrefsync.config import cache, config
-from artrefsync.constants import APP, E621, TABLE
+from artrefsync.constants import E621, TABLE
 from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)
@@ -52,6 +51,10 @@ class E621_Client:
         self, tags: str, post_limit=10000, stop_event: Event = None
     ) -> list[E621_Post]:
         # logger.info("Getting Posts")
+        if "+limit:" in tags:
+            limit = int(re.split("\rD+", tags.split("limit:")[-1])[0])
+            if limit:
+                post_limit = limit
 
         last_id = None
         if self.only_recent:
@@ -83,8 +86,8 @@ class E621_Client:
         logger.info("E621 Client GetPosts for tags=%s len = %s, ", tags, len(posts))
         return posts
 
-    @cache.memoize(expire=300)
-    @retry
+    @cache.memoize(expire=config.cache_ttl())
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     @limits(calls=2, period=1)
     def get_page(self, tags, page, last_id=None):
 
