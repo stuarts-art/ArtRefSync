@@ -20,12 +20,18 @@ class TkThreadCaller:
         else:
             return TkThreadCaller._instance
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop()
+
     @staticmethod
     def get_thread_caller() -> "TkThreadCaller":
         return TkThreadCaller._instance
 
-    def __init__(self, root: ttk.Frame, event_name=None):
-        self.executor = ThreadPoolExecutor(max_workers=4)
+    def __init__(self, root: ttk.Frame = None, event_name=None):
+        self.executor = ThreadPoolExecutor()
         self.root = root
         self.on_finish_map = {}
         self.cancel_map = defaultdict(set)
@@ -42,16 +48,17 @@ class TkThreadCaller:
         self, task: callable, on_finish: callable, cancel_key="key", *args, **kwargs
     ) -> None:
         future = self.executor.submit(task, *args, **kwargs)
-        self.on_finish_map[future] = on_finish
-        future.add_done_callback(self.call_on_finish)
-        if cancel_key:
-            self.cancel_map[cancel_key].add(future)
-            self.cancel_key_map[future] = cancel_key
-            logger.debug(
-                "%i active threads for cancel key %s",
-                len(self.cancel_map[cancel_key]),
-                cancel_key,
-            )
+        if on_finish:
+            self.on_finish_map[future] = on_finish
+            future.add_done_callback(self.call_on_finish)
+            if cancel_key:
+                self.cancel_map[cancel_key].add(future)
+                self.cancel_key_map[future] = cancel_key
+                logger.debug(
+                    "%i active threads for cancel key %s",
+                    len(self.cancel_map[cancel_key]),
+                    cancel_key,
+                )
 
         return future
 
@@ -78,7 +85,10 @@ class TkThreadCaller:
             if future in self.cancel_key_map:
                 on_finish = self.on_finish_map.pop(future)
                 result = future.result()
-                self.root.after_idle(on_finish, result)
+                if self.root:
+                    self.root.after_idle(on_finish, result)
+                else:
+                    on_finish(result)
                 cancel_key = self.cancel_key_map.pop(future)
                 if cancel_key in self.cancel_map:
                     if future in self.cancel_map[cancel_key]:
@@ -89,4 +99,6 @@ class TkThreadCaller:
 
     def stop(self):
         logger.info("Stopping active threads...")
-        return self.executor.shutdown(cancel_futures=True, wait=True)
+        self.executor.shutdown(cancel_futures=True, wait=True)
+        logger.info("Active Threads Stopped.")
+

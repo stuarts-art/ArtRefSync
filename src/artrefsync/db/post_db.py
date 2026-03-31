@@ -1,7 +1,6 @@
 import logging
 import os
 import sqlite3
-from datetime import datetime
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config

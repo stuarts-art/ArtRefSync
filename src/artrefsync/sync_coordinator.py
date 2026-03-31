@@ -2,9 +2,7 @@ import concurrent
 import logging
 from asyncio import Event
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 
-from tenacity import retry
 
 from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile
 from artrefsync.boards.danbooru_handler import Danbooru_Handler
@@ -28,6 +26,7 @@ from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.plain_file_storage import PlainLocalStorage
 from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.TkThreadCaller import TkThreadCaller
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +176,6 @@ class SyncCoordinator:
         self.update_post_file_table(artist=artist)
         logger.debug("Ending sync artist %s", artist)
 
-    @retry
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
 
@@ -222,7 +220,6 @@ class SyncCoordinator:
             missing_ids = [post_id for post_id in post_ids if post_id not in storeposts]
             return missing_ids
 
-    @retry
     def download_missing_ids(self, artist):
         missing_ids = self.get_missing_ids(artist)
         failure_list = []
@@ -232,29 +229,35 @@ class SyncCoordinator:
         with PostDb() as post_db:
             missing_posts = [post_db.posts[id] for id in missing_ids]
 
-        with ThreadPoolExecutor() as executor:
-            future_to_pid = {
-                executor.submit(
-                    self.store_handler.save_post, post, self.cache, self.stop_event
-                ): post.id
-                for post in missing_posts
-            }
-            ebinder.event_generate(
-                BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
-            )
-            for future in concurrent.futures.as_completed(future_to_pid.keys()):
-                try:
-                    result = future.result()
-                    ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
-                    if self.stop_event and self.stop_event.is_set():
-                        logger.warning("Stop Event Recieved.")
-                        executor.shutdown(wait=True, cancel_futures=True)
-                        return
-                    if isinstance(result, PostFile):
-                        success_list.append(result)
-                except Exception:
-                    failure_list.append(future_to_pid[future])
-                    continue
+        thread_caller = TkThreadCaller()
+        # with ThreadPoolExecutor() as executor:
+        future_to_pid = {
+            thread_caller.add(
+                task=self.store_handler.save_post,
+                cancel_key=__name__,
+                on_finish=None,
+                post=post,
+                link_cache=self.cache,
+                event=self.stop_event,
+            ): post.id
+            for post in missing_posts
+        }
+        ebinder.event_generate(
+            BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
+        )
+        for future in concurrent.futures.as_completed(future_to_pid.keys()):
+            try:
+                result = future.result()
+                ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
+                if self.stop_event and self.stop_event.is_set():
+                    logger.warning("Stop Event Recieved.")
+                    thread_caller.executor.shutdown(wait=True, cancel_futures=True)
+                    return
+                if isinstance(result, PostFile):
+                    success_list.append(result)
+            except Exception:
+                failure_list.append(future_to_pid[future])
+                continue
         if failure_list:
             logger.error("The following IDs failed to load. %s", failure_list)
 
@@ -265,7 +268,6 @@ class SyncCoordinator:
 
         return success_list
 
-    @retry
     def update_post_file_table(self, artist, repair=False):
         logger.debug(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist

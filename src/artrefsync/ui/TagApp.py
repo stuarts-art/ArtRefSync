@@ -7,6 +7,7 @@ from PIL import Image, ImageTk
 import logging
 from artrefsync.config import config
 from artrefsync.constants import BINDING
+from artrefsync.stores.link_cache import LinkCache
 from artrefsync.ui.tabs.SortByTab import SortByTab
 from artrefsync.ui.tabs.ActiveTags import ActiveTagsTab
 from artrefsync.ui.tabs.ConfigTab import ConfigTab
@@ -41,6 +42,10 @@ class ImagViewerApp(ttk.Window):
         self.init_bindings()
         self.after_idle(ebinder.event_generate, BINDING.ON_FILTER_UPDATE)
         logger.info("App Init Complete")
+
+    def start(self):
+        with LinkCache(), TkThreadCaller(self):
+            self.mainloop()
 
     def init_scaffolding(self):
         logger.info("Init Scafolding")

@@ -1,5 +1,4 @@
 import logging
-import time
 from threading import Event
 import re
 

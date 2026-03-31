@@ -2,11 +2,9 @@ import base64
 import re
 import json
 from threading import Event
-import time
 from dacite import DaciteError
 from ratelimit import limits
 import requests
-from dacite.exceptions import MissingValueError
 from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.api.danbooru_model import Danbooru_Post, parse_danbooru_post
 from artrefsync.config import config, cache
@@ -15,13 +13,11 @@ from artrefsync.constants import DANBOORU, TABLE
 import logging
 
 from artrefsync.db.post_db import PostDb
-from artrefsync.disk_cache import disk_cache
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 def main():
-    client = Danbooru_Client(only_recent=True)
     pass
 
 
