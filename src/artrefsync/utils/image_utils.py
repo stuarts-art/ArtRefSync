@@ -3,9 +3,10 @@ import logging
 import os
 import threading
 
+import cv2
 import ttkbootstrap as ttk
 from PIL import Image, ImageDraw, ImageSequence, ImageTk
-from tenacity import retry
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.config import config
 
@@ -21,14 +22,12 @@ class ImageUtils:
     _thumblock = threading.Lock()
     photo_failed_set = set()
 
-    @property
-    @functools.lru_cache()
     def blank():
         return ttk.PhotoImage()
 
     @classmethod
-    @retry
     @functools.lru_cache(maxsize=100)
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     def getPilImage(cls, file: str, height=None, width=None):
         logger.debug("Cache-Miss, Getting Image")
         if not os.path.exists(file):
@@ -37,14 +36,13 @@ class ImageUtils:
 
         with cls._lock:
             image = Image.open(file)
-        if height and width:
+        if height and width and height < image.height:
             with cls._lock:
                 image.thumbnail((height, width))
         return image
 
     @staticmethod
-    @functools.lru_cache(maxsize=100)
-    @retry
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     def getPilImageThumb(file: str, size: tuple, upscale=False):
 
         try:
@@ -60,11 +58,11 @@ class ImageUtils:
                     )
             return thumbnail
         except Exception as e:
-            print(e)
+            logger.warning(e)
 
     @staticmethod
     @functools.lru_cache(maxsize=3)
-    @retry
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     def getPilFrames(file, size=(1440, 1440)):
         image = ImageUtils.getPilImage(file)
         frames = []
@@ -82,7 +80,7 @@ class ImageUtils:
             return (None, None)
         return (frames, duration)
 
-    @retry
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     def getTkFrames(file, size=(1440, 1440)):
         frames, duration = ImageUtils.getPilFrames(file)
         if not frames:
@@ -97,7 +95,7 @@ class ImageUtils:
         return (tkFrames, duration)
 
     @staticmethod
-    @retry
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     @functools.lru_cache(maxsize=50)
     def get_tk_thumb(file: str, size=(1080, 720), radius=0):
         image = ImageUtils.getPilImageThumb(file, size=size)
@@ -108,7 +106,7 @@ class ImageUtils:
             return ImageTk.PhotoImage(image=image)
 
     @staticmethod
-    @retry
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     @functools.lru_cache
     def getrounded_rect(size, radius) -> Image.Image:
         """
@@ -129,7 +127,7 @@ class ImageUtils:
         return image
 
     @staticmethod
-    @retry
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     @functools.lru_cache(maxsize=20)
     def get_round_colored_rect(
         width, height, radius, fill="white", as_photoimage=False
@@ -143,3 +141,21 @@ class ImageUtils:
         image.thumbnail((width, height), Image.Resampling.LANCZOS)
 
         return ImageTk.PhotoImage(image) if as_photoimage else image
+
+    @staticmethod
+    @functools.lru_cache(maxsize=50)
+    def cv2_image_open(file) -> cv2.typing.MatLike:
+        cv_image = cv2.imread(file)
+        return cv_image
+
+    @staticmethod
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
+    def get_cv2_thumb(file: str, size, upscale=False):
+        cv_image = ImageUtils.cv2_image_open(file)
+        if size:
+            h, w = cv_image.shape[:2]
+            height = int(size[1])
+            width = int(size[1]  * w / h)
+            cv_image = cv2.resize(cv_image, (width, height), interpolation= cv2.INTER_AREA)
+        cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(cv_image_rgb)

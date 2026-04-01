@@ -77,6 +77,8 @@ class PhotoImageGallery(ttk.Frame):
                     break
 
     def change_tags(self, tags=None):
+        if tags is None:
+            tags = []
         if self.tags == tags:
             return
         self.tags = tags
@@ -202,9 +204,10 @@ class SimpleFrames:
         self.zooming = False
 
     def change_posts(self, posts):
+        if posts is None:
+            posts = []
         if posts == SimplePhotoLabel.post_ids:
             return
-
         ebinder.event_generate(BINDING.ON_POST_COUNT, len(posts) if posts else "0")
 
         self.text.focus_set()
@@ -217,6 +220,8 @@ class SimpleFrames:
     def update(self):
         logger.debug("Updating Image Gallery")
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
+        for i, frame in enumerate(self.frames):
+            frame.update_size()
         for i, frame in enumerate(self.frames):
             frame.reset()
             if frame.bbox:
@@ -466,7 +471,7 @@ class SimplePhotoLabel(tk.Label):
 
     @property
     def pid(self):
-        if self.idx >= len(SimplePhotoLabel.post_ids):
+        if SimplePhotoLabel.post_ids is None or self.idx >= len(SimplePhotoLabel.post_ids):
             return None
         else:
             return SimplePhotoLabel.post_ids[self.idx]
@@ -538,15 +543,9 @@ class SimplePhotoLabel(tk.Label):
         self.config(image=None)
 
     def update_size(self):
-        ratio = self.file.width / self.file.height
-
-        if ratio * self.height_var.get() > self.width_var.get():
-            width = self.width_var.get()
-            height = width / ratio
-        else:
-            width = self.height_var.get() * ratio
-            height = self.height_var.get()
-
+        ratio = self.post_file.width / self.post_file.height
+        height = self.height_var.get()
+        width = self.height_var.get() * ratio
         self.config(height=int(height), width=int(width))
 
     def get_image(self):
@@ -576,7 +575,7 @@ class SimplePhotoLabel(tk.Label):
                 self.file_name = self.file.file
 
             thread_caller.add(
-                ImageUtils.getPilImageThumb,
+                ImageUtils.get_cv2_thumb,
                 self.set_image,
                 self.get_image_cancel_key,
                 self.file_name,

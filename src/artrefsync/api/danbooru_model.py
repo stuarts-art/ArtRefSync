@@ -46,3 +46,15 @@ class Danbooru_Post:
 def parse_danbooru_post(post_dict) -> Danbooru_Post:
     post = dacite.from_dict(Danbooru_Post, post_dict, config=config)
     return post
+
+
+@dataclass
+class Danbooru_Tag:
+    id: int
+    name: str
+    category: int
+    post_count: int
+    is_deprecated: bool
+    created_at: str
+    updated_at: str
+    words: list[str]
