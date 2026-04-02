@@ -143,6 +143,22 @@ class ImageUtils:
         return ImageTk.PhotoImage(image) if as_photoimage else image
 
     @staticmethod
+    @functools.lru_cache
+    def get_cv_thumb_size(img_size, size):
+        img_w, img_h = img_size
+        w, h = size 
+        ratio = img_w / img_h
+        vh = int(w / ratio)
+        vw = int(h * ratio)
+        if h < vh:
+            width = vw
+            height= h
+        else:
+            width = w
+            height = vh
+        return (width, height)
+
+    @staticmethod
     @functools.lru_cache(maxsize=50)
     def cv2_image_open(file) -> cv2.typing.MatLike:
         cv_image = cv2.imread(file)
@@ -154,8 +170,8 @@ class ImageUtils:
         cv_image = ImageUtils.cv2_image_open(file)
         if size:
             h, w = cv_image.shape[:2]
-            height = int(size[1])
-            width = int(size[1]  * w / h)
-            cv_image = cv2.resize(cv_image, (width, height), interpolation= cv2.INTER_AREA)
+            thumb_size = ImageUtils.get_cv_thumb_size((w,h), size)
+            cv_image = cv2.resize(cv_image, thumb_size, interpolation= cv2.INTER_AREA)
         cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         return Image.fromarray(cv_image_rgb)
+

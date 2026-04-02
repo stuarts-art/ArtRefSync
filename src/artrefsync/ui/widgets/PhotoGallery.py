@@ -136,7 +136,6 @@ class SimpleFrames:
         self.last_focus_next = time.time() - self.min_focus_delay
         self.focussing_prev = False
         self.focussing_next = False
-        self.increase_frames()
         ebinder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         ebinder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
         self.text.bind("q", lambda _: self.change_zoom(-100))
@@ -145,8 +144,23 @@ class SimpleFrames:
         self.text.bind("a", self.throttled_focus_prev)
         self.text.bind("s", self.throttled_focus_next)
         self.text.bind("d", self.focus_next)
+        self.text.bind(
+            "<Escape>", lambda _: ebinder.event_generate(BINDING.ON_TEXT_ESCAPE)
+        )
+        self.text.bind(
+            "<space>",
+            lambda e: ebinder.event_generate(
+                BINDING.ON_IMAGE_DOUBLE_CLICK, self.last_selected
+            ),
+        )
         self.color = ttk.Style().colors
         SimplePhotoLabel.text = text
+        self.increase_frames()
+        if self.frames:
+            e = tk.Event()
+            e.state = 0
+            e.widget = self.frames[0]
+            self.add_select_tag(e)
 
     def create_frame(self):
         idx = len(self.frames) if self.frames else 0
@@ -252,7 +266,9 @@ class SimpleFrames:
             start = min(self.text.index(ranges[0]), index)
             end = max(self.text.index(ranges[0]), index + "+1c")
             self.text.tag_add("sel", start, end)
-        self.updated_selected_post(self.selected.pid)
+
+        if self.selected is not None:
+            self.updated_selected_post(self.selected.pid)
 
     def updated_selected_post(self, pid):
         if self.last_selected != pid:
@@ -471,7 +487,9 @@ class SimplePhotoLabel(tk.Label):
 
     @property
     def pid(self):
-        if SimplePhotoLabel.post_ids is None or self.idx >= len(SimplePhotoLabel.post_ids):
+        if SimplePhotoLabel.post_ids is None or self.idx >= len(
+            SimplePhotoLabel.post_ids
+        ):
             return None
         else:
             return SimplePhotoLabel.post_ids[self.idx]
@@ -543,10 +561,14 @@ class SimplePhotoLabel(tk.Label):
         self.config(image=None)
 
     def update_size(self):
-        ratio = self.post_file.width / self.post_file.height
-        height = self.height_var.get()
-        width = self.height_var.get() * ratio
-        self.config(height=int(height), width=int(width))
+        try:
+            thumb_size = ImageUtils.get_cv_thumb_size(
+                (self.post_file.width, self.post_file.height),
+                (self.width_var.get(), self.height_var.get()),
+            )
+            return thumb_size
+        except Exception:
+            return (self.width_var.get(), self.height_var.get())
 
     def get_image(self):
         if self.pid is None or not self.post_file:

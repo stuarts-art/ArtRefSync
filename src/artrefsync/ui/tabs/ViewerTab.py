@@ -25,6 +25,7 @@ class ViewerTab(ttk.Frame):
         super().__init__(root, name=NAMES.VIEWER_TAB, *args, **kwargs)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
+        self.pid = None
 
         self.file = ""
         self.post_file: PostFile = None
@@ -53,8 +54,11 @@ class ViewerTab(ttk.Frame):
         ebinder.bind(BINDING.ON_IMAGE_DOUBLE_CLICK, self.open_image_viewer, self)
         ebinder.bind(BINDING.ON_POST_SELECT, self.update_viewer_image, self)
         ebinder.bind(BINDING.ON_FILTER_UPDATE, self.close_image_viewer, self)
+        ebinder.bind(BINDING.ON_TEXT_ESCAPE, self.close_image_viewer, self)
 
     def open_image_viewer(self, pid):
+        if pid is None:
+            return
         self.grid(column=0, row=0, sticky=tk.NSEW)
         self.lift()
         self.after(50, self.update_viewer_image, pid)
@@ -97,6 +101,10 @@ class ViewerTab(ttk.Frame):
         self.setImage()
 
     def update_viewer_image(self, pid):
+        if self.pid == pid:
+            self.close_image_viewer()
+            self.pid = None
+
         if not pid:
             logger.error("Missing PID in viewer")
             return
@@ -123,6 +131,7 @@ class ViewerTab(ttk.Frame):
                 self.gif_viewer.load(
                     post_file.file, (self.winfo_width(), self.winfo_height())
                 )
+            self.pid = pid
 
     def setImage(self):
         width = self.winfo_width()
