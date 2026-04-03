@@ -8,17 +8,16 @@ from artrefsync.api.eagle_client import EagleClient
 from artrefsync.api.eagle_model import EagleFolder, EagleItem
 from artrefsync.boards.board_handler import PostFile
 from artrefsync.config import config
-from artrefsync.constants import BOARD, EAGLE, STORE, TABLE
+from artrefsync.constants import BOARD, DANBOORU, E621, EAGLE, R34, STORE, TABLE
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler, Post
-from artrefsync.utils.str_dict import str_dict
+from artrefsync.utils import str_dict
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 def main():
-    EagleHandler()
-
+    pass
 
 
 class EagleHandler(ImageStoreHandler):
@@ -28,28 +27,18 @@ class EagleHandler(ImageStoreHandler):
 
     def __init__(self):
         logger.info("Initializing Eagle Handler")
+        self.client = EagleClient()
         self.reload_config()
         config.subscribe_reload(self.reload_config)
 
     def reload_config(self):
-        # self.library = config.get(TABLE.EAGLE,EAGLE.LIBRARY)
-        # self.artists_folder_name = config.get(TABLE.EAGLE, EAGLE.ARTIST_FOLDER, "artists").strip()
         self.library = config[TABLE.EAGLE][EAGLE.LIBRARY]
         self.artists_folder_name = config[TABLE.EAGLE][EAGLE.ARTIST_FOLDER]
-
-        self.client = EagleClient()
         self._artist_folder: EagleFolder.ListFolder= None
         self.board_id_map = str_dict()
         self.board_artist_id_map = str_dict(dict)
         self.id_artist_map = {}
-
         self.library_path_dict = {}
-        history = self.client.library.history()
-        for path in history:
-            library_str = path.split("/")[-1]
-            library_str = library_str.removesuffix(".library")
-            self.library_path_dict[library_str] = path
-
         self.switch_libary(self.library)
         self.get_artists_folder()
         logger.debug("%s \n%s", "Board Artist dict:", self.board_artist_id_map)
@@ -58,19 +47,7 @@ class EagleHandler(ImageStoreHandler):
         return STORE.EAGLE
 
     def post_add_from_path(self, post: Post, path: str) -> str:
-        if (
-            post.board not in self.board_artist_id_map
-            or post.artist_name not in self.board_artist_id_map[post.board]
-        ):
-            logger.info("Creating Artist Folder for %s, %s", post.board, post.artist_name)
-            self.create_board_and_artist_folders(
-                post.board,
-                [
-                    post.artist_name,
-                ],
-            )
-
-        artist_folder = self.board_artist_id_map[post.board][post.artist_name]
+        artist_folder = self.get_board_artist_id(post.board, post.artist_name)
         return self.client.item.post_add_from_path(
             path=path,
             name=post.name,
@@ -132,29 +109,20 @@ class EagleHandler(ImageStoreHandler):
     def create_board_and_artist_folders(self, board: BOARD, artists: list[str]):
         self.get_artists_folder()
         for artist in artists:
-            self.make_board_artist_dir(board, artist)
+            self.get_board_artist_id(board, artist)
 
-    def make_board_artist_dir(self, board: BOARD, artist: str) -> dict[str, Post]:
-        board_name = f"{board}"
-        folder_created = False
-        # Create board folder if not exists
+    def get_board_artist_id(self, board: BOARD, artist: str) -> EagleFolder.ListFolder:
         if board not in self.board_id_map:
             board_folder = self.client.folder.create(board, self.get_artists_folder().id)
-            self.board_id_map[board_folder.name] = board_folder.id
-            folder_created = True
-        # Create board folder if not exists
+            self.board_id_map[board] = board_folder.id
         if artist not in self.board_artist_id_map[board]:
-            artist_folder = self.client.folder.create(artist, self.board_id_map[board_name])
+            artist_folder = self.client.folder.create(artist, self.board_id_map[board])
             self.board_artist_id_map[board][artist] = artist_folder.id
             self.id_artist_map[artist_folder.id] = artist
-            folder_created = True
-        return folder_created
+        return self.board_artist_id_map[board][artist]
 
     # Assuming that we will always call get_posts before save_posts
     def get_posts(self, board: BOARD, artist: str) -> dict[str, PostFile]:
-        if self.make_board_artist_dir(board, artist):
-            return {}
-
         data = self.get_list_items(folders=self.board_artist_id_map[board][artist])
         post_files = {}
         for item in data:
@@ -185,20 +153,20 @@ class EagleHandler(ImageStoreHandler):
     def update_post(self, post: Post):
         self.client.item.update(post.ext_id, post.tags, url=post.url)
 
-    def get_artists_folder(self) -> EagleFolder.ListFolder:
+    def get_artists_folder(self, refresh = False) -> EagleFolder.ListFolder:
         if self._artist_folder is not None:
-            return self._artist_folder.id
+            if not refresh:
+                return self._artist_folder
         for folder in self.client.folder.list():
             if folder.name == self.artists_folder_name:
-                artists_folder = folder
+                self._artist_folder = folder
                 break
-
-        if not artists_folder:
+        if not self._artist_folder:
             logger.info("Creating Artists (Main Parent) Folder: %s", self.artists_folder_name)
             self._artist_folder = self.client.folder.create(self.artists_folder_name)
 
-        logger.info("Artist Folder ID: %s", artists_folder.id)
-        for board_folder in artists_folder.children:
+        logger.info("Artist Folder ID: %s", self._artist_folder.id)
+        for board_folder in self._artist_folder.children:
             board_name = board_folder.name
             self.board_id_map[board_name] = board_folder.id
             self.board_artist_id_map[board_name] = {}
@@ -206,8 +174,14 @@ class EagleHandler(ImageStoreHandler):
                 artist_name = artist.name
                 self.board_artist_id_map[board_name][artist_name] = artist.id
                 self.id_artist_map[artist.id] = artist_name
+            logger.info("Board %s, Artist Count: %d", board_name, len(self.board_artist_id_map[board_name]))
 
     def switch_libary(self, library_string):
+        history = self.client.library.history()
+        for path in history:
+            library_str = path.split("/")[-1]
+            library_str = library_str.removesuffix(".library")
+            self.library_path_dict[library_str] = path
         try:
             if library_string in self.library_path_dict:
                 response = self.client.library.switch(

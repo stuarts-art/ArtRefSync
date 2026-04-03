@@ -2,8 +2,8 @@ import logging
 import os
 import sqlite3
 
+from artrefsync import config
 from artrefsync.boards.board_handler import Post, PostFile
-from artrefsync.config import config
 from artrefsync.constants import APP, BOARD, DB, TABLE
 from artrefsync.db.dataclass_db import Dataclass_DB
 from artrefsync.db.db_utils import BlobDb, DbUtils
@@ -104,6 +104,18 @@ class PostDb:
         return posts
 
     def get_missing_post_file_ids(self):
+        missing_ids = self.posts.select_freeform(
+            select_args="t1.id",
+            from_args=f"{Post.__name__} t1",
+            join_str=f"LEFT JOIN {PostFile.__name__} t2 ON t1.id = t2.id",
+            where_str="WHERE t2.id IS NULL",
+            as_tupple=True,
+            as_scalar=True
+
+        )
+        return missing_ids
+
+    def get_posts_with_files(self):
         missing_ids = self.posts.select_freeform(
             select_args="t1.id, t1.artist_name, t1.board",
             from_args=f"{Post.__name__} t1",

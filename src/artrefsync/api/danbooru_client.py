@@ -3,7 +3,6 @@ import json
 import logging
 import re
 from threading import Event
-
 import dacite
 import requests
 from dacite import DaciteError
@@ -17,7 +16,7 @@ from artrefsync.api.danbooru_model import (
 )
 from artrefsync.config import cache, config
 from artrefsync.constants import DANBOORU, TABLE
-from artrefsync.db.post_db import PostDb
+from artrefsync.db import PostDb
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)

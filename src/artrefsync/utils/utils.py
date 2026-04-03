@@ -1,4 +1,5 @@
 from collections import UserDict
+from functools import wraps
 
 class str_dict(UserDict):
     # This class forces keys to be strings, useful when dealing with StrEnums.
@@ -20,3 +21,12 @@ class str_dict(UserDict):
 
     def __getitem__(self, key):
         return super().__getitem__(str(key))
+
+def singleton(cls):
+    instances = {}
+    @wraps(cls)
+    def wrapper(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+    return wrapper

@@ -3,16 +3,13 @@ from ratelimit import limits
 import requests
 from artrefsync.config import config
 import logging
+from artrefsync.utils import singleton
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+@singleton
 class LinkCache:
-    _instance = None
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
 
     def __init__(self):
         self._link_cache: dict[str, tempfile.NamedTemporaryFile] = {}

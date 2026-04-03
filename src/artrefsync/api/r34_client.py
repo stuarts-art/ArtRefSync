@@ -8,9 +8,9 @@ from ratelimit import limits
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.r34_model import R34_Post, parse_r34_post
-from artrefsync.config import cache, config
+from artrefsync import cache, config
 from artrefsync.constants import R34, TABLE
-from artrefsync.db.post_db import PostDb
+from artrefsync.db import PostDb
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)

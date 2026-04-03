@@ -1,20 +1,22 @@
-from collections.abc import Iterable
 import logging
 import pickle
 import sqlite3
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Generic, Type, TypeVar
 
 import dacite
 
-from artrefsync.db.db_utils import DbUtils
 from artrefsync.config import config
+from artrefsync.db.db_utils import DbUtils
 
 T = TypeVar("T", contravariant=dataclass)
 
+
 def main():
     pass
+
 
 class Dataclass_DB(Generic[T]):
     def __init__(
@@ -53,8 +55,17 @@ class Dataclass_DB(Generic[T]):
         )
         if not lazy:
             self.create_or_update_table(cls)
-        
-    def select_freeform(self, select_args, from_args, join_str ="", where_str ="", suffix_str ="", as_tupple = False):
+
+    def select_freeform(
+        self,
+        select_args,
+        from_args,
+        join_str="",
+        where_str="",
+        suffix_str="",
+        as_tupple=False,
+        as_scalar=False,
+    ):
         query = f"SELECT {select_args} FROM {from_args} {join_str} {where_str} {suffix_str};"
         cur = self.connection.cursor()
         if not as_tupple:
@@ -65,6 +76,8 @@ class Dataclass_DB(Generic[T]):
         if not rows:
             return []
         else:
+            if as_tupple and as_scalar:
+                return [row[0] for row in rows]
             return rows
 
     def create_or_update_table(self, cls):
@@ -254,6 +267,7 @@ class Dataclass_DB(Generic[T]):
             ]
 
     def select_id_list(self, conditions: list[tuple], suffix="") -> list[T]:
+
         if conditions:
             condition_fields, condition_vals = zip(*conditions)
             condition_query_str = " WHERE " + " AND ".join(
@@ -331,6 +345,7 @@ class Dataclass_DB(Generic[T]):
         if self.connection_owner:
             self.connection.close()
         pass
+
 
 if __name__ == "__main__":
     main()

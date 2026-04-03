@@ -4,11 +4,7 @@ from asyncio import Event
 from collections import defaultdict
 
 
-from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile
-from artrefsync.boards.danbooru_handler import Danbooru_Handler
-from artrefsync.boards.e621_handler import E621Handler
-from artrefsync.boards.rule34_handler import R34Handler
-from artrefsync.config import config
+from artrefsync import config
 from artrefsync.constants import (
     APP,
     BINDING,
@@ -20,6 +16,7 @@ from artrefsync.constants import (
     R34,
     TABLE,
 )
+from artrefsync.boards import ImageBoardHandler, Danbooru_Handler, E621Handler, R34Handler, Post, PostFile
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.eagle_storage import EagleHandler
 from artrefsync.stores.link_cache import LinkCache
@@ -133,7 +130,7 @@ class SyncCoordinator:
         self,
         board_handler: ImageBoardHandler,
         store_handler: ImageStoreHandler,
-        max_per_artist: int = None,
+        max_per_artist: int = int(config[TABLE.APP][APP.LIMIT]),
         stop_event: Event = Event(),
     ):
         self.board_handler = board_handler
@@ -231,35 +228,42 @@ class SyncCoordinator:
 
         thread_caller = TkThreadCaller()
         # with ThreadPoolExecutor() as executor:
-        future_to_pid = {
-            thread_caller.add(
-                task=self.store_handler.save_post,
-                cancel_key=__name__,
-                on_finish=None,
-                post=post,
-                link_cache=self.cache,
-                event=self.stop_event,
-            ): post.id
-            for post in missing_posts
-        }
-        ebinder.event_generate(
-            BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
-        )
-        for future in concurrent.futures.as_completed(future_to_pid.keys()):
-            try:
-                result = future.result()
-                ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
-                if self.stop_event and self.stop_event.is_set():
-                    logger.warning("Stop Event Recieved.")
-                    thread_caller.executor.shutdown(wait=True, cancel_futures=True)
-                    return
-                if isinstance(result, PostFile):
-                    success_list.append(result)
-            except Exception:
-                failure_list.append(future_to_pid[future])
-                continue
-        if failure_list:
-            logger.error("The following IDs failed to load. %s", failure_list)
+        if config.log_level == "DEBUG":
+            for post in missing_posts:
+                result = self.store_handler.save_post(
+                    post=post, link_cache=self.cache, event=self.stop_event
+                )
+                success_list.append(result)
+        else:
+            future_to_pid = {
+                thread_caller.add(
+                    task=self.store_handler.save_post,
+                    cancel_key=__name__,
+                    on_finish=None,
+                    post=post,
+                    link_cache=self.cache,
+                    event=self.stop_event,
+                ): post.id
+                for post in missing_posts
+            }
+            ebinder.event_generate(
+                BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
+            )
+            for future in concurrent.futures.as_completed(future_to_pid.keys()):
+                try:
+                    result = future.result()
+                    ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
+                    if self.stop_event and self.stop_event.is_set():
+                        logger.warning("Stop Event Recieved.")
+                        thread_caller.executor.shutdown(wait=True, cancel_futures=True)
+                        return
+                    if isinstance(result, PostFile):
+                        success_list.append(result)
+                except Exception:
+                    failure_list.append(future_to_pid[future])
+                    continue
+            if failure_list:
+                logger.error("The following IDs failed to load. %s", failure_list)
 
         logger.info("Adding Entries to PostFile Table.")
         with PostDb() as post_db:

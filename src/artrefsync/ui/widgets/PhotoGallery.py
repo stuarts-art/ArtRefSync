@@ -95,15 +95,15 @@ class PhotoImageGallery(ttk.Frame):
         )
 
         with PostDb() as post_db:
-            order_query = f" ORDER BY {sort_by} {sort_dir}"
+            order_query = f" id IN (SELECT id from PostFile) ORDER BY {sort_by} {sort_dir}"
             if self.tags:
                 posts = post_db.get_tag_intersection(self.tags)
                 sorted_posts = post_db.posts.get_all(
-                    posts, ["id"], as_scalar=True, suffix=order_query
+                    posts, ["id"], as_scalar=True, suffix=f" AND {order_query}"
                 )
             else:
                 sorted_posts = post_db.posts.select_id_list(
-                    conditions=None, suffix=f"{order_query} LIMIT 1000"
+                    conditions=None, suffix=f" WHERE {order_query} LIMIT 1000"
                 )
 
             self.simple_frames.change_posts(sorted_posts)
@@ -204,10 +204,10 @@ class SimpleFrames:
         self.zooming = True
         old_height = self.height_var.get()
         new_height = old_height + delta
-        if new_height < 200:
-            new_height = 200
-        if new_height > 800:
-            new_height = 800
+        if new_height < 300:
+            new_height = 300
+        if new_height > self.text.winfo_height():
+            new_height = self.text.winfo_height()
 
         if new_height != old_height:
             self.height_var.set(new_height)
@@ -234,12 +234,12 @@ class SimpleFrames:
     def update(self):
         logger.debug("Updating Image Gallery")
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
+        # for i, frame in enumerate(self.frames):
         for i, frame in enumerate(self.frames):
-            frame.update_size()
-        for i, frame in enumerate(self.frames):
-            frame.reset()
             if frame.bbox:
                 frame.get_image()
+            else:
+                frame.reset()
 
     def add_select_tag(self, e):
         self.text.focus_set()
@@ -464,8 +464,8 @@ class SimplePhotoLabel(tk.Label):
     post_files: dict[str, PostFile] = {}
     photos = ImageCache()
     text: ttk.Text = None
-    default_height = 15
-    default_width = 20
+    default_height = 30
+    default_width = 40
     get_image_cancel_key = "photo_label_get_image"
 
     @staticmethod
