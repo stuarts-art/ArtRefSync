@@ -3,6 +3,7 @@ import os
 import tempfile
 from asyncio import Event
 from pathlib import Path
+import time
 
 from artrefsync.api.eagle_client import EagleClient
 from artrefsync.api.eagle_model import EagleFolder, EagleItem
@@ -193,6 +194,8 @@ class EagleHandler(ImageStoreHandler):
                 logger.debug(
                     "Switch Library to %s response: %s.", library_string, response
                 )
+                # Fixes a bug where Eagle returns incorrect data if called too quickly after switching.
+                time.sleep(.5)
             else:
                 logger.warning('Failed to find library "%s" in History', library_string)
         except Exception as e:

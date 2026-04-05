@@ -146,6 +146,7 @@ class SyncCoordinator:
         self.board_tag_counts = defaultdict(int)
         self.cache = LinkCache()
         self.download_count = 0
+        self.max_download_threads = config[TABLE.APP][APP.MAX_DOWNLOAD_THREADS]
 
     def sync(self):
         ebinder.event_generate(
@@ -158,15 +159,13 @@ class SyncCoordinator:
             self.sync_artist(artist)
 
         with PostDb() as post_db:
+
+            ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
             post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_counts)
             for tag, posts in self.tag_post_dict.items():
                 if self.stop_event.is_set():
                     return
                 post_db.tag_posts.union_update(tag, posts)
-
-        for artist in self.board_handler.artist_list:
-            if self.stop_event.is_set():
-                return
 
     def sync_artist(self, artist):
         logger.info("Starting sync artist %s", artist)
@@ -178,6 +177,7 @@ class SyncCoordinator:
 
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
+        ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
 
         updated_posts = []
         artist_tag_count = defaultdict(int)
@@ -221,6 +221,8 @@ class SyncCoordinator:
             return missing_ids
 
     def download_missing_ids(self, artist):
+        ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Downloading missing")
+
         missing_ids = self.get_missing_ids(artist)
         failure_list = []
         success_list = []
@@ -234,7 +236,7 @@ class SyncCoordinator:
         logger.info("Downloading %d missing posts for %s", len(missing_posts), artist)
 
         # thread_caller = TkThreadCaller()
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=self.max_download_threads) as executor:
             future_to_pid = {
                 executor.submit(
                     self.store_handler.save_post,
@@ -271,6 +273,7 @@ class SyncCoordinator:
         return success_list
 
     def update_post_file_table(self, artist, repair=False):
+        ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
         logger.info(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist
         )

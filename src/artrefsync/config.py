@@ -93,7 +93,8 @@ class __Config:
             APP.DB_BLOB_NAME: DB.BLOB_DB,
             APP.THUMBNAIL_WIDTH: 640,
             APP.THUMBNAIL_HEIGHT: 480,
-            APP.ONLY_RECENT_ENABLED: True
+            APP.ONLY_RECENT_ENABLED: True,
+            APP.MAX_DOWNLOAD_THREADS: 8,
 
         },
         TABLE.R34: {

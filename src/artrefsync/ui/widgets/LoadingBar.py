@@ -77,13 +77,15 @@ class LoadingBars(ttk.Frame):
 
         self.left_bar = LoadingBar(self)
         self.right_bar = LoadingBar(self)
+        self.mid_label = ttk.Label(self) 
         self.sep = ttk.Label(self)
 
         self.left_bar.grid(column=0, row=0, sticky=tk.W)
-        self.sep.grid(column=1, row=0, sticky=tk.NSEW)
+        self.mid_label.grid(column=1, row=0, sticky=tk.NSEW)
         # self.right_bar.grid(column=2,row=0, sticky=tk.W)
 
         ebinder.bind(BINDING.ON_LOAD_LEFT_SET, self.reset_right, self)
+        ebinder.bind(BINDING.ON_LOAD_MID_SET, self.set_mid, self)
         ebinder.bind(BINDING.ON_LOAD_RIGHT_SET, self.set_right, self)
         ebinder.bind(BINDING.ON_LOADING_DONE, self.reset_bar, self)
 
@@ -95,6 +97,9 @@ class LoadingBars(ttk.Frame):
     def reset_bar(self):
         self.is_packed = False
         self.root.grid_forget()
+
+    def set_mid(self, text, *args, **kwargs):
+        self.mid_label.config(text=text)
 
     def set_bar(self, *args, **kwargs):
         if not self.is_packed:

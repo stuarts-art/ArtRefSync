@@ -29,6 +29,7 @@ class BINDING(StrEnum):
     SORT_DIR = auto()
 
     ON_LOAD_LEFT_SET = auto()
+    ON_LOAD_MID_SET = auto()
     ON_LOAD_RIGHT_SET = auto()
     ON_LOAD_LEFT_INCR = auto()
     ON_LOAD_RIGHT_INCR = auto()
@@ -94,6 +95,7 @@ class APP(StrEnum):
     THUMBNAIL_WIDTH = auto()
     THUMBNAIL_HEIGHT = auto()
     ONLY_RECENT_ENABLED = auto()
+    MAX_DOWNLOAD_THREADS = auto()
 
 
 class BOARD(StrEnum):
