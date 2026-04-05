@@ -187,7 +187,7 @@ class SimpleFrames:
     def bind_b2(self, e: tk.Event):
         print(e)
         edict = {k: v for k, v in e.__dict__.items() if k not in ["num"]}
-        self.text.event_generate("<Button-2>", **edict)
+        self.text.event_generate("<ButtonPress-2>", **edict)
 
     def bind_b2_motion(self, e: tk.Event):
         edict = {k: v for k, v in e.__dict__.items() if k not in ["num"]}
@@ -602,7 +602,7 @@ class SimplePhotoLabel(tk.Label):
                 self.get_image_cancel_key,
                 self.file_name,
                 (self.width_var.get(), self.height_var.get()),
-                True,
+                False,
             )
 
     def set_image(self, image):

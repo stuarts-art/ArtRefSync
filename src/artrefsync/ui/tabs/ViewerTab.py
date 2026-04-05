@@ -7,8 +7,8 @@ from artrefsync.config import config
 from artrefsync.constants import BINDING, NAMES
 from artrefsync.db.post_db import PostDb
 import logging
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.ui.widgets.AdvancedScrolling import CanvasImage
-from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
 from artrefsync.utils.EventManager import ebinder
 
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
@@ -75,6 +75,8 @@ class ViewerTab(ttk.Frame):
     def close_image_viewer(self, _=None):
         if self.gif_top:
             self.gif_viewer.unload()
+            self.gif_top = False
+
             
         if self.grid_info():
             logger.info("Closing Image Viewer")

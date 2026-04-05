@@ -1,7 +1,7 @@
 import json
 import dacite
 import requests
-from tenacity import retry
+from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.api.eagle_model import EagleFolder, EagleItem, EagleLibrary
 from artrefsync.constants import STORE, EAGLE
 from artrefsync.config import config
@@ -30,7 +30,7 @@ class EagleClient:
         def folder_url(self, folder_path) -> str:
             return f"{self.eagle_url}/folder/{folder_path}"
 
-        @retry
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def create(
             self, folderName: str, parent: str = None
         ) -> EagleFolder.CreatedFolder:
@@ -49,7 +49,8 @@ class EagleClient:
             return created_file
 
         # If no args given, returns info on folder id
-        @retry
+        
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def update(
             self,
             folderId: str,
@@ -77,7 +78,7 @@ class EagleClient:
             updated_item = dacite.from_dict(EagleFolder.UpdatedFolder, data)
             return updated_item
 
-        @retry
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def list(self) -> list[EagleFolder.ListFolder]:
             with self.lock:
                 response = requests.get(self.folder_url("list"), timeout=5).content
@@ -97,7 +98,7 @@ class EagleClient:
         def library_url(self, library_path):
             return f"{self._library_url}/{library_path}"
 
-        @retry
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def info(self) -> EagleLibrary.Info:
             with self.lock:
                 response = requests.get(self.library_url("info"), timeout=5)
@@ -105,7 +106,7 @@ class EagleClient:
             data = json.loads(response.content)["data"]
             return dacite.from_dict(EagleLibrary.Info, data)
 
-        @retry
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def history(self) -> list[str]:
             with self.lock:
                 response = requests.get(self.library_url("history"), timeout=5)
@@ -115,7 +116,7 @@ class EagleClient:
             data = [x.replace("\\", "/").removesuffix("/") for x in data]
             return data
 
-        @retry
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def switch(self, library_path: str) -> str:
             data = {"libraryPath": library_path}
             with self.lock:
@@ -134,7 +135,7 @@ class EagleClient:
         def item_url(self, item_path) -> str:
             return f"{self._item_url}/{item_path}"
 
-        @retry
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def thumbnail(self, pid) -> EagleItem.UpdatedItem:
             with self.lock:
                 response = requests.get(
@@ -143,7 +144,7 @@ class EagleClient:
             data = json.loads(response.content)["data"]
             return data
 
-        @retry
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def info(self, pid) -> EagleItem.UpdatedItem:
             with self.lock:
                 response = requests.get(f"{self.item_url('info')}?id={pid}", timeout=5)
@@ -152,7 +153,7 @@ class EagleClient:
             info = dacite.from_dict(EagleItem.UpdatedItem, data)
             return info
 
-        @retry
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def update(
             self,
             pid: str,

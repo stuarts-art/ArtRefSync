@@ -10,7 +10,7 @@ from tkinterdnd2 import COPY, DND_FILES
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.constants import BINDING
 from artrefsync.db.post_db import PostDb
-from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 from artrefsync.utils.EventManager import ebinder
 from artrefsync.config import config

@@ -166,12 +166,16 @@ class ImageUtils:
 
     @staticmethod
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def get_cv2_thumb(file: str, size, upscale=False):
+    def get_cv2_thumb(file: str, size, as_photoimage = False):
         cv_image = ImageUtils.cv2_image_open(file)
         if size:
             h, w = cv_image.shape[:2]
             thumb_size = ImageUtils.get_cv_thumb_size((w,h), size)
             cv_image = cv2.resize(cv_image, thumb_size, interpolation= cv2.INTER_AREA)
         cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-        return Image.fromarray(cv_image_rgb)
+        img = Image.fromarray(cv_image_rgb)
+        if as_photoimage:
+            return ImageTk.PhotoImage(img)
+        else:
+            return img
 

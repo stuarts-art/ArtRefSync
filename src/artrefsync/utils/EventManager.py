@@ -2,6 +2,8 @@ from dataclasses import dataclass
 import tkinter
 import logging
 
+from artrefsync.utils.utils import singleton
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,12 +13,12 @@ class _EventBinding:
     root: tkinter.Widget
 
 
+@singleton
 class EventManager:
     """
     Standard tkinter bindings can't easily pass data in events.
     This class provides a simplified solution leveraging the builtin "after" method.
     [2016 Python PR for virtual event data](https://github.com/python/cpython/pull/7142)
-
     """
 
     def __init__(self):

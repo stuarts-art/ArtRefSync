@@ -4,7 +4,7 @@ import tkinter as tk
 import logging
 from artrefsync.config import config
 from artrefsync.constants import BINDING
-from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import ebinder
 
 logger = logging.getLogger(__name__)

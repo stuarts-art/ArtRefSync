@@ -7,10 +7,10 @@ from bs4 import BeautifulSoup
 from ratelimit import limits
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from artrefsync.api.r34_model import R34_Post, parse_r34_post
-from artrefsync import cache, config
+from artrefsync.config import cache, config
+from artrefsync.api.r34_model import R34_Post
 from artrefsync.constants import R34, TABLE
-from artrefsync.db import PostDb
+from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -66,7 +66,7 @@ class R34_Client:
                 break
         for post_data in posts_data:
             try:
-                r34_post = parse_r34_post(post_data.attrs)
+                r34_post = R34_Post.parse_r34_post(post_data.attrs)
                 posts.append(r34_post)
             except Exception:
                 pass

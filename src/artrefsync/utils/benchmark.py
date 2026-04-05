@@ -1,12 +1,13 @@
 import shutil
 import sys
 import time
-import humanize
+# import humanize
 import inspect
-from pympler import asizeof
+# from pympler import asizeof
 
 def obj_size(obj) -> str:
-    return humanize.naturalsize(asizeof.asizeof(obj))
+    # return humanize.naturalsize(asizeof.asizeof(obj))
+    return obj
 
 def wrap_line(lines, line_size, border_char="│"):
     wrapped_lines = ""

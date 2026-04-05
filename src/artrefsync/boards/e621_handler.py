@@ -2,9 +2,10 @@ import base64
 import logging
 from threading import Event
 
-from artrefsync.api import E621_Client, E621_Post
+from artrefsync.api.e621_client import E621_Client
+from artrefsync.api.e621_model import E621_Post
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
-from artrefsync import config
+from artrefsync.config import config
 from artrefsync.constants import BOARD, E621, STATS
 from artrefsync.stats import stats
 

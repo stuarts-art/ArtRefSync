@@ -2,9 +2,9 @@ import logging
 from datetime import datetime
 from threading import Event
 
-from artrefsync.api import Danbooru_Client
+from artrefsync.config import config
+from artrefsync.api.danbooru_client import Danbooru_Client
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
-from artrefsync import config
 from artrefsync.constants import BOARD, DANBOORU, STATS
 from artrefsync.stats import stats
 

@@ -11,7 +11,7 @@ from artrefsync.config import config
 from artrefsync.constants import BOARD, DANBOORU, E621, EAGLE, R34, STORE, TABLE
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler, Post
-from artrefsync.utils import str_dict
+from artrefsync.utils.utils import str_dict
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -30,6 +30,8 @@ class EagleHandler(ImageStoreHandler):
         self.client = EagleClient()
         self.reload_config()
         config.subscribe_reload(self.reload_config)
+        logger.info("Initializing Eagle Handler Complete.")
+
 
     def reload_config(self):
         self.library = config[TABLE.EAGLE][EAGLE.LIBRARY]
@@ -123,7 +125,8 @@ class EagleHandler(ImageStoreHandler):
 
     # Assuming that we will always call get_posts before save_posts
     def get_posts(self, board: BOARD, artist: str) -> dict[str, PostFile]:
-        data = self.get_list_items(folders=self.board_artist_id_map[board][artist])
+        folder_id = self.get_board_artist_id(board, artist)
+        data = self.get_list_items(folders=folder_id)
         post_files = {}
         for item in data:
             post_file = self.eagle_item_to_postfile(item)

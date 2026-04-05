@@ -2,8 +2,8 @@ import logging
 from datetime import datetime
 from threading import Event
 
-from artrefsync.api import R34_Client
-from artrefsync.api import R34_Post
+from artrefsync.api.r34_client import R34_Client
+from artrefsync.api.r34_model import R34_Post
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
 from artrefsync.config import config
 from artrefsync.constants import BOARD, R34, STATS

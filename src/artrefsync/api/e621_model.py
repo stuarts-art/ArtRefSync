@@ -11,6 +11,9 @@ from typing import List, Optional
 
 import dacite
 
+config = dacite.Config(cast=[int, str], type_hooks={
+    datetime: datetime.fromisoformat
+    })
 
 @dataclass
 class E621_Post:
@@ -41,16 +44,9 @@ class E621_Post:
     duration: float | None
     uploader_name: str
 
-
-config = dacite.Config(cast=[int, str], type_hooks={
-    # List[str]: (lambda x: x.split()),
-    datetime: datetime.fromisoformat
-    })
-
-
-def parse_e621_post(post_dict) -> E621_Post:
-    return dacite.from_dict(E621_Post, post_dict, config=config)
-    
+    @staticmethod
+    def parse_e621_post(post_dict) -> E621_Post:
+        return dacite.from_dict(E621_Post, post_dict, config=config)
 
 
 class Ratings(StrEnum):

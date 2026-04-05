@@ -10,7 +10,7 @@ from dacite import DaciteError
 from ratelimit import limits
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from artrefsync.api.e621_model import E621_Post, parse_e621_post
+from artrefsync.api.e621_model import E621_Post
 from artrefsync.config import cache, config
 from artrefsync.constants import E621, TABLE
 from artrefsync.db.post_db import PostDb
@@ -71,7 +71,7 @@ class E621_Client:
 
         for post_data in posts_data:
             try:
-                if (post := parse_e621_post(post_data)) is not None:
+                if (post := E621_Post.parse_e621_post(post_data)) is not None:
                     posts.append(post)
             except DaciteError as e:
                 logger.error(e)

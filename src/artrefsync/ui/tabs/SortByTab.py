@@ -2,7 +2,7 @@ import tkinter as tk
 import ttkbootstrap as ttk
 
 
-from artrefsync.ui.widgets.ModernTopBar import RoundedIcon
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.config import config

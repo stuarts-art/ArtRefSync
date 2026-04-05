@@ -12,7 +12,7 @@ from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
-from artrefsync.utils import str_dict
+from artrefsync.utils.utils import str_dict
 
 import logging
 

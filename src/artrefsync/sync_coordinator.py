@@ -1,10 +1,11 @@
 import concurrent
+from concurrent.futures import ThreadPoolExecutor
 import logging
 from asyncio import Event
 from collections import defaultdict
 
 
-from artrefsync import config
+from artrefsync.config import config
 from artrefsync.constants import (
     APP,
     BINDING,
@@ -16,14 +17,16 @@ from artrefsync.constants import (
     R34,
     TABLE,
 )
-from artrefsync.boards import ImageBoardHandler, Danbooru_Handler, E621Handler, R34Handler, Post, PostFile
+from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile 
+from artrefsync.boards.danbooru_handler import Danbooru_Handler
+from artrefsync.boards.e621_handler import  E621Handler
+from artrefsync.boards.rule34_handler import R34Handler
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.eagle_storage import EagleHandler
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.plain_file_storage import PlainLocalStorage
 from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.utils.EventManager import ebinder
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +184,7 @@ class SyncCoordinator:
         posts: dict[str, Post] = self.board_handler.get_posts(
             artist, self.max_per_artist, self.stop_event
         )
-        logger.debug(
+        logger.info(
             "Recieved %d metadata posts for %s from board %s",
             len(posts) if posts else 0,
             artist,
@@ -200,7 +203,7 @@ class SyncCoordinator:
                     artist_tag_count[tag] += 1
             post_db.artist_tags.dumps_blob(artist, artist_tag_count)
             post_db.artist_tags.commit()
-        logger.debug(
+        logger.info(
             "Updated %d metadata posts for %s from board %s",
             len(updated_posts) if updated_posts else 0,
             artist,
@@ -225,21 +228,16 @@ class SyncCoordinator:
             return []
         with PostDb() as post_db:
             missing_posts = [post_db.posts[id] for id in missing_ids]
+        if not missing_posts:
+            return
+        
+        logger.info("Downloading %d missing posts for %s", len(missing_posts), artist)
 
-        thread_caller = TkThreadCaller()
-        # with ThreadPoolExecutor() as executor:
-        if config.log_level == "DEBUG":
-            for post in missing_posts:
-                result = self.store_handler.save_post(
-                    post=post, link_cache=self.cache, event=self.stop_event
-                )
-                success_list.append(result)
-        else:
+        # thread_caller = TkThreadCaller()
+        with ThreadPoolExecutor() as executor:
             future_to_pid = {
-                thread_caller.add(
-                    task=self.store_handler.save_post,
-                    cancel_key=__name__,
-                    on_finish=None,
+                executor.submit(
+                    self.store_handler.save_post,
                     post=post,
                     link_cache=self.cache,
                     event=self.stop_event,
@@ -255,7 +253,7 @@ class SyncCoordinator:
                     ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
                     if self.stop_event and self.stop_event.is_set():
                         logger.warning("Stop Event Recieved.")
-                        thread_caller.executor.shutdown(wait=True, cancel_futures=True)
+                        executor.shutdown(wait=True, cancel_futures=True)
                         return
                     if isinstance(result, PostFile):
                         success_list.append(result)
@@ -273,7 +271,7 @@ class SyncCoordinator:
         return success_list
 
     def update_post_file_table(self, artist, repair=False):
-        logger.debug(
+        logger.info(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist
         )
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(
@@ -322,7 +320,7 @@ class SyncCoordinator:
                     inserted = post_db.files.insert(post_file)
                 if inserted:
                     inserted_list.append(pid)
-        logger.debug(
+        logger.info(
             "Inserted %d PostFile Table for %s, %s, %s",
             len(inserted_list),
             self.store,

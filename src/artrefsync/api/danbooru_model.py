@@ -42,10 +42,10 @@ class Danbooru_Post:
     large_file_url: str
     preview_file_url: str
 
-
-def parse_danbooru_post(post_dict) -> Danbooru_Post:
-    post = dacite.from_dict(Danbooru_Post, post_dict, config=config)
-    return post
+    @staticmethod
+    def parse_danbooru_post(post_dict) -> Danbooru_Post:
+        post = dacite.from_dict(Danbooru_Post, post_dict, config=config)
+        return post
 
 
 @dataclass

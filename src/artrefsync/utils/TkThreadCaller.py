@@ -6,19 +6,14 @@ from threading import Event
 import ttkbootstrap as ttk
 
 from artrefsync.config import config
+from artrefsync.utils.utils import singleton
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 
+@singleton
 class TkThreadCaller:
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            return object.__new__(cls)
-        else:
-            return TkThreadCaller._instance
 
     def __enter__(self):
         return self
@@ -26,11 +21,8 @@ class TkThreadCaller:
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
-    @staticmethod
-    def get_thread_caller() -> "TkThreadCaller":
-        return TkThreadCaller._instance
-
     def __init__(self, root: ttk.Frame = None, event_name=None):
+        logger.info("Thread Caller Init")
         self.executor = ThreadPoolExecutor()
         self.root = root
         self.on_finish_map = {}

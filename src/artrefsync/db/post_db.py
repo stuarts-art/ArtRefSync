@@ -2,11 +2,11 @@ import logging
 import os
 import sqlite3
 
-from artrefsync import config
+from artrefsync.config import config
+from artrefsync.db.db_utils import BlobDb, DbUtils
+from artrefsync.db.dataclass_db import  Dataclass_DB
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.constants import APP, BOARD, DB, TABLE
-from artrefsync.db.dataclass_db import Dataclass_DB
-from artrefsync.db.db_utils import BlobDb, DbUtils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -110,8 +110,7 @@ class PostDb:
             join_str=f"LEFT JOIN {PostFile.__name__} t2 ON t1.id = t2.id",
             where_str="WHERE t2.id IS NULL",
             as_tupple=True,
-            as_scalar=True
-
+            as_scalar=True,
         )
         return missing_ids
 

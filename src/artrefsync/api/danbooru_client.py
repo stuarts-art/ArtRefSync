@@ -9,15 +9,13 @@ from dacite import DaciteError
 from ratelimit import limits
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from artrefsync.config import cache, config
 from artrefsync.api.danbooru_model import (
     Danbooru_Post,
     Danbooru_Tag,
-    parse_danbooru_post,
 )
-from artrefsync.config import cache, config
 from artrefsync.constants import DANBOORU, TABLE
-from artrefsync.db import PostDb
-
+from artrefsync.db.post_db import PostDb
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
@@ -92,7 +90,7 @@ class Danbooru_Client:
                 break
         for post_data in posts_data:
             try:
-                post = parse_danbooru_post(post_data)
+                post = Danbooru_Post.parse_danbooru_post(post_data)
                 if post.is_deleted:
                     skipped.append(post_data["id"])
                     continue

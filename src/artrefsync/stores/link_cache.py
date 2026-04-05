@@ -3,7 +3,7 @@ from ratelimit import limits
 import requests
 from artrefsync.config import config
 import logging
-from artrefsync.utils import singleton
+from artrefsync.utils.utils import singleton
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)

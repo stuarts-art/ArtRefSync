@@ -14,11 +14,12 @@ from artrefsync.ui.tabs.ConfigTab import ConfigTab
 from artrefsync.ui.widgets.LoadingBar import LoadingBars
 from artrefsync.ui.tabs.ViewerTab import ViewerTab
 from artrefsync.ui.tabs.TagTab import TagTab
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 
 from artrefsync.ui.tabs.ArtistTab import ArtistTab
 from artrefsync.ui.widgets.PostInfo import PostInfo
-from artrefsync.ui.widgets.ModernTopBar import ModernTopBar, RoundedIcon
+from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
 from artrefsync.ui.widgets.PhotoGallery import PhotoImageGallery
 from artrefsync.utils.EventManager import ebinder
 from tkinterdnd2 import TkinterDnD
