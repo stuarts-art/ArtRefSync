@@ -83,7 +83,7 @@ class __Config:
 
     default_config = {
         TABLE.APP: {
-            APP.LIMIT: 30000,
+            APP.LIMIT: 1000,
             APP.LOG_LEVEL: "INFO",
             APP.ID_LENGTH: 8,
             APP.CACHE_DIR: ".metadata_cache",
@@ -91,8 +91,8 @@ class __Config:
             APP.DB_DIR: ".db",
             APP.DB_FILE_NAME: DB.TAGAPP_DB,
             APP.DB_BLOB_NAME: DB.BLOB_DB,
-            APP.THUMBNAIL_WIDTH: 640,
-            APP.THUMBNAIL_HEIGHT: 480,
+            APP.THUMBNAIL_WIDTH: 1280,
+            APP.THUMBNAIL_HEIGHT: 720,
             APP.ONLY_RECENT_ENABLED: True,
             APP.MAX_DOWNLOAD_THREADS: 8,
 

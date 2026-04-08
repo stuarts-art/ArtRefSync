@@ -157,27 +157,30 @@ class CanvasImage:
             self.next_job = self.__imframe.after(self.duration, self.next, path)
             self.__show_image()
         else:
-            self.__show_image()
-            self.next_job = self.__imframe.after(self.duration, self.next, path)
+            try:
+                self.__show_image()
+            finally:
+                self.next_job = self.__imframe.after(self.duration, self.next, path)
 
     def update_frame_size(self):
+        index  = 0
         self.imwidth, self.imheight = self.__images[
-            self.index
+            index
         ].size  # public for outer classes
         frame_width = self.__imframe.master.winfo_width()
         frame_height = self.__imframe.master.winfo_height()
         self.imscale = min(frame_width / self.imwidth, frame_height / self.imheight)
         if (
             self.imwidth * self.imheight > self.__huge_size * self.__huge_size
-            and self.__images[self.index].tile[0][0] == "raw"
+            and self.__images[index].tile[0][0] == "raw"
         ):  # only raw images could be tiled
             self.__huge = True  # image is huge
-            self.__offset = self.__images[self.index].tile[0][2]  # initial tile offset
+            self.__offset = self.__images[index].tile[0][2]  # initial tile offset
             self.__tile = [
-                self.__images[self.index].tile[0][0],  # it have to be 'raw'
+                self.__images[index].tile[0][0],  # it have to be 'raw'
                 [0, 0, self.imwidth, 0],  # tile extent (a rectangle)
                 self.__offset,
-                self.__images[self.index].tile[0][3],
+                self.__images[index].tile[0][3],
             ]  # list of arguments to the decoder
         self.__min_side = min(self.imwidth, self.imheight)  # get the smaller image side
         self.__ratio = (
@@ -198,7 +201,7 @@ class CanvasImage:
         else:
             # self.frames = [ImageUtils.getPilImage(path),]
             self.frames = [
-                ImageUtils.get_cv2_pil_image(path, size=None),
+                ImageUtils.get_cv2_pil_image(path)
             ]
             self.duration = None
         self.index = 0
@@ -250,8 +253,8 @@ class CanvasImage:
             self.__images[i] = self.frames[i].copy()
             self.__images[i].size = (self.imwidth, band)  # set size of the tile band
             self.__images[i].tile = [self.__tile]  # set tile
-            cropped = self.__images[self.index].crop(
-                (0, 0, self.imwidth, band)
+            cropped = self.__images[index].crop(
+                (0, 0, self.imwidth, band), index
             )  # crop tile band
             image.paste(
                 cropped.resize((w, int(band * k) + 1), self.__filter), (0, int(i * k))
@@ -292,22 +295,23 @@ class CanvasImage:
         self.canvas.yview(*args)  # scroll vertically
         self.__show_image()  # redraw the image
 
-    def __update_pyramid(self):
+    def __update_pyramid(self, index):
         if self.__pyramid is None:
             return
-        if self.index not in self.__pyramid:
-            self.__pyramid[self.index] = (
-                [self.smaller(self.index)]
+        if index >= len(self.frames):
+            return
+        if index not in self.__pyramid:
+            self.__pyramid[index] = (
+                [self.smaller(index)]
                 if self.__huge
-                else [self.frames[self.index].copy()]
+                else [self.frames[index].copy()]
             )
-            w, h = self.__pyramid[self.index][-1].size
-            # self.update_frame_size()
+            w, h = self.__pyramid[index][-1].size
             while w > 512 and h > 512:  # top pyramid image is around 512 pixels in size
                 w /= self.__reduction  # divide on reduction degree
                 h /= self.__reduction  # divide on reduction degree
-                self.__pyramid[self.index].append(
-                    self.__pyramid[self.index][-1].resize(
+                self.__pyramid[index].append(
+                    self.__pyramid[index][-1].resize(
                         (int(w), int(h)), self.__filter
                     )
                 )
@@ -333,7 +337,8 @@ class CanvasImage:
                 )
 
     def __show_image(self):
-        self.__update_pyramid()
+        index = self.index
+        self.__update_pyramid(index)
         if self.__pyramid is None:
             return
 
@@ -383,19 +388,19 @@ class CanvasImage:
                     self.__offset + self.imwidth * int(y1 / self.imscale) * 3
                 )
 
-                self.__images[self.index].close()
-                # self.__images[self.index] = Image.open(self.path)  # reopen / reset image
-                self.__images[self.index] = self.frames[self.index].copy()
-                self.__images[self.index].size = (
+                self.__images[index].close()
+                # self.__images[index] = Image.open(self.path)  # reopen / reset image
+                self.__images[index] = self.frames[index].copy()
+                self.__images[index].size = (
                     self.imwidth,
                     h,
                 )  # set size of the tile band
-                self.__images[self.index].tile = [self.__tile]
-                image = self.__images[self.index].crop(
-                    (int(x1 / self.imscale), 0, int(x2 / self.imscale), h)
+                self.__images[index].tile = [self.__tile]
+                image = self.__images[index].crop(
+                    (int(x1 / self.imscale), 0, int(x2 / self.imscale), h), index
                 )
             else:  # show normal image
-                image = self.__pyramid[self.index][
+                image = self.__pyramid[index][
                     max(0, self.__curr_img)
                 ].crop(  # crop current img from pyramid
                     (
@@ -403,7 +408,7 @@ class CanvasImage:
                         int(y1 / self.__scale),
                         int(x2 / self.__scale),
                         int(y2 / self.__scale),
-                    )
+                    ), index
                 )
             #
             imagetk = ImageTk.PhotoImage(
@@ -503,7 +508,7 @@ class CanvasImage:
             ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
                 self.__scroll_y("scroll", 1, "unit", event=event)
 
-    def crop(self, bbox):
+    def crop(self, bbox, index):
         """Crop rectangle from the image and return it"""
         if self.__huge:  # image is huge and not totally in RAM
             band = bbox[3] - bbox[1]  # width of the tile band
@@ -511,22 +516,22 @@ class CanvasImage:
             self.__tile[2] = (
                 self.__offset + self.imwidth * bbox[1] * 3
             )  # set offset of the band
-            self.__images[self.index].close()
-            self.__images[self.index] = self.frames[self.index].copy()
-            self.__images[self.index].size = (
+            self.__images[index].close()
+            self.__images[index] = self.frames[self.index].copy()
+            self.__images[index].size = (
                 self.imwidth,
                 band,
             )  # set size of the tile band
-            self.__images[self.index].tile = [self.__tile]
-            return self.__images[self.index].crop((bbox[0], 0, bbox[2], band))
+            self.__images[index].tile = [self.__tile]
+            return self.__images[index].crop((bbox[0], 0, bbox[2], band), index)
         else:  # image is totally in RAM
-            return self.__pyramid[self.index][0].crop(bbox)
+            return self.__pyramid[index][0].crop(bbox, index)
 
     def destroy(self):
         """ImageFrame destructor"""
         for image in self.__images:
-            image[self.index].close()
-
+            image.close()
+            # image[self.index].close()
         map(lambda i: i.close, self.__pyramid)  # close all pyramid images
         for pyramid in self.__pyramid.values():
             map(lambda i: i.close, pyramid)  # close all pyramid images

@@ -1,5 +1,5 @@
 [app]
-limit = 30000
+limit = 1000
 log_level = "INFO"
 id_length = 8
 cache_dir = ".metadata_cache"

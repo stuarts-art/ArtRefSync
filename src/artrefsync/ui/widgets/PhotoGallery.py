@@ -586,7 +586,7 @@ class SimplePhotoLabel(tk.Label):
             self.image_h = self.height_var.get()
             if self.file.thumbnail:
                 self.file_name = self.file.thumbnail
-            if self.file.preview:
+            elif self.file.preview:
                 self.file_name = self.file.preview
             elif self.file.sample:
                 self.file_name = self.file.sample

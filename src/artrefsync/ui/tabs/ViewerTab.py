@@ -115,7 +115,7 @@ class ViewerTab(ttk.Frame):
             if post_file.ext == "gif":
                 if post_file.thumbnail:
                     filename = post_file.thumbnail
-                if post_file.preview:
+                elif post_file.preview:
                     filename = post_file.preview
                 elif post_file.sample:
                     filename = post_file.sample
