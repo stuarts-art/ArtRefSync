@@ -43,12 +43,14 @@ class RoundedIcon(ttk.Label):
     def __init__(
         self,
         root,
-        text,
+        text = "",
         normal_color="#FFFFFF00",
         hover_color="#595253",
         size=40,
         radius=5,
         style=None,
+        text_variable=None,
+        command = None,
         **kwargs,
     ):
         logger.info("Round Icon init for text \"%s\"", text)
@@ -86,8 +88,11 @@ class RoundedIcon(ttk.Label):
                 style = "primary.TLabel"
 
         super().__init__(
-            root, image=self.image, text=text, compound=tk.CENTER, style=style, **kwargs
+            root, image=self.image, text=text, compound=tk.CENTER, style=style, textvariable= text_variable, **kwargs
         )
+
+        if command:
+            self.bind("<Button-1>", command)
 
     def set_image(self):
         self.normal_icon = ImageTk.PhotoImage(

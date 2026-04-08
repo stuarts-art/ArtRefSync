@@ -6,7 +6,6 @@ from threading import Event
 import dacite
 import requests
 from dacite import DaciteError
-from ratelimit import limits
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.config import cache, config
@@ -109,7 +108,6 @@ class Danbooru_Client:
 
         return posts
 
-    @limits(calls=10, period=1)
     def get_tag(self, tag) -> list[Danbooru_Tag]:
         tag_dicts = self.get_tag_info(f"{tag}*")
         default_tag = None
@@ -121,7 +119,6 @@ class Danbooru_Client:
                 default_tag = dtag
         return default_tag
 
-    @limits(calls=10, period=1)
     def get_tag_info(self, tag: str):
 
         response = requests.get(
@@ -135,7 +132,6 @@ class Danbooru_Client:
 
     @cache.memoize(expire=config.cache_ttl())
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @limits(calls=10, period=1)
     def get_page(self, tag: str, page: int, last_id):
         response = requests.get(
             self._build_post_url_request(tag, page, last_id),

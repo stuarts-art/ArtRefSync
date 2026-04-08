@@ -138,7 +138,7 @@ class PostInfo(ttk.Frame):
         if file_name:
             if not os.path.exists(file_name):
                 return
-            thumbnail = ImageUtils.get_tk_thumb(file_name, (190, 190))
+            thumbnail = ImageUtils.get_cv2_pil_image(file_name, (190, 190), as_photoimage=True)
             self.thumbnail.config(image=thumbnail)
             self.thumbnail.image = thumbnail
 

@@ -4,7 +4,6 @@ import re
 
 import requests
 from bs4 import BeautifulSoup
-from ratelimit import limits
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.config import cache, config
@@ -77,7 +76,6 @@ class R34_Client:
 
     @cache.memoize(expire=config.cache_ttl())
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @limits(calls=5, period=1)
     def get_page(self, tag, page, last_id=None):
         response = requests.get(
             self._build_url_request(tag, page, last_id), timeout=2.0

@@ -159,21 +159,32 @@ class ImageUtils:
         return (width, height)
 
     @staticmethod
+    def cv_array_to_image(cv_image):
+        cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(cv_image_rgb)
+
+    @staticmethod
     @functools.lru_cache(maxsize=50)
     def cv2_image_open(file) -> cv2.typing.MatLike:
         cv_image = cv2.imread(file)
         return cv_image
 
     @staticmethod
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def get_cv2_thumb(file: str, size, as_photoimage = False):
+    @functools.lru_cache(maxsize=50)
+    def get_cv2_rgb_array(file, size) -> cv2.typing.MatLike:
         cv_image = ImageUtils.cv2_image_open(file)
         if size:
             h, w = cv_image.shape[:2]
             thumb_size = ImageUtils.get_cv_thumb_size((w,h), size)
             cv_image = cv2.resize(cv_image, thumb_size, interpolation= cv2.INTER_AREA)
         cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-        img = Image.fromarray(cv_image_rgb)
+        return cv_image_rgb
+
+    @staticmethod
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
+    def get_cv2_pil_image(file: str, size=(1440,1440), as_photoimage = False):
+        image_array = ImageUtils.get_cv2_rgb_array(file, size)
+        img = Image.fromarray(image_array)
         if as_photoimage:
             return ImageTk.PhotoImage(img)
         else:

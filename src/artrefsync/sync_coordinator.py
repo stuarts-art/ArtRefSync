@@ -146,7 +146,7 @@ class SyncCoordinator:
         self.board_tag_counts = defaultdict(int)
         self.cache = LinkCache()
         self.download_count = 0
-        self.max_download_threads = config[TABLE.APP][APP.MAX_DOWNLOAD_THREADS]
+        self.max_download_threads = int(config[TABLE.APP][APP.MAX_DOWNLOAD_THREADS])
 
     def sync(self):
         ebinder.event_generate(
@@ -212,12 +212,22 @@ class SyncCoordinator:
         return updated_posts
 
     def get_missing_ids(self, artist: str):
+        missing_ids = []
         storeposts = self.store_handler.get_posts(self.board, artist)
         with PostDb() as post_db:
             post_ids = post_db.posts.select_id_list(
                 [("artist_name", artist), ("board", self.board)]
             )
-            missing_ids = [post_id for post_id in post_ids if post_id not in storeposts]
+
+            post_file_ids = set(post_db.files.select_id_list(
+                [("artist_name", artist), ("board", self.board)]
+            ))
+            for pid in post_ids:
+                if pid not in storeposts or pid not in post_file_ids:
+                    missing_ids.append(pid)
+                else:
+                    if not storeposts[pid].thumbnail or not storeposts[pid].sample:
+                        missing_ids.append(pid)
             return missing_ids
 
     def download_missing_ids(self, artist):
@@ -237,15 +247,15 @@ class SyncCoordinator:
 
         # thread_caller = TkThreadCaller()
         with ThreadPoolExecutor(max_workers=self.max_download_threads) as executor:
-            future_to_pid = {
-                executor.submit(
+            future_to_pid = {}
+            for post in missing_posts:
+                future = executor.submit(
                     self.store_handler.save_post,
                     post=post,
                     link_cache=self.cache,
                     event=self.stop_event,
-                ): post.id
-                for post in missing_posts
-            }
+                )
+                future_to_pid[future] = post.id
             ebinder.event_generate(
                 BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
             )
@@ -259,9 +269,11 @@ class SyncCoordinator:
                         return
                     if isinstance(result, PostFile):
                         success_list.append(result)
-                except Exception:
+                except Exception as e:
+                    logger.error(e)
+                    
                     failure_list.append(future_to_pid[future])
-                    continue
+                    # continue
             if failure_list:
                 logger.error("The following IDs failed to load. %s", failure_list)
 

@@ -1,5 +1,4 @@
 import tempfile
-from ratelimit import limits
 import requests
 from artrefsync.config import config
 import logging
@@ -34,7 +33,6 @@ class LinkCache:
         return self.store_count[store]
 
     @staticmethod
-    @limits(calls=20, period=1)
     def download_link_to_file(link, file):
         site_response = requests.get(link, stream=True)
         site_response.raise_for_status()

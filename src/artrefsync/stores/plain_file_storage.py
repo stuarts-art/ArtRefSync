@@ -249,13 +249,8 @@ class PlainLocalStorage(ImageStoreHandler):
                 "Skipping downloading %s for %s. Already exists.", dir.value, pid
             )
             return file_path
-
-        try:
-            temp_thumbnail = link_cache.get_file_from_link(link)
-            shutil.copy2(temp_thumbnail, file_path)
-        except Exception:
-            return ""
-
+        temp_thumbnail = link_cache.get_file_from_link(link)
+        shutil.copy2(temp_thumbnail, file_path)
         self.folder_id_file_map[file_dir][post.id] = file_path
         return file_path
 

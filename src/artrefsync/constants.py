@@ -46,7 +46,12 @@ class BINDING(StrEnum):
     ON_FILTER_UPDATE = auto()
     ON_SORT_BY_UPDATE = auto()
     ON_POST_COUNT = auto()
+    ON_ZOOM_DELTA = auto()
+
     ON_TEXT_ESCAPE = auto()
+    ON_TEXT_Z = auto()
+    ON_TEXT_X = auto()
+    ON_TEXT_C = auto()
 
 
 class DB(StrEnum):

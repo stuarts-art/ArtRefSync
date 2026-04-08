@@ -7,7 +7,6 @@ from threading import Event
 import requests
 from dacite import DaciteError
 
-from ratelimit import limits
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.e621_model import E621_Post
@@ -84,7 +83,6 @@ class E621_Client:
 
     @cache.memoize(expire=config.cache_ttl())
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @limits(calls=2, period=1)
     def get_page(self, tags, page, last_id=None):
 
         logger.debug("CACHE MISS")

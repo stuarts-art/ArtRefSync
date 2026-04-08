@@ -138,15 +138,17 @@ class SimpleFrames:
         self.focussing_next = False
         ebinder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         ebinder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
-        self.text.bind("q", lambda _: self.change_zoom(-100))
-        self.text.bind("e", lambda _: self.change_zoom(+100))
+        ebinder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
+        self.text.bind("q", lambda _: ebinder.event_generate(BINDING.ON_ZOOM_DELTA, -100))
+        self.text.bind("e", lambda _: ebinder.event_generate(BINDING.ON_ZOOM_DELTA, +100))
         self.text.bind("w", self.focus_prev_row)
         self.text.bind("a", self.throttled_focus_prev)
         self.text.bind("s", self.throttled_focus_next)
         self.text.bind("d", self.focus_next)
-        self.text.bind(
-            "<Escape>", lambda _: ebinder.event_generate(BINDING.ON_TEXT_ESCAPE)
-        )
+        self.text.bind("<Escape>", lambda _: ebinder.event_generate(BINDING.ON_TEXT_ESCAPE))
+        self.text.bind("z", lambda _: ebinder.event_generate(BINDING.ON_TEXT_Z))
+        self.text.bind("x", lambda _: ebinder.event_generate(BINDING.ON_TEXT_X))
+        self.text.bind("c", lambda _: ebinder.event_generate(BINDING.ON_TEXT_C))
         self.text.bind(
             "<space>",
             lambda e: ebinder.event_generate(
@@ -597,7 +599,7 @@ class SimplePhotoLabel(tk.Label):
                 self.file_name = self.file.file
 
             thread_caller.add(
-                ImageUtils.get_cv2_thumb,
+                ImageUtils.get_cv2_pil_image,
                 self.set_image,
                 self.get_image_cancel_key,
                 self.file_name,
