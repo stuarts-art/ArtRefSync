@@ -27,7 +27,7 @@ jobs:
     - name: Install package
       run: uv pip install .
     - name: Build executable
-      run: uv run pyinstaller --collect-all ttkbootstrap --name ArtRefSync  main.py
+      run: uv run pyinstaller --collect-all ttkbootstrap --hidden-import artrefsync --name ArtRefSync  main.py
     - name: Store the distribution packages
       uses: actions/upload-artifact@v6
       with:
