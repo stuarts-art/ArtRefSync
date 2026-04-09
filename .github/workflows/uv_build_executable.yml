@@ -21,7 +21,7 @@ jobs:
       with:
         enable-cache: true
     - name: Sync Dependencies
-      run: uv sync --locked --all-extras
+      run: uv sync --all-extras
     - name: Install package
       run: uv pip install .
     - name: Build executable
