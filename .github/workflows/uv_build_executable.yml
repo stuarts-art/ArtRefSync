@@ -1,4 +1,4 @@
-name: Build project and create release
+name: UV sync and create executable
 
 on: [push, pull_request]
 
@@ -21,7 +21,9 @@ jobs:
       with:
         enable-cache: true
     - name: Sync Dependencies
-      run: uv sync --all-extras
+      run: uv lock
+    - name: Sync Dependencies
+      run: uv sync --locked --all-extras --dev
     - name: Install package
       run: uv pip install .
     - name: Build executable
