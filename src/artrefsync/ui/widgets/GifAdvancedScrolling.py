@@ -254,7 +254,7 @@ class CanvasImage:
             self.__images[i].size = (self.imwidth, band)  # set size of the tile band
             self.__images[i].tile = [self.__tile]  # set tile
             cropped = self.__images[index].crop(
-                (0, 0, self.imwidth, band), index
+                (0, 0, self.imwidth, band)
             )  # crop tile band
             image.paste(
                 cropped.resize((w, int(band * k) + 1), self.__filter), (0, int(i * k))
@@ -397,7 +397,7 @@ class CanvasImage:
                 )  # set size of the tile band
                 self.__images[index].tile = [self.__tile]
                 image = self.__images[index].crop(
-                    (int(x1 / self.imscale), 0, int(x2 / self.imscale), h), index
+                    (int(x1 / self.imscale), 0, int(x2 / self.imscale), h)
                 )
             else:  # show normal image
                 image = self.__pyramid[index][
@@ -408,7 +408,8 @@ class CanvasImage:
                         int(y1 / self.__scale),
                         int(x2 / self.__scale),
                         int(y2 / self.__scale),
-                    ), index
+                    # ), index
+                    )
                 )
             #
             imagetk = ImageTk.PhotoImage(
@@ -523,9 +524,9 @@ class CanvasImage:
                 band,
             )  # set size of the tile band
             self.__images[index].tile = [self.__tile]
-            return self.__images[index].crop((bbox[0], 0, bbox[2], band), index)
+            return self.__images[index].crop((bbox[0], 0, bbox[2], band))
         else:  # image is totally in RAM
-            return self.__pyramid[index][0].crop(bbox, index)
+            return self.__pyramid[index][0].crop(bbox)
 
     def destroy(self):
         """ImageFrame destructor"""

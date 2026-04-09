@@ -1,0 +1,36 @@
+name: Build project and create release
+
+on: [push, pull_request]
+
+env:
+  UV_SYSTEM_PYTHON: 1
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v6
+    - name: "Set up Python"
+      uses: actions/setup-python@v6
+      with:
+        python-version-file: "pyproject.toml"
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+    - name: Sync Dependencies
+      run: uv sync --locked --all-extras
+    - name: Install package
+      run: uv pip install .
+    - name: Build executable
+      run: uv run pyinstaller --collect-all ttkbootstrap --name ArtRefSync  main.py
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v6
+      with:
+        name: python-package-distributions
+        path: dist/
+
+
+
