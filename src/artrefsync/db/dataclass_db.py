@@ -285,6 +285,7 @@ class Dataclass_DB(Generic[T]):
         else:
             cur.execute(query)
         items = cur.fetchall()
+        self.logger.debug("%d items returned for conditions: %s", len(items), conditions)
         return [row[0] for row in items]
 
     def update(self, item_id: str, item: T, item_fields: list[str] = None):

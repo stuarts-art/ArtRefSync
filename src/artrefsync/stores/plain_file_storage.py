@@ -33,31 +33,34 @@ def main():
 class PlainLocalStorage(ImageStoreHandler):
     def __init__(self):
         logger.info("Plain File Store Handler Init Start")
-        self.artists_base_dir = Path(config[TABLE.LOCAL][LOCAL.ARTIST_DIR])
+        self.artist_base_folder = Path.cwd() / f"{config[TABLE.LOCAL][LOCAL.ARTIST_DIR]}"
+        print(self.artist_base_folder.absolute())
         self.dir_base_map = {}
         self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = str_dict(str_dict)
+        self.dir_board_folder_map = str_dict(str_dict)
         self.update_map: dict = {}
         self.folder_id_file_map: dict = defaultdict(dict)
-        self.dir_base_map[DIRS.FILE] = self.artists_base_dir
+        self.dir_base_map[DIRS.FILE] = self.artist_base_folder
         self._artist_name_map = {}
         self._ignore_list = ["(", ")", "[", "]", ",", ";", "<", ">", "="]
 
         for dir in DIRS:
             if dir is not DIRS.FILE:
-                self.dir_base_map[dir] = os.path.join(self.dir_base_map[DIRS.FILE], dir)
-            base_path = self.dir_base_map[dir]
-            os.makedirs(base_path, exist_ok=True)
+                self.dir_base_map[dir] = self.artist_base_folder / dir.value
+            dir_path = self.dir_base_map[dir]
+            os.makedirs(dir_path, exist_ok=True)
             for board in BOARD:
-                board_path = Path(os.path.join(base_path, board.value))
+                board_path =  dir_path / board.value
                 os.makedirs(board_path, exist_ok=True)
                 self._dir_map[dir][board] = {}
-                self._dir_map[dir][board][board] = board_path
+                # self._dir_map[dir][board][board] = board_path
+                self.dir_board_folder_map[dir][board] = board_path
 
                 for artist_path in board_path.iterdir():
                     if artist_path.is_file():
                         continue
                     update_time = os.path.getmtime(artist_path)
-                    artisttxt = os.path.join(artist_path, "artist.txt")
+                    artisttxt = artist_path /  "artist.txt"
                     if os.path.exists(artisttxt):
                         with open(artisttxt, 'rt') as f:
                             artist = f.readline()
@@ -76,7 +79,7 @@ class PlainLocalStorage(ImageStoreHandler):
 
 
     def get_artist_posts(self, dir, board, artist) -> dict[str, str]:
-        artist_dir = self.get_artist_dir(dir, board, artist)
+        artist_dir:Path = self.get_dir_board_artist_folder(dir, board, artist)
         update_time = os.path.getmtime(artist_dir)
         last_updated = (
             self.update_map[artist_dir] if artist_dir in self.update_map else None
@@ -86,7 +89,8 @@ class PlainLocalStorage(ImageStoreHandler):
             if update_time == last_updated:
                 return self.folder_id_file_map[artist_dir]
 
-        for file in Path.iterdir(artist_dir):
+        for file in artist_dir.resolve().iterdir():
+        # for file in artist_dir.iterdir():
             pid = file.name.rsplit(".", maxsplit=1)[0].split("-")[0]
             if not pid or pid == "artist":
                 continue
@@ -94,17 +98,35 @@ class PlainLocalStorage(ImageStoreHandler):
         self.update_map[artist_dir] = update_time
         return self.folder_id_file_map[artist_dir]
 
-    def get_artist_dir(self, dir: DIRS, board: BOARD, artist):
+    def get_dir_board_folder(self, dir:DIRS, board:BOARD):
+
+        if dir not in self.dir_base_map:
+            if dir is DIRS.FILE:
+                dir_folder = self.artist_base_folder
+            else:
+                dir_folder = self.artist_base_folder / dir
+            os.makedirs(dir_folder, exist_ok=True)
+            self.dir_base_map[dir] = dir_folder
+        if board not in self.dir_board_folder_map[dir]:
+            board_folder = self.dir_base_map[dir] / board
+            os.makedirs(board_folder, exist_ok=True)
+            self.dir_board_folder_map[dir][board] = board_folder
+
+        return self.dir_board_folder_map[dir][board]
+    
+
+    def get_dir_board_artist_folder(self, dir: DIRS, board: BOARD, artist):
         if artist not in self._dir_map[dir][board]:
+            dir_board_folder = self.get_dir_board_folder(dir, board)
             mapped_name = self.get_mapped_artist_name(artist)
-            artist_dir = os.path.join(self._dir_map[dir][board][board], mapped_name)
-            artist_dir = PureWindowsPath(artist_dir).as_posix()
+            artist_dir = dir_board_folder / mapped_name
             os.makedirs(artist_dir, exist_ok=True)
             if mapped_name != artist:
-                artist_txt = os.path.join(artist_dir, "artist.txt")
+                artist_txt = artist_dir / "artist.txt"
+                # artist_txt = os.path.join(artist_dir, "artist.txt")
                 with open(artist_txt, 'w+t') as f:
                     f.write(artist)
-            self._dir_map[dir][board][artist] = Path(artist_dir)
+            self._dir_map[dir][board][artist] = artist_dir
         return self._dir_map[dir][board][artist]
     
     def get_mapped_artist_name(self, artist_name: str):
@@ -119,21 +141,18 @@ class PlainLocalStorage(ImageStoreHandler):
     def get_store(self) -> STORE:
         return STORE.LOCAL
 
-    def get_board_artist_folder(self, board: BOARD, artist: str):
-        artist_folder = os.path.join(self.artists_folder, board, artist)
-        os.makedirs(artist_folder, exist_ok=True)
-        return artist_folder
 
     def create_board_and_artist_folders(self, board: BOARD, artists: Iterable[str]):
         logger.debug("Creating Board for %s, and artists: %s", board, artists)
         for artist in artists:
             for dir in DIRS:
-                self.get_artist_dir(dir, board, artist)
+                self.get_dir_board_artist_folder(dir, board, artist)
 
     def get_posts(self, board: BOARD, artist: str) -> list[PostFile]:
         """
         Returns a partial PostFile Object. Remaining metadata should be added using a Post object.
         """
+        logger.info("Getting posts for %s, %s", board, artist)
         files: dict[str, Path] = self.get_artist_posts(DIRS.FILE, board, artist)
         previews = self.get_artist_posts(DIRS.PREVIEW, board, artist)
         samples = self.get_artist_posts(DIRS.SAMPLE, board, artist)
@@ -158,6 +177,7 @@ class PlainLocalStorage(ImageStoreHandler):
                 thumbnail=str(thumbnail),
             )
             post_files[pid] = post_file
+        logger.info("Returning %d posts for %s, %s", len(post_files), board, artist)
         return post_files
 
 
@@ -166,7 +186,7 @@ class PlainLocalStorage(ImageStoreHandler):
         thumb_width = float(config[TABLE.APP][APP.THUMBNAIL_WIDTH])
         thumb_height = float(config[TABLE.APP][APP.THUMBNAIL_HEIGHT])
         posts = self.get_posts(board, artist)
-        thumb_dir = self.get_artist_dir(DIRS.THUMBNAIL, board, artist)
+        thumb_dir = self.get_dir_board_artist_folder(DIRS.THUMBNAIL, board, artist)
         for pid, post in posts.items():
             thumbnail_flag = False
             if post.thumbnail == "":
@@ -182,7 +202,7 @@ class PlainLocalStorage(ImageStoreHandler):
                 continue
 
             file_name = f"{post.id}-thumbnail.{post.ext}"
-            file_path = os.path.join(thumb_dir, file_name)
+            file_path = thumb_dir /  file_name
             logger.debug("Creating thumbnail for %s. path name: %s", pid, file_path)
 
             if post.ext == "mp4" or post.ext == "webm":
@@ -200,7 +220,7 @@ class PlainLocalStorage(ImageStoreHandler):
             return
         saved_posts = {}
         for dir in DIRS:
-            saved_posts[dir] = self.save_link(post, link_cache, dir)
+            saved_posts[dir] = str(self.save_link(post, link_cache, dir))
 
         post_file = PostFile(
             id=post.id,
@@ -237,12 +257,12 @@ class PlainLocalStorage(ImageStoreHandler):
             logger.debug("Skipping downloading %s for %s. No link.", dir.value, pid)
             return ""
 
-        file_dir = self.get_artist_dir(
+        file_dir = self.get_dir_board_artist_folder(
             dir=dir, board=post.board, artist=post.artist_name
         )
         link_ext = link.split(".")[-1]
         file_name = f"{pid}{suffix}.{link_ext}"
-        file_path = os.path.join(file_dir, file_name)
+        file_path = file_dir /  file_name
 
         if os.path.exists(file_path):
             logger.debug(

@@ -42,6 +42,7 @@ class EagleHandler(ImageStoreHandler):
         self.board_artist_id_map = str_dict(dict)
         self.id_artist_map = {}
         self.library_path_dict = {}
+        self.pid_map = {}
         self.switch_libary(self.library)
         self.get_artists_folder()
         logger.debug("%s \n%s", "Board Artist dict:", self.board_artist_id_map)
@@ -101,6 +102,7 @@ class EagleHandler(ImageStoreHandler):
             store=self.get_store(),
             board=None,
             preview=thumbnail,
+            sample=thumbnail,
             thumbnail=thumbnail,
             height=height,
             width=width,
@@ -133,6 +135,7 @@ class EagleHandler(ImageStoreHandler):
             post_file = self.eagle_item_to_postfile(item)
             if post_file:
                 post_files[post_file.id] = post_file
+                self.pid_map[post_file.id] = post_file.ext_id
         logger.debug(f"Eagle Items for {board}, {artist} - {len(post_files)}")
         return post_files
 
@@ -141,6 +144,12 @@ class EagleHandler(ImageStoreHandler):
     ) -> str | None:
         if event and event.is_set():
             return
+        artist = post.artist_name
+        board = post.board
+        pid = post.id
+        if pid in self.pid_map:
+            return None
+
         if link_cache:
             # loading(link_cache.increment_store_count(self.get_store())/link_cache.get_store_missing(self.get_store()))
             eagle_id = self.post_add_from_path(

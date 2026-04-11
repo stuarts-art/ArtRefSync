@@ -3,7 +3,7 @@ name = "artrefsync"
 version = "0.1.0"
 description = "Tool to sync reference images from major image board sites given a list of artist names "
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13.0, <3.14"
 dependencies = [
     "beautifulsoup4>=4.14.2",
     "dacite>=1.9.2",

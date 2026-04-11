@@ -1,10 +1,13 @@
 import concurrent
-from concurrent.futures import ThreadPoolExecutor
 import logging
 from asyncio import Event
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
-
+from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile
+from artrefsync.boards.danbooru_handler import Danbooru_Handler
+from artrefsync.boards.e621_handler import E621Handler
+from artrefsync.boards.rule34_handler import R34Handler
 from artrefsync.config import config
 from artrefsync.constants import (
     APP,
@@ -17,10 +20,6 @@ from artrefsync.constants import (
     R34,
     TABLE,
 )
-from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile 
-from artrefsync.boards.danbooru_handler import Danbooru_Handler
-from artrefsync.boards.e621_handler import  E621Handler
-from artrefsync.boards.rule34_handler import R34Handler
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.eagle_storage import EagleHandler
 from artrefsync.stores.link_cache import LinkCache
@@ -109,6 +108,7 @@ def sync_from_store(event: Event):
                     artist,
                     len(updated),
                 )
+            sync_coordinator.update_board_tag_count(board, handler.artist_list)
 
     except Exception as e:
         logger.warning(e)
@@ -159,7 +159,6 @@ class SyncCoordinator:
             self.sync_artist(artist)
 
         with PostDb() as post_db:
-
             ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
             post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_counts)
             for tag, posts in self.tag_post_dict.items():
@@ -214,21 +213,52 @@ class SyncCoordinator:
     def get_missing_ids(self, artist: str):
         missing_ids = []
         storeposts = self.store_handler.get_posts(self.board, artist)
+        logger.info("%d store posts for %s", len(storeposts), artist)
         with PostDb() as post_db:
             post_ids = post_db.posts.select_id_list(
                 [("artist_name", artist), ("board", self.board)]
             )
 
-            post_file_ids = set(post_db.files.select_id_list(
-                [("artist_name", artist), ("board", self.board)]
-            ))
             for pid in post_ids:
-                if pid not in storeposts or pid not in post_file_ids:
+                if pid not in storeposts:
+                    # if pid not in storeposts or pid not in post_file_ids:
                     missing_ids.append(pid)
                 else:
                     if not storeposts[pid].thumbnail or not storeposts[pid].sample:
                         missing_ids.append(pid)
             return missing_ids
+
+    def update_board_tag_count(self, board, artists):
+        board_tags_count = defaultdict(int)
+
+        with PostDb() as post_db:
+            for artist in artists:
+                artist_tags_count = self.update_artist_tag_tables(board, artist)
+                if artist_tags_count:
+                    for tag, count in artist_tags_count.items:
+                        board_tags_count[tag] += count
+            post_db.artist_tags.dumps_blob(str(board), board_tags_count)
+
+    def update_artist_tag_tables(self, board, artist):
+        board = str(board)
+        artist_tag_counts = defaultdict(set)
+        tag_posts = defaultdict(set)
+        with PostDb() as post_db:
+            posts = post_db.posts.select(
+                conditions=[("artist_name", artist), ("board", board)],
+                select_fields=["id", "tags", "ext"],
+            )
+            for post in posts:
+                pid = post["id"]
+                ext = post["ext"]
+                tags = set(post["tags"] + [board, artist, ext])
+
+                for tag in tags:
+                    artist_tag_counts[tag] += 1
+                    tag_posts[tag].add(pid)
+            for tag, posts in tag_posts.items():
+                post_db.tag_posts.union_update(tag, posts)
+        return artist_tag_counts
 
     def download_missing_ids(self, artist):
         ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Downloading missing")
@@ -242,7 +272,7 @@ class SyncCoordinator:
             missing_posts = [post_db.posts[id] for id in missing_ids]
         if not missing_posts:
             return
-        
+
         logger.info("Downloading %d missing posts for %s", len(missing_posts), artist)
 
         # thread_caller = TkThreadCaller()
@@ -271,7 +301,7 @@ class SyncCoordinator:
                         success_list.append(result)
                 except Exception as e:
                     logger.error(e)
-                    
+
                     failure_list.append(future_to_pid[future])
                     # continue
             if failure_list:
@@ -292,11 +322,12 @@ class SyncCoordinator:
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(
             self.board, artist
         )
-        logger.debug("store_posts recieved with %s records.", len(store_posts))
+        logger.info("store_posts recieved with %s records.", len(store_posts))
         inserted_list = []
+
         with PostDb() as post_db:
             metadata_ids = post_db.posts.select_id_list(
-                [("board", self.board), ("artist_name", artist)]
+                [("board", str(self.board)), ("artist_name", artist)]
             )
             for pid, store_post in store_posts.items():
                 if pid not in metadata_ids:

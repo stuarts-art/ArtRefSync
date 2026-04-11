@@ -45,7 +45,7 @@ class E621_Post:
     uploader_name: str
 
     @staticmethod
-    def parse_e621_post(post_dict) -> E621_Post:
+    def parse_e621_post(post_dict) -> "E621_Post":
         return dacite.from_dict(E621_Post, post_dict, config=config)
 
 

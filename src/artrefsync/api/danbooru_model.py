@@ -43,7 +43,7 @@ class Danbooru_Post:
     preview_file_url: str
 
     @staticmethod
-    def parse_danbooru_post(post_dict) -> Danbooru_Post:
+    def parse_danbooru_post(post_dict) -> "Danbooru_Post":
         post = dacite.from_dict(Danbooru_Post, post_dict, config=config)
         return post
 

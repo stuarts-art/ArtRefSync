@@ -33,6 +33,6 @@ class R34_Post:
     preview_height: int | None
 
     @staticmethod
-    def parse_r34_post(post_dict) -> R34_Post:
+    def parse_r34_post(post_dict) -> "R34_Post":
         post = dacite.from_dict(R34_Post, post_dict, config=config)
         return post

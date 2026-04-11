@@ -167,9 +167,13 @@ class ConfigTab(ttk.Frame):
             self.start_store_sync_button.configure(
                 state="active", text="Cancel Sync", bootstyle="warning"
             )
-            self.thread_caller.add(
-                sync_from_store, self.finish_store_sync, __name__, self.store_sync_event
-            )
+            if config.log_level == "DEBUG":
+                    sync_from_store(self.sync_event) 
+                    self.finish_store_sync()
+            else:
+                self.thread_caller.add(
+                    sync_from_store, self.finish_store_sync, __name__, self.store_sync_event
+                )
         else:
             self.start_store_sync_button.configure(state="disabled")
             self.store_sync_event.set()
@@ -187,9 +191,13 @@ class ConfigTab(ttk.Frame):
         if not self.sync_running:
             self.sync_running = True
             self.start_sync_button.configure(state="active", text="Cancel Sync")
-            self.thread_caller.add(
-                sync_config, self.finish_sync, __name__, self.sync_event
-            )
+            if config.log_level == "DEBUG":
+                    sync_config(self.sync_event)
+                    self.finish_sync()
+            else:
+                self.thread_caller.add(
+                    sync_config, self.finish_sync, __name__, self.sync_event
+                )
         else:
             self.start_sync_button.configure(state="disabled")
             self.sync_event.set()

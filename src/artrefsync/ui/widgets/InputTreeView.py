@@ -75,7 +75,9 @@ class InputTreeviewFrame(ttk.Frame):
 
     def on_return(self, event):
         if self.focus_get() == self.entry:
-            self.tree.add(self.entry.get())
+            value = self.entry.get()
+            value = value.strip()
+            self.tree.add(value)
         logger.info(event)
 
     def on_tree_lclick(self, event):
