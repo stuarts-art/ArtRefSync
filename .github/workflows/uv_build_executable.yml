@@ -26,6 +26,8 @@ jobs:
       run: uv sync
     - name: Install package
       run: uv pip install .
+    - name: source uv
+      run: .\.venv\Scripts\activate.ps1
     - name: Build executable
       run: uv run pyinstaller --collect-all ttkbootstrap --name ArtRefSync  main.py
     - name: Store the distribution packages
