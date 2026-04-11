@@ -150,8 +150,12 @@ class CanvasImage:
             return
         if self.duration is None:
             return
-        self.index += 1
-        self.index %= len(self.frames)
+
+        if self.index >= len(self.frames):
+            self.index = 0
+        else:
+            self.index += 1
+            self.index %= len(self.frames)
 
         if self.index in self.__pyramid:
             self.next_job = self.__imframe.after(self.duration, self.next, path)

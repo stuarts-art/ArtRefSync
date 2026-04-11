@@ -29,7 +29,8 @@ jobs:
     - name: source uv
       run: .\.venv\Scripts\activate.ps1
     - name: Build executable
-      run: uv run pyinstaller --collect-all ttkbootstrap --name ArtRefSync  main.py
+      # run: uv run pyinstaller --collect-all ttkbootstrap --name ArtRefSync  main.py
+      run: uv run pyinstaller main.spec
     - name: Store the distribution packages
       uses: actions/upload-artifact@v6
       with:

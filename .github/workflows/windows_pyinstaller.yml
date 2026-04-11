@@ -21,7 +21,8 @@ jobs:
     - name: Install dependencies before testing
       run: python3 -m pip install . --user
     - name: Run pyinstaller
-      run: pyinstaller main.py --collect-all ttkbootstrap --name ArtRefSync
+      # run: pyinstaller main.py --collect-all ttkbootstrap --name ArtRefSync
+      run: pyinstaller main.spec
     - name: Store the distribution packages
       uses: actions/upload-artifact@v6
       with:
