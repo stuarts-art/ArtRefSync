@@ -1,7 +1,7 @@
 [project]
 name = "artrefsync"
-version = "0.1.0"
-description = "Tool to sync reference images from major image board sites given a list of artist names "
+version = "1.0.0"
+description = "Tool to sync reference images from major image board sites given a list of artist names."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
