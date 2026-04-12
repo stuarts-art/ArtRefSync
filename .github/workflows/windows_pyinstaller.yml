@@ -1,6 +1,6 @@
 name: Package exe and publish to store
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   build:
@@ -21,10 +21,18 @@ jobs:
     - name: Install dependencies before testing
       run: python3 -m pip install . --user
     - name: Run pyinstaller
-      # run: pyinstaller main.py --collect-all ttkbootstrap --name ArtRefSync
       run: pyinstaller main.spec
     - name: Store the distribution packages
       uses: actions/upload-artifact@v6
       with:
         name: python-package-distributions
         path: dist/
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: github.ref_type == 'tag'
+      with:
+        working_directory: dist
+        files: |
+          LICENSE
+          dist/ArtRefSync/*
+          dist/ArtRefSync/**/*
