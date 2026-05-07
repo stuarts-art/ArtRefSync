@@ -12,6 +12,7 @@ from tkinter import ttk
 
 from PIL import Image, ImageTk
 
+
 from artrefsync.config import config
 from artrefsync.utils.image_utils import ImageUtils
 
@@ -22,12 +23,12 @@ logger.setLevel(config.log_level)
 class AutoScrollbar(ttk.Scrollbar):
     """A scrollbar that hides itself if it's not needed. Works only for grid geometry manager"""
 
-    def set(self, lo, hi):
-        if float(lo) <= 0.0 and float(hi) >= 1.0:
+    def set(self, first, last):
+        if float(first) <= 0.0 and float(last) >= 1.0:
             self.grid_remove()
         else:
             self.grid()
-            ttk.Scrollbar.set(self, lo, hi)
+            ttk.Scrollbar.set(self, first, last)
 
     def pack(self, **kw):
         raise tk.TclError("Cannot use pack with the widget " + self.__class__.__name__)
@@ -88,7 +89,7 @@ class CanvasImage:
         self.imscale = 1.0  # scale for the canvas image zoom, public for outer classes
         self.__delta = 1.3  # zoom magnitude
         self.__filter = (
-            Image.LANCZOS
+            Image.Resampling.LANCZOS
         )  # could be: NEAREST, BILINEAR, BICUBIC and ANTIALIAS
         self.__previous_state = 0  # previous state of the keyboard
         # Create ImageFrame in placeholder widget
@@ -167,7 +168,7 @@ class CanvasImage:
                 self.next_job = self.__imframe.after(self.duration, self.next, path)
 
     def update_frame_size(self):
-        index  = 0
+        index = 0
         self.imwidth, self.imheight = self.__images[
             index
         ].size  # public for outer classes
@@ -192,7 +193,9 @@ class CanvasImage:
         )
 
     # Moved out of init to allow for hotswapping images
-    def set_image(self, path: str):
+    def set_image(self, path: str | None):
+        if path is None:
+            return
         if self.path == path:
             self.__show_image()
             self.toggle_pause(toggle_on=True)
@@ -204,9 +207,7 @@ class CanvasImage:
             self.frames, self.duration = ImageUtils.getPilFrames(path)
         else:
             # self.frames = [ImageUtils.getPilImage(path),]
-            self.frames = [
-                ImageUtils.get_cv2_pil_image(path)
-            ]
+            self.frames = [ImageUtils.get_cv2_pil_image(path)]
             self.duration = None
         self.index = 0
         self.path = path  # path to the image, should be public for outer classes
@@ -306,18 +307,14 @@ class CanvasImage:
             return
         if index not in self.__pyramid:
             self.__pyramid[index] = (
-                [self.smaller(index)]
-                if self.__huge
-                else [self.frames[index].copy()]
+                [self.smaller(index)] if self.__huge else [self.frames[index].copy()]
             )
             w, h = self.__pyramid[index][-1].size
             while w > 512 and h > 512:  # top pyramid image is around 512 pixels in size
                 w /= self.__reduction  # divide on reduction degree
                 h /= self.__reduction  # divide on reduction degree
                 self.__pyramid[index].append(
-                    self.__pyramid[index][-1].resize(
-                        (int(w), int(h)), self.__filter
-                    )
+                    self.__pyramid[index][-1].resize((int(w), int(h)), self.__filter)
                 )
             if not self.container:
                 self.container = self.canvas.create_rectangle(
@@ -412,7 +409,7 @@ class CanvasImage:
                         int(y1 / self.__scale),
                         int(x2 / self.__scale),
                         int(y2 / self.__scale),
-                    # ), index
+                        # ), index
                     )
                 )
             #

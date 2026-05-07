@@ -146,13 +146,13 @@ class ImageUtils:
     @functools.lru_cache
     def get_cv_thumb_size(img_size, size):
         img_w, img_h = img_size
-        w, h = size 
+        w, h = size
         ratio = img_w / img_h
         vh = int(w / ratio)
         vw = int(h * ratio)
         if h < vh:
             width = vw
-            height= h
+            height = h
         else:
             width = w
             height = vh
@@ -165,7 +165,7 @@ class ImageUtils:
 
     @staticmethod
     @functools.lru_cache(maxsize=50)
-    def cv2_image_open(file) -> cv2.typing.MatLike:
+    def cv2_image_open(file) -> cv2.typing.MatLike | None:
         cv_image = cv2.imread(file)
         return cv_image
 
@@ -173,16 +173,21 @@ class ImageUtils:
     @functools.lru_cache(maxsize=50)
     def get_cv2_rgb_array(file, size) -> cv2.typing.MatLike:
         cv_image = ImageUtils.cv2_image_open(file)
+        if cv_image is None:
+            error_message = "Failed to open image " + file
+            logger.error(error_message)
+            raise AttributeError
         if size:
             h, w = cv_image.shape[:2]
-            thumb_size = ImageUtils.get_cv_thumb_size((w,h), size)
-            cv_image = cv2.resize(cv_image, thumb_size, interpolation= cv2.INTER_AREA)
+            thumb_size = ImageUtils.get_cv_thumb_size((w, h), size)
+            cv_image = cv2.resize(cv_image, thumb_size, interpolation=cv2.INTER_AREA)
         cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         return cv_image_rgb
 
     @staticmethod
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def get_cv2_pil_image(file: str, size=(1440,1440), as_photoimage = False):
+    def get_cv2_pil_image(
+        file: str, size=(1440, 1440), as_photoimage=False
+    ) -> Image.Image | ImageTk.PhotoImage:
         image_array = ImageUtils.get_cv2_rgb_array(file, size)
         img = Image.fromarray(image_array)
         if as_photoimage:
@@ -190,3 +195,80 @@ class ImageUtils:
         else:
             return img
 
+    @staticmethod
+    def get_cv2_frame(file, size=(1080, 1080)):
+        print(f"Getting single frames for {file}")
+        gif = cv2.VideoCapture(file)
+        ret, frame = gif.read()
+        if not ret:
+            return None
+        if size:
+            h, w = frame.shape[:2]
+            thumb_size = ImageUtils.get_cv_thumb_size((w, h), size)
+            frame = cv2.resize(frame, thumb_size, interpolation=cv2.INTER_AREA)
+        image_frame = ImageUtils.cv_array_to_image(frame)
+        return image_frame
+
+    @staticmethod
+    def get_cv2_frames(file, size=(1080, 1080)):
+        duration = 0
+        print(f"Getting frames for {file}")
+        frames = []
+        if not ImageUtils.is_multiple_frames(file):
+            print(f"{file} is not a video or gif")
+            frames = [
+                ImageUtils.get_cv2_pil_image(file, size),
+            ]
+            return frames, None, file
+
+        gif = cv2.VideoCapture(file)
+        if gif.isOpened():
+            fps = gif.get(cv2.CAP_PROP_FPS)
+            if fps:
+                duration = int(1000 // fps)
+            else:
+                duration = 100
+
+        while True:
+            if len(frames) >= 100:
+                break
+            if frame := ImageUtils.frame_from_capture(gif, size):
+                frames.append(frame)
+            else:
+                break
+        print(f"Returning {len(frames)} frames")
+        return frames, duration, file
+
+    @staticmethod
+    def frame_from_capture(capture, size):
+        ret, frame = capture.read()
+        if not ret:
+            return None
+        if size:
+            h, w = frame.shape[:2]
+            thumb_size = ImageUtils.get_cv_thumb_size((w, h), size)
+            frame = cv2.resize(frame, thumb_size, interpolation=cv2.INTER_AREA)
+        img = ImageUtils.cv_array_to_image(frame)
+        return img
+
+    @staticmethod
+    def is_multiple_frames(file):
+        ext = file.rsplit(".", 1)[-1]
+        if ext in ["mp4", "mov", "webm", "gif"]:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def get_frame_duration(file):
+        """Returns the average framerate of a PIL Image object"""
+        duration = 100
+        try:
+            img = Image.open(file)
+            img.seek(0)
+            duration = img.info["duration"]
+            duration = int(duration)
+        except Exception:
+            pass
+            return 100
+        return duration

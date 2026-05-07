@@ -9,13 +9,14 @@ from artrefsync.api.eagle_client import EagleClient
 from artrefsync.api.eagle_model import EagleFolder, EagleItem
 from artrefsync.boards.board_handler import PostFile
 from artrefsync.config import config
-from artrefsync.constants import BOARD, DANBOORU, E621, EAGLE, R34, STORE, TABLE
+from artrefsync.constants import BOARD, EAGLE, STORE, TABLE
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler, Post
 from artrefsync.utils.utils import str_dict
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
+
 
 def main():
     pass
@@ -33,11 +34,10 @@ class EagleHandler(ImageStoreHandler):
         config.subscribe_reload(self.reload_config)
         logger.info("Initializing Eagle Handler Complete.")
 
-
     def reload_config(self):
         self.library = config[TABLE.EAGLE][EAGLE.LIBRARY]
         self.artists_folder_name = config[TABLE.EAGLE][EAGLE.ARTIST_FOLDER]
-        self._artist_folder: EagleFolder.ListFolder= None
+        self._artist_folder: EagleFolder.ListFolder = None
         self.board_id_map = str_dict()
         self.board_artist_id_map = str_dict(dict)
         self.id_artist_map = {}
@@ -76,12 +76,12 @@ class EagleHandler(ImageStoreHandler):
         return data
 
     def eagle_item_to_postfile(
-        self, item: EagleItem.Item, artist_name=None, artist_board=BOARD.OTHER
+        self, item: EagleItem.Item, artist_name="", artist_board=BOARD.OTHER
     ) -> Post | None:
         pid = Post.parse_id(item.name)
         lib = self.library_path_dict[self.library]
         board_path = Path(os.path.join(lib, "images", f"{item.id}.info"))
-        thumbnail = ""
+        thumbnail = self.get_thumbnail(ext_id=item.id)
         f"{self.library_path_dict[self.library]}/images/{item.id}.info/{item.name}.{item.ext}"
         for path in board_path.iterdir():
             strpath = str(path)
@@ -118,7 +118,9 @@ class EagleHandler(ImageStoreHandler):
 
     def get_board_artist_id(self, board: BOARD, artist: str) -> EagleFolder.ListFolder:
         if board not in self.board_id_map:
-            board_folder = self.client.folder.create(board, self.get_artists_folder().id)
+            board_folder = self.client.folder.create(
+                board, self.get_artists_folder().id
+            )
             self.board_id_map[board] = board_folder.id
         if artist not in self.board_artist_id_map[board]:
             artist_folder = self.client.folder.create(artist, self.board_id_map[board])
@@ -144,8 +146,6 @@ class EagleHandler(ImageStoreHandler):
     ) -> str | None:
         if event and event.is_set():
             return
-        artist = post.artist_name
-        board = post.board
         pid = post.id
         if pid in self.pid_map:
             return None
@@ -166,7 +166,7 @@ class EagleHandler(ImageStoreHandler):
     def update_post(self, post: Post):
         self.client.item.update(post.ext_id, post.tags, url=post.url)
 
-    def get_artists_folder(self, refresh = False) -> EagleFolder.ListFolder:
+    def get_artists_folder(self, refresh=False) -> EagleFolder.ListFolder:
         if self._artist_folder is not None:
             if not refresh:
                 return self._artist_folder
@@ -175,7 +175,9 @@ class EagleHandler(ImageStoreHandler):
                 self._artist_folder = folder
                 break
         if not self._artist_folder:
-            logger.info("Creating Artists (Main Parent) Folder: %s", self.artists_folder_name)
+            logger.info(
+                "Creating Artists (Main Parent) Folder: %s", self.artists_folder_name
+            )
             self._artist_folder = self.client.folder.create(self.artists_folder_name)
 
         logger.info("Artist Folder ID: %s", self._artist_folder.id)
@@ -187,34 +189,43 @@ class EagleHandler(ImageStoreHandler):
                 artist_name = artist.name
                 self.board_artist_id_map[board_name][artist_name] = artist.id
                 self.id_artist_map[artist.id] = artist_name
-            logger.info("Board %s, Artist Count: %d", board_name, len(self.board_artist_id_map[board_name]))
+            logger.info(
+                "Board %s, Artist Count: %d",
+                board_name,
+                len(self.board_artist_id_map[board_name]),
+            )
 
     def switch_libary(self, library_string):
+        logger.info("Switching to library %s", library_string)
         history = self.client.library.history()
         for path in history:
             library_str = path.split("/")[-1]
             library_str = library_str.removesuffix(".library")
             self.library_path_dict[library_str] = path
+        if library_string in self.library_path_dict:
+            response = self.client.library.switch(
+                self.library_path_dict[library_string]
+            )
+            logger.debug("Switch Library to %s response: %s.", library_string, response)
+            # Fixes a bug where Eagle returns incorrect data if called too quickly after switching.
+            time.sleep(0.5)
+        else:
+            logger.info('Failed to find library "%s" in History', library_string)
+
+    def get_thumbnail(self, post=None, ext_id=None):
         try:
-            if library_string in self.library_path_dict:
-                response = self.client.library.switch(
-                    self.library_path_dict[library_string]
-                )
-                logger.debug(
-                    "Switch Library to %s response: %s.", library_string, response
-                )
-                # Fixes a bug where Eagle returns incorrect data if called too quickly after switching.
-                time.sleep(.5)
+            if ext_id:
+                return self.client.item.thumbnail(ext_id)
+            elif post:
+                return self.client.item.thumbnail(post.ext_id)
             else:
-                logger.warning('Failed to find library "%s" in History', library_string)
-        except Exception as e:
-            logger.error(e)
+                return ""
+        except Exception:
+            return ""
 
-    def get_thumbnail(self, post):
-        return self.client.item.thumbnail(post.ext_id)
-
-    def update_thumbnails(self, board: BOARD, artist:str):
+    def update_thumbnails(self, board: BOARD, artist: str):
         pass
+
 
 if __name__ == "__main__":
     main()

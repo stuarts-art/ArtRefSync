@@ -47,7 +47,7 @@ class EventManager:
             for binding in self.sequence_bindings[sequence]:
                 binding.root.after(0, binding.func, *args)
         elif sequence.startswith("on_"):
-            logger.warning(
+            logger.debug(
                 "Sequence %s not bound. Currently bound keys: %s.",
                 sequence,
                 self.sequence_bindings.keys(),

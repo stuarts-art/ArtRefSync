@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from threading import Event
-from artrefsync.constants import BOARD, TABLE, APP, STORE
+
 from artrefsync.config import config
+from artrefsync.constants import APP, BOARD, STORE, TABLE
 
 
 # @dataclass_json
@@ -12,7 +13,7 @@ class Post:
     ext_id: str  # external id (When from Board->BoardID, Store -> StoreID)
     name: str = ""
     artist_name: str = ""
-    tags: list[str] = None
+    tags: list[str] | None = None
     board: BOARD | None = None
     score: int | None = 0
     url: str | None = ""
@@ -22,7 +23,7 @@ class Post:
     height: int | None = 0
     width: int | None = 0
     ratio: float | None = 0.0
-    ext: str | None = ""
+    ext: str = ""
     file_link: str | None = ""
     sample_link: str | None = ""
     preview_link: str | None = ""
@@ -82,5 +83,3 @@ class ImageBoardHandler(ABC):
 
     def get_artist_list(self) -> list[str]:
         pass
-
-

@@ -1,40 +1,53 @@
-import ttkbootstrap as ttk
-import tkinter as tk
+import logging
 import time
+import tkinter as tk
+
+import ttkbootstrap as ttk
 
 # import sv_ttk
 from PIL import Image, ImageTk
-import logging
-from artrefsync.config import config
-from artrefsync.constants import BINDING
-from artrefsync.stores.link_cache import LinkCache
-from artrefsync.ui.tabs.SortByTab import SortByTab
-from artrefsync.ui.tabs.ActiveTags import ActiveTagsTab
-from artrefsync.ui.tabs.ConfigTab import ConfigTab
-from artrefsync.ui.widgets.LoadingBar import LoadingBars
-from artrefsync.ui.tabs.ViewerTab import ViewerTab
-from artrefsync.ui.tabs.TagTab import TagTab
-from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
-
-from artrefsync.ui.tabs.ArtistTab import ArtistTab
-from artrefsync.ui.widgets.PostInfo import PostInfo
-from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
-from artrefsync.ui.widgets.PhotoGallery import PhotoImageGallery
-from artrefsync.utils.EventManager import ebinder
 from tkinterdnd2 import TkinterDnD
 
+from artrefsync.config import Config
+from artrefsync.constants import BINDING
+from artrefsync.stores.link_cache import LinkCache
+from artrefsync.ui.tabs.ActiveTags import ActiveTagsTab
+from artrefsync.ui.tabs.ArtistTab import ArtistTab
+from artrefsync.ui.tabs.ConfigTab import ConfigTab
+from artrefsync.ui.tabs.SortByTab import SortByTab
+from artrefsync.ui.tabs.TagTab import TagTab
+from artrefsync.ui.tabs.ViewerTab import ViewerTab
+from artrefsync.ui.widgets.LoadingBar import LoadingBars
+from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
+from artrefsync.ui.widgets.PhotoGallery import PhotoImageGallery
+from artrefsync.ui.widgets.PostInfo import PostInfo
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
+from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.TkThreadCaller import TkThreadCaller
+
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
+config = Config()
 
 
 def main():
-    app = ImagViewerApp()
+    app = App()
     app.mainloop()
 
 
-class ImagViewerApp(ttk.Window):
-    def __init__(self):
+class App(ttk.Window):
+    def __init__(self, config_path="config", config_file_name="config"):
+        """
+        Parameters:
+
+            config_path (str):
+                The title that appears on the application titlebar.
+
+            config_file_name (str):
+                The name of the ttkbootstrap theme to apply to the
+                application.
+        """
+
+        logger.setLevel(config.log_level)
         logger.info("Starting App")
         self.init_scaffolding()
         self.init_top_bar_vars()
@@ -46,7 +59,13 @@ class ImagViewerApp(ttk.Window):
 
     def start(self):
         with LinkCache(), TkThreadCaller(self):
-            self.mainloop()
+            try:
+                self.mainloop()
+            except Exception:
+                # logger.error(e)
+                logger.exception("Exception Raised")
+                # traceback.print_exc()
+                # traceback.
 
     def init_scaffolding(self):
         logger.info("Init Scafolding")
@@ -112,9 +131,7 @@ class ImagViewerApp(ttk.Window):
         self.top_artist_text = ttk.StringVar()
         self.top_artist_count_text = ttk.StringVar()
         self.top_post_text = ttk.StringVar()
-        ebinder.bind(
-            BINDING.ON_ARTIST_SELECT, self.on_artist_select, self.bar
-        )
+        ebinder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist_select, self.bar)
         ebinder.bind(
             BINDING.ON_POST_COUNT,
             lambda x: self.top_artist_count_text.set(f"({x})"),
@@ -126,7 +143,7 @@ class ImagViewerApp(ttk.Window):
         ttk.Label(self.bar.top_mid, textvariable=self.top_artist_count_text).pack(
             side=tk.LEFT
         )
-    
+
     def on_artist_select(self, artist, *nargs):
         self.top_artist_text.set(artist)
 
@@ -142,6 +159,7 @@ class ImagViewerApp(ttk.Window):
     def init_bindings(self):
         logger.info("Init Bindings")
         self.bind(self.bar.menu_event_name, self.toggle_config)
+        self.config_tab.clear_button.bind("<Button-1>", self.toggle_config)
 
         self.artists_button.bind("<Button-1>", self.toggle_artists)
         self.tags_button.bind("<Button-1>", self.toggle_tags)

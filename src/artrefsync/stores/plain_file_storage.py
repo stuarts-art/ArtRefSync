@@ -4,7 +4,7 @@ from enum import StrEnum, auto
 import os
 import shutil
 from typing import Iterable
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
 from PIL import Image
 from artrefsync.stores.link_cache import LinkCache

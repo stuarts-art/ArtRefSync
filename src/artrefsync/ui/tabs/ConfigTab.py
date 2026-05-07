@@ -10,8 +10,8 @@ from artrefsync.config import config
 from artrefsync.constants import TABLE, get_table_mapping
 from artrefsync.sync_coordinator import sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -44,6 +44,9 @@ class ConfigTab(ttk.Frame):
                 tab_frame,
                 text=table.capitalize().ljust(6),
             )
+
+            self.clear_button = RoundedIcon(self, text="✕", size=(25, 25), command=self.toggle_console_window)
+            self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
 
     def reload(self):
         config.reload_config()
@@ -136,13 +139,12 @@ class ConfigTab(ttk.Frame):
                 entry.grid(row=i, column=1, sticky=("w", "e"), pady=10)
                 widget = entry
             self.widget_dict[table][table_field] = widget
-    
+
     def toggle_console_window(self):
         self.console_var.set(not self.console_var.get())
         toggle = self.console_var.get()
         logger.info("Toggling to %s", toggle)
         # toggle_console(toggle)
-
 
     def select_dir(self, e):
         dir = askdirectory()
@@ -168,11 +170,14 @@ class ConfigTab(ttk.Frame):
                 state="active", text="Cancel Sync", bootstyle="warning"
             )
             if config.log_level == "DEBUG":
-                    sync_from_store(self.sync_event) 
-                    self.finish_store_sync()
+                sync_from_store(self.sync_event)
+                self.finish_store_sync()
             else:
                 self.thread_caller.add(
-                    sync_from_store, self.finish_store_sync, __name__, self.store_sync_event
+                    sync_from_store,
+                    self.finish_store_sync,
+                    __name__,
+                    self.store_sync_event,
                 )
         else:
             self.start_store_sync_button.configure(state="disabled")
@@ -192,8 +197,8 @@ class ConfigTab(ttk.Frame):
             self.sync_running = True
             self.start_sync_button.configure(state="active", text="Cancel Sync")
             if config.log_level == "DEBUG":
-                    sync_config(self.sync_event)
-                    self.finish_sync()
+                sync_config(self.sync_event)
+                self.finish_sync()
             else:
                 self.thread_caller.add(
                     sync_config, self.finish_sync, __name__, self.sync_event

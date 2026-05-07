@@ -29,7 +29,7 @@ class PhotoImageGallery(ttk.Frame):
         global thread_caller
         super().__init__(root)
         self.tags = ["Initial Value"]
-        self.scrolled_text = ScrolledText(self)
+        self.scrolled_text = ScrolledText(self, autohide=True)
         self.text = self.scrolled_text.text
         self.colors = ttk.Style().colors
 
@@ -45,6 +45,7 @@ class PhotoImageGallery(ttk.Frame):
         self.text.tag_configure(
             "sel", background=color.warning, foreground=color.warning, underline=1
         )
+        self.text.tag_configure("center", justify="center")
 
         self.frame_height = ttk.IntVar(self, value=500)
         self.frame_width = ttk.IntVar(self, value=500)
@@ -95,7 +96,9 @@ class PhotoImageGallery(ttk.Frame):
         )
 
         with PostDb() as post_db:
-            order_query = f" id IN (SELECT id from PostFile) ORDER BY {sort_by} {sort_dir}"
+            order_query = (
+                f" id IN (SELECT id from PostFile) ORDER BY {sort_by} {sort_dir}"
+            )
             if self.tags:
                 posts = post_db.get_tag_intersection(self.tags)
                 sorted_posts = post_db.posts.get_all(
@@ -114,13 +117,11 @@ class SimpleFrames:
     frame_map: map = {}
 
     # @staticmethod
-    def __class_getitem__(cls, index):
-        if index is not None and index >= 0 and index < len(SimpleFrames.frames):
-            return SimpleFrames.frames[index]
 
     def __init__(
         self, text: ttk.Text, width_var, height_var, scrolled_text: ScrolledText
     ):
+        SimplePhotoLabel.text = text
         self.text = text
         self.width_var = width_var
         self.height_var = height_var
@@ -130,39 +131,58 @@ class SimpleFrames:
         self.last_selected = None
         self.zooming = False
         self.scrolled_text = scrolled_text
-
         self.min_focus_delay = 100
         self.last_focus_prev = time.time() - self.min_focus_delay
         self.last_focus_next = time.time() - self.min_focus_delay
         self.focussing_prev = False
         self.focussing_next = False
+        self.color = ttk.Style().colors
+        self.init_bindings()
+        self.increase_frames()
+        if self.frames:
+            self.add_select_tag(self.frames[0], False, False)
+
+    def __class_getitem__(cls, index) -> SimpleFrames:
+        if index is not None and index >= 0 and index < len(SimpleFrames.frames):
+            return SimpleFrames.frames[index]
+            
+    def init_bindings(self):
         ebinder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         ebinder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
         ebinder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
-        self.text.bind("q", lambda _: ebinder.event_generate(BINDING.ON_ZOOM_DELTA, -100))
-        self.text.bind("e", lambda _: ebinder.event_generate(BINDING.ON_ZOOM_DELTA, +100))
-        self.text.bind("w", self.focus_prev_row)
-        self.text.bind("a", self.throttled_focus_prev)
-        self.text.bind("s", self.throttled_focus_next)
-        self.text.bind("d", self.focus_next)
-        self.text.bind("<Escape>", lambda _: ebinder.event_generate(BINDING.ON_TEXT_ESCAPE))
+        self.text.bind(
+            "q", lambda _: ebinder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
+        )
+        self.text.bind(
+            "e", lambda _: ebinder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
+        )
         self.text.bind("z", lambda _: ebinder.event_generate(BINDING.ON_TEXT_Z))
         self.text.bind("x", lambda _: ebinder.event_generate(BINDING.ON_TEXT_X))
         self.text.bind("c", lambda _: ebinder.event_generate(BINDING.ON_TEXT_C))
         self.text.bind(
-            "<space>",
-            lambda e: ebinder.event_generate(
-                BINDING.ON_IMAGE_DOUBLE_CLICK, self.last_selected
-            ),
+            "w", lambda e: self.text.event_generate("<MouseWheel>", delta=120)
         )
-        self.color = ttk.Style().colors
-        SimplePhotoLabel.text = text
-        self.increase_frames()
-        if self.frames:
-            e = tk.Event()
-            e.state = 0
-            e.widget = self.frames[0]
-            self.add_select_tag(e)
+        self.text.bind(
+            "s", lambda e: self.text.event_generate("<MouseWheel>", delta=-120)
+        )
+        self.text.bind("a", self.throttled_focus_prev)
+        self.text.bind("d", self.throttled_focus_next)
+        self.text.bind(
+            "<Escape>", lambda _: ebinder.event_generate(BINDING.ON_TEXT_ESCAPE)
+        )
+        self.text.bind("<space>", self.on_space)
+
+    def on_space(self, e):
+
+        if self.selected.bbox:
+            ebinder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid)
+        else:
+            for frame in self.frames:
+                if frame.bbox:
+                    self.add_select_tag(frame, False, False)
+                    self.text.see(frame)
+                    ebinder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid)
+                    break
 
     def create_frame(self):
         idx = len(self.frames) if self.frames else 0
@@ -174,7 +194,7 @@ class SimpleFrames:
         label.bind("<MouseWheel>", self.bind_scroll)
         bindtags.insert(1, self.text)
         label.bindtags(tuple(bindtags))
-        label.bind("<ButtonRelease-1>", self.add_select_tag)
+        label.bind("<ButtonRelease-1>", self.add_select_tag_handler)
         label.bind(
             "<Double-Button-1>",
             lambda e: ebinder.event_generate(
@@ -183,7 +203,9 @@ class SimpleFrames:
         )
         label.drag_source_register(DND_FILES)
         label.dnd_bind("<<DragInitCmd>>", self.drag_binding)
-        self.text.window_create(tk.END, window=label, padx=5, pady=5)
+        self.text.window_create(tk.END, window=label, padx=3, pady=3)
+        self.text.tag_add("center", label)
+
         self.scrolling = Event()
 
     def bind_b2(self, e: tk.Event):
@@ -243,28 +265,31 @@ class SimpleFrames:
             else:
                 frame.reset()
 
-    def add_select_tag(self, e):
+    def add_select_tag_handler(self, e: tk.Event):
         self.text.focus_set()
         logger.debug("Add Select Tag %s", e)
         s = e.state
         ctrl_pressed = (s & 0x4) != 0
         shift_pressed = (s & 0x1) != 0
+        self.add_select_tag(e.widget, ctrl_pressed, shift_pressed)
+
+    def add_select_tag(self, widget, ctrl_pressed=False, shift_pressed=False):
         ranges = self.text.tag_ranges("sel")
         if not ranges or (not ctrl_pressed and not shift_pressed):
             if ranges:
                 self.text.tag_remove("sel", 1.0, tk.END)
-            self.text.tag_add("sel", e.widget)
+            self.text.tag_add("sel", widget)
         elif ctrl_pressed:
-            if "sel" in self.text.tag_names(e.widget):
-                logger.debug("Removing sel tag from %s", e.widget.pid)
-                self.text.tag_remove("sel", e.widget)
+            if "sel" in self.text.tag_names(widget):
+                logger.debug("Removing sel tag from %s", widget.pid)
+                self.text.tag_remove("sel", widget)
             else:
-                self.text.tag_add("sel", e.widget)
-                index = self.text.index(e.widget)
+                self.text.tag_add("sel", widget)
+                index = self.text.index(widget)
         elif shift_pressed:
-            if "sel" in self.text.tag_names(e.widget):
+            if "sel" in self.text.tag_names(widget):
                 return
-            index = self.text.index(e.widget)
+            index = self.text.index(widget)
             start = min(self.text.index(ranges[0]), index)
             end = max(self.text.index(ranges[0]), index + "+1c")
             self.text.tag_add("sel", start, end)
@@ -361,8 +386,6 @@ class SimpleFrames:
                 self.text.tag_add("sel", widget)
                 self.updated_selected_post(widget.pid)
                 self.text.after(0, self.text.see, widget)
-                if not self.selected.same_row(widget):
-                    self.text.event_generate("<MouseWheel>", delta=120)
         else:
             for frame in self.frames:
                 if frame.bbox:
@@ -403,13 +426,33 @@ class SimpleFrames:
         label: SimplePhotoLabel = self.selected
         prev = label.prev_row
         if prev:
+            self.text.event_generate("<MouseWheel>", delta=+120)
             self.update_focus(prev.pid)
+            widget = prev
+            self.text.tag_remove("sel", 1.0, self.text.index(widget))
+            self.text.tag_remove("sel", f"{self.text.index(widget)}+1c", tk.END)
+            self.updated_selected_post(widget.pid)
+            self.text.after_idle(self.text.see, widget)
 
     def focus_next_row(self, e=None):
         label: SimplePhotoLabel = self.selected
         next = label.next_row
         if next:
-            self.update_focus(next.pid)
+            if self.selected:
+                if self.selected.next:
+                    widget = next
+                    self.text.event_generate("<MouseWheel>", delta=-120)
+                    self.text.tag_add("sel", widget)
+                    self.text.tag_remove("sel", 1.0, self.text.index(widget))
+                    self.text.tag_remove("sel", f"{self.text.index(widget)}+1c", tk.END)
+                    self.updated_selected_post(widget.pid)
+                    self.text.after_idle(self.text.see, widget)
+                return
+            else:
+                for frame in self.frames:
+                    if frame.bbox:
+                        frame.event_generate("<Button-1>")
+                        break
 
     def set_focus(self, e=None):
         logger.debug("Set Focus on %s", e.widget.pid)
@@ -518,16 +561,19 @@ class SimplePhotoLabel(tk.Label):
             return None
 
     def same_row(self, next):
-        if self and self.bbox and next and next.bbox:
+        if not next or not next.bbox:
+            return False
+        elif self and self.bbox:
             x = self.bbox[1]
             y = self.bbox[3]
             x0 = next.bbox[1]
             y0 = next.bbox[3]
-            if y < x0:
+            overlap = max(x, x0) < min(y, y0)
+            if overlap:
+                return True
+            else:
                 return False
-            elif y0 < x:
-                return False
-        return True
+        return False
 
     @property
     def prev_row(self):
@@ -536,19 +582,21 @@ class SimplePhotoLabel(tk.Label):
         prev = self.prev
         while prev and prev.bbox:
             if not self.same_row(prev):
+                break
+            if not prev.prev:
                 return prev
-
             prev = prev.prev
         return prev
 
     @property
     def next_row(self):
+        print(f"next Row for {self.idx}")
         if not self:
             return None
         next = self.next
         while next:
-            if not next.bbox or (next.bbox[1] > self.bbox[3]):
-                return next
+            if not self.same_row(next):
+                break
             next = next.next
         return next
 
@@ -586,16 +634,17 @@ class SimplePhotoLabel(tk.Label):
             self.image_h = self.height_var.get()
             if self.file.thumbnail:
                 self.file_name = self.file.thumbnail
-            elif self.file.preview:
-                self.file_name = self.file.preview
             elif self.file.sample:
                 self.file_name = self.file.sample
+            elif self.file.preview:
+                self.file_name = self.file.preview
             else:
                 self.file_name = self.file.file
 
             self.config(image=None)
             self.thumbsize = (self.width_var.get(), self.height_var.get())
             if self.file.ext not in ["webm", "mp4"] and self.image_h > 400:
+                logger.info("Upscaling file %s to the full file", self.file_name)
                 self.file_name = self.file.file
 
             thread_caller.add(

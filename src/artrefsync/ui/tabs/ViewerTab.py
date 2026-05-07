@@ -26,13 +26,11 @@ class ViewerTab(ttk.Frame):
         self.cancle_key = "ViewerTab"
 
         self.file = ""
-        self.post_file: PostFile = None
         self.thread_caller = TkThreadCaller(self)
         self.height = self.winfo_height()
         self.width = self.winfo_width()
-        self.canvas_image = None
         self.index_var = ttk.IntVar(value=0)
-
+        self.canvas_image = CanvasImage(self, self.index_var)
         self.init_widgets()
         self.init_bindings()
         self.gif_top = False
@@ -40,7 +38,6 @@ class ViewerTab(ttk.Frame):
     def init_widgets(self):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
-        self.canvas_image = CanvasImage(self, self.index_var)
         self.canvas_image.grid(row=0, column=0)
         self.gif_controls = ttk.Frame(self)
         self.gif_controls.grid(row=1, column=0)
@@ -97,6 +94,8 @@ class ViewerTab(ttk.Frame):
                 self.canvas_image.toggle_pause()
 
     def update_viewer_image(self, pid):
+        self.thread_caller.cancel(__name__)
+
         if self.pid == pid:
             self.close_image_viewer()
             self.pid = None
@@ -112,7 +111,7 @@ class ViewerTab(ttk.Frame):
                 else:
                     logger.info("Failed to load postFile for %s", pid)
                     return
-            if post_file.ext == "gif":
+            if post_file.ext in ["mp4", "mov", "webm", "gif"]:
                 if post_file.thumbnail:
                     filename = post_file.thumbnail
                 elif post_file.preview:
@@ -122,14 +121,19 @@ class ViewerTab(ttk.Frame):
                 else:
                     filename = post_file.file
                 self.canvas_image.set_image(filename)
-            self.file = (
-                post_file.preview
-                if post_file.ext in ("webm", "mp4")
-                else post_file.file
-            )
-            self.thread_caller.add(
-                self.canvas_image.set_image, self.clear_button.lift, __name__, self.file
-            )
+
+            self.file = post_file.file
+            if config.log_level == "DEBUG":
+                self.canvas_image.set_image(self.file)
+            else:
+                self.thread_caller.cancel(__name__)
+
+                self.thread_caller.add(
+                    self.canvas_image.set_image,
+                    self.clear_button.lift,
+                    __name__,
+                    self.file,
+                )
             self.pid = pid
 
     def prev_frame(self, e=None):

@@ -14,7 +14,6 @@ logger.setLevel(config.log_level)
 
 @singleton
 class TkThreadCaller:
-
     def __enter__(self):
         return self
 
@@ -38,24 +37,24 @@ class TkThreadCaller:
 
     def add(
         self, task: callable, on_finish: callable, cancel_key="key", *args, **kwargs
-    ) -> None:
+    ) -> Future:
         future = self.executor.submit(task, *args, **kwargs)
         if on_finish:
             self.on_finish_map[future] = on_finish
             future.add_done_callback(self.call_on_finish)
-            if cancel_key:
-                self.cancel_map[cancel_key].add(future)
-                self.cancel_key_map[future] = cancel_key
-                logger.debug(
-                    "%i active threads for cancel key %s",
-                    len(self.cancel_map[cancel_key]),
-                    cancel_key,
-                )
+        if cancel_key:
+            self.cancel_map[cancel_key].add(future)
+            self.cancel_key_map[future] = cancel_key
+            logger.debug(
+                "%i active threads for cancel key %s",
+                len(self.cancel_map[cancel_key]),
+                cancel_key,
+            )
 
         return future
 
     def cancel(self, cancel_key):
-        logger.debug(
+        logger.info(
             "Cancel called for key: %s, Current thread count: %s",
             cancel_key,
             (
@@ -75,6 +74,8 @@ class TkThreadCaller:
     def call_on_finish(self, future: Future):
         try:
             if future in self.cancel_key_map:
+                if future.cancelled():
+                    return
                 on_finish = self.on_finish_map.pop(future)
                 result = future.result()
                 if self.root:
@@ -86,11 +87,12 @@ class TkThreadCaller:
                     if future in self.cancel_map[cancel_key]:
                         self.cancel_map[cancel_key].discard(future)
 
-        except Exception as e:
-            logger.debug(e)
+        except Exception:
+            logger.exception("Exception raised on call_on_finish")
+            if future:
+                logger.error(future)
 
     def stop(self):
         logger.info("Stopping active threads...")
         self.executor.shutdown(cancel_futures=True, wait=True)
         logger.info("Active Threads Stopped.")
-

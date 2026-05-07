@@ -24,3 +24,6 @@ dev = [
     "pyinstaller>=6.19.0",
     "ruff>=0.15.9",
 ]
+
+[project.scripts]
+sync_cli = "artrefsync.cli:ui"

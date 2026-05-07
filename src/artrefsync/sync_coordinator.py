@@ -1,8 +1,9 @@
 import concurrent
 import logging
-from asyncio import Event
+import traceback
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile
 from artrefsync.boards.danbooru_handler import Danbooru_Handler
@@ -112,6 +113,7 @@ def sync_from_store(event: Event):
 
     except Exception as e:
         logger.warning(e)
+        traceback.print_exc()
 
 
 # TODO: Remove old Sync file
@@ -149,22 +151,26 @@ class SyncCoordinator:
         self.max_download_threads = int(config[TABLE.APP][APP.MAX_DOWNLOAD_THREADS])
 
     def sync(self):
-        ebinder.event_generate(
-            BINDING.ON_LOAD_LEFT_SET, len(self.board_handler.artist_list)
-        )
-        for artist in self.board_handler.artist_list:
-            if self.stop_event.is_set():
-                return
-            ebinder.event_generate(BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}")
-            self.sync_artist(artist)
-
-        with PostDb() as post_db:
-            ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
-            post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_counts)
-            for tag, posts in self.tag_post_dict.items():
+        try:
+            artist_list = self.board_handler.get_artist_list()
+            ebinder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(artist_list))
+            for artist in artist_list:
                 if self.stop_event.is_set():
                     return
-                post_db.tag_posts.union_update(tag, posts)
+                ebinder.event_generate(
+                    BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
+                )
+                self.sync_artist(artist)
+
+            with PostDb() as post_db:
+                ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
+                post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_counts)
+                for tag, posts in self.tag_post_dict.items():
+                    if self.stop_event.is_set():
+                        return
+                    post_db.tag_posts.union_update(tag, posts)
+        except Exception:
+            logger.exception("Sync Failed.")
 
     def sync_artist(self, artist):
         logger.info("Starting sync artist %s", artist)
@@ -229,19 +235,24 @@ class SyncCoordinator:
             return missing_ids
 
     def update_board_tag_count(self, board, artists):
-        board_tags_count = defaultdict(int)
+        board_tags_count = {}
 
         with PostDb() as post_db:
             for artist in artists:
                 artist_tags_count = self.update_artist_tag_tables(board, artist)
                 if artist_tags_count:
-                    for tag, count in artist_tags_count.items:
-                        board_tags_count[tag] += count
+                    for tag, count in artist_tags_count.items():
+                        if tag not in board_tags_count:
+                            self.board_tag_counts[tag] = count
+                        else:
+                            self.board_tag_counts[tag] += count
+
+                        # board_tags_count[tag] = self.board_tag_counts[tag] + count
             post_db.artist_tags.dumps_blob(str(board), board_tags_count)
 
     def update_artist_tag_tables(self, board, artist):
         board = str(board)
-        artist_tag_counts = defaultdict(set)
+        artist_tag_counts = defaultdict(dict)
         tag_posts = defaultdict(set)
         with PostDb() as post_db:
             posts = post_db.posts.select(
@@ -254,7 +265,9 @@ class SyncCoordinator:
                 tags = set(post["tags"] + [board, artist, ext])
 
                 for tag in tags:
-                    artist_tag_counts[tag] += 1
+                    if tag not in artist_tag_counts[artist]:
+                        artist_tag_counts[artist][tag] = 0
+                    artist_tag_counts[artist][tag] += 1
                     tag_posts[tag].add(pid)
             for tag, posts in tag_posts.items():
                 post_db.tag_posts.union_update(tag, posts)
@@ -265,7 +278,7 @@ class SyncCoordinator:
 
         missing_ids = self.get_missing_ids(artist)
         failure_list = []
-        success_list = []
+        success_list: list[PostFile] = []
         if not missing_ids:
             return []
         with PostDb() as post_db:
@@ -303,69 +316,58 @@ class SyncCoordinator:
                     logger.error(e)
 
                     failure_list.append(future_to_pid[future])
-                    # continue
             if failure_list:
                 logger.error("The following IDs failed to load. %s", failure_list)
 
         logger.info("Adding Entries to PostFile Table.")
         with PostDb() as post_db:
             for post_file in success_list:
-                post_db.files.insert(post_file)
-
+                if not self.update_post_file(post_db, post_file):
+                    logger.debug("Did not update Postfile with id %s", post_file.id)
         return success_list
 
+    def update_post_file(self, post_db: PostDb, store_post: PostFile):
+        pid = store_post.id
+        post = post_db.posts[pid]
+        if not post:
+            logger.warning("No post for id %s", pid)
+
+            return False
+        post_file = PostFile(
+            id=post.id,
+            ext_id=post.ext_id,
+            store=store_post.store,
+            board=post.board,
+            artist_name=post.artist_name,
+            height=post.height,
+            width=post.width,
+            ratio=post.ratio,
+            ext=post.ext,
+            preview=store_post.preview,
+            thumbnail=store_post.thumbnail,
+            sample=store_post.sample,
+            file=store_post.file,
+        )
+        return post_db.files.insert(post_file)
+        # return post_file
+
     def update_post_file_table(self, artist, repair=False):
-        ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
         logger.info(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist
         )
+        ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(
-            self.board, artist
+            str(self.board), artist
         )
         logger.info("store_posts recieved with %s records.", len(store_posts))
         inserted_list = []
 
         with PostDb() as post_db:
-            metadata_ids = post_db.posts.select_id_list(
-                [("board", str(self.board)), ("artist_name", artist)]
-            )
             for pid, store_post in store_posts.items():
-                if pid not in metadata_ids:
-                    continue
-                post = post_db.posts[pid]
-
-                if pid in post_db.files:
-                    old_file: PostFile = post_db.files[pid]
-                    if (
-                        old_file.file == store_post.file
-                        and old_file.sample == store_post.sample
-                        and old_file.preview == store_post.preview
-                        and old_file.thumbnail == store_post.thumbnail
-                    ):
-                        continue
-                inserted = None
-
-                if pid in store_posts:
-                    store_post = store_posts[pid]
-                    post = post_db.posts[pid]
-                    post_file = PostFile(
-                        id=post.id,
-                        ext_id=store_post.ext_id,
-                        store=store_post.store,
-                        board=post.board,
-                        artist_name=post.artist_name,
-                        height=post.height,
-                        width=post.width,
-                        ratio=post.ratio,
-                        ext=post.ext,
-                        preview=store_post.preview,
-                        thumbnail=store_post.thumbnail,
-                        sample=store_post.sample,
-                        file=store_post.file,
-                    )
-                    inserted = post_db.files.insert(post_file)
-                if inserted:
-                    inserted_list.append(pid)
+                if store_post:
+                    inserted = self.update_post_file(post_db, store_post)
+                    if inserted:
+                        inserted_list.append(pid)
         logger.info(
             "Inserted %d PostFile Table for %s, %s, %s",
             len(inserted_list),

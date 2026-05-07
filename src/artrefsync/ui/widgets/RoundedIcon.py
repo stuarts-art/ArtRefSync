@@ -11,6 +11,7 @@ from artrefsync.utils.image_utils import ImageUtils
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+
 class RoundedIcon(ttk.Label):
     font = None
 
@@ -43,17 +44,17 @@ class RoundedIcon(ttk.Label):
     def __init__(
         self,
         root,
-        text = "",
+        text="",
         normal_color="#FFFFFF00",
         hover_color="#595253",
-        size=40,
+        size: int | tuple = 40,
         radius=5,
         style=None,
         text_variable=None,
-        command = None,
+        command=None,
         **kwargs,
     ):
-        logger.info("Round Icon init for text \"%s\"", text)
+        logger.info('Round Icon init for text "%s"', text)
         if isinstance(size, int):
             self.width = size
             self.height = size
@@ -88,7 +89,13 @@ class RoundedIcon(ttk.Label):
                 style = "primary.TLabel"
 
         super().__init__(
-            root, image=self.image, text=text, compound=tk.CENTER, style=style, textvariable= text_variable, **kwargs
+            root,
+            image=self.image,
+            text=text,
+            compound=tk.CENTER,
+            style=style,
+            textvariable=text_variable,
+            **kwargs,
         )
 
         if command:

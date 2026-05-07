@@ -1,27 +1,31 @@
 # Config Related setup
-import os
-import sys
-from diskcache import Cache
-from simple_toml_configurator import Configuration
-from artrefsync.constants import (
-    DB,
-    R34,
-    E621,
-    TABLE,
-    LOCAL,
-    EAGLE,
-    APP,
-    STORE,
-    BOARD,
-    DANBOORU,
-)
 import logging
 import logging.handlers
+import os
+import sys
+
+from diskcache import Cache
+from simple_toml_configurator import Configuration
+
+from artrefsync.constants import (
+    APP,
+    BOARD,
+    DANBOORU,
+    DB,
+    E621,
+    EAGLE,
+    LOCAL,
+    R34,
+    STORE,
+    TABLE,
+)
+from artrefsync.utils.utils import singleton
 
 __all__ = ["config"]
 
 
-class __Config:
+@singleton
+class Config:
     def __init__(self, config_path="config", config_file_name="config"):
         self.kwargs = {
             "config_path": config_path,
@@ -38,7 +42,9 @@ class __Config:
 
         self.log_file = "log/art_sink.log"
         os.makedirs(os.path.dirname(self.log_file), exist_ok=True)
-        log_file_handler = logging.handlers.TimedRotatingFileHandler(self.log_file, encoding="utf-8")
+        log_file_handler = logging.handlers.TimedRotatingFileHandler(
+            self.log_file, encoding="utf-8"
+        )
         log_file_handler.suffix = "%Y-%m-%d.log"
         logging.basicConfig(
             level=self.log_level,
@@ -63,9 +69,7 @@ class __Config:
         for reload in self._subscribed_reload:
             reload()
 
-    def __getitem__(
-        self, field: TABLE | STORE | BOARD
-    ) -> dict[R34 | E621 | EAGLE | LOCAL,]:
+    def __getitem__(self, field: TABLE | STORE | BOARD) -> dict:
         return self.settings.config[field]
 
     def get(
@@ -79,7 +83,6 @@ class __Config:
 
     def cache_ttl(self):
         return int(self.get(TABLE.APP, APP.CACHE_TTL, 300))
-
 
     default_config = {
         TABLE.APP: {
@@ -95,7 +98,6 @@ class __Config:
             APP.THUMBNAIL_HEIGHT: 720,
             APP.ONLY_RECENT_ENABLED: True,
             APP.MAX_DOWNLOAD_THREADS: 8,
-
         },
         TABLE.R34: {
             R34.ENABLED: False,
@@ -130,5 +132,5 @@ class __Config:
     }
 
 
-config = __Config()
-cache:Cache = Cache(config[TABLE.APP][APP.CACHE_DIR])
+config = Config()
+cache: Cache = Cache(config[TABLE.APP][APP.CACHE_DIR])

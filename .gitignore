@@ -220,3 +220,4 @@ LocalTest/
 .log
 media/
 log/
+.zed/tasks.json
