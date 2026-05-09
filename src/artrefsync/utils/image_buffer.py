@@ -25,8 +25,6 @@ class ImageCache:
         self.max_size = 50
 
     def __contains__(self, key):
-        # print(key)
-        # key = hash(key)
         return self.cache.__contains__(key)
 
     def __len__(self):
@@ -69,9 +67,12 @@ class ImageBuffer:
         self.thread_caller = thread_caller
         self.gif: cv2.VideoCapture = cv2.VideoCapture()
         self.path = ""
+        self.prev = -1
 
     def current_frame(self, frame=None):
         try:
+            if self.frame_count == 1:
+                return 1
             if frame is None:
                 return int(self.gif.get(cv2.CAP_PROP_POS_FRAMES))
             else:
@@ -83,40 +84,63 @@ class ImageBuffer:
         if self.frame_count:
             return self.frame_count
         else:
-            return 0
+            return 1
+
+    def size(self):
+        return self.__len__()
 
     def __getitem__(self, index):
+
         if not self.gif:
             return None
         index %= self.frame_count
-        self.get_curr_frame(index)
         index = self.get_key(index)
-        return self.frames.cache.get(index, None)
+        if index not in self.frames:
+            image, _ = self.get_curr_frame(index)
+            pil_image = ImageUtils.cv_array_to_image(image)
+            self.frames[index] = pil_image
+        return self.frames[index]
 
     def __setitem__(self, key, value):
         key = self.get_key(key)
         self.frames[key] = value
 
     def get_key(self, index):
-        return f"{self.path}.{index}"
+        # return f"{self.path}.{index}"
+        return index
 
     def set_image(self, path, size=(720, 720)):
+        if path == self.path:
+            return
         self.path = path
+        self.frames.clear()
         if self.gif and self.gif.isOpened():
             self.gif.release()
         self.gif = cv2.VideoCapture(path)
         self.size = size
         self.prev = -1
-        self.frame_count = int(max(int(self.gif.get(cv2.CAP_PROP_FRAME_COUNT)), 1))
-        self.fps = int(self.gif.get(cv2.CAP_PROP_FPS))
-        self.delay = int(1000 / self.fps)
+
+
+        if ImageUtils.is_multiple_frames:
+            try:
+                with self.lock():
+                    self.frame_count = int(max(int(self.gif.get(cv2.CAP_PROP_FRAME_COUNT)), 1))
+                    self.fps = int(self.gif.get(cv2.CAP_PROP_FPS))
+                    self.delay = int(1000 / self.fps)
+            except Exception:
+                self.frame_count = 1
+                self.fps = 1
+                self.delay = 1
+        else:
+            self.frames[0] = [ImageUtils.get_cv2_pil_image(path)]
+            self.frame_count = 1
+            self.delay = None
 
     def get_frame(self, index=0):
         if index != 0:
             index %= self.frame_count
         logger.debug(f"Getting Frame {index}")
         key = self.get_key(index)
-        # print(key)
         if key in self.frames:
             for i in range(5):
                 next_index = (index + i) % self.frame_count

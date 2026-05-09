@@ -54,7 +54,7 @@ class TkThreadCaller:
         return future
 
     def cancel(self, cancel_key):
-        logger.info(
+        logger.debug(
             "Cancel called for key: %s, Current thread count: %s",
             cancel_key,
             (

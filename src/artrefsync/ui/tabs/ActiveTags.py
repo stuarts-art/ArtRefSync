@@ -1,7 +1,9 @@
-from tkinter.font import nametofont
-import ttkbootstrap as ttk
-import tkinter as tk
 import logging
+import tkinter as tk
+from tkinter.font import nametofont
+
+import ttkbootstrap as ttk
+
 from artrefsync.config import config
 from artrefsync.constants import BINDING
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
@@ -43,6 +45,7 @@ class ActiveTagsTab(ttk.Frame):
 
     def add_bindings(self):
         self.clear_button.bind("<Button-1>", self.clear_active)
+        ebinder.bind(BINDING.ON_ARTIST_CLEAR, self.clear_active, self)
         ebinder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist, self)
         ebinder.bind(BINDING.ON_TAG_SELECT, self.on_tag, self)
         ebinder.bind(BINDING.ON_TAG_MIDDLE, self.on_tag_middle, self)
@@ -82,7 +85,6 @@ class ActiveTagsTab(ttk.Frame):
         if self.is_artist(tag):
             return self.on_artist(tag)
         if self.active_tags:
-
             tags = [tag for tag in self.active_tags]
 
             for curr_tag in tags:
@@ -146,8 +148,9 @@ class ActiveTagsTab(ttk.Frame):
                 self.artist = None
             item[1].destroy()
         if event is not None:  # If called by normal bind interface
-            self.update_filter()
+            # self.update_filter()
             self.forget_self()
+        self.update_filter()
 
     def update_filter(self):
         tags = list(self.active_tags.keys())

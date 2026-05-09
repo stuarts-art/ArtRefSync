@@ -169,9 +169,6 @@ class App(ttk.Window):
         image.thumbnail(size)
         return ImageTk.PhotoImage(image)
 
-    def setImage(self, photoimage):
-        self.image_label.config(image=photoimage)
-
     def toggle_config(self, event=None):
         if self.config_tab.grid_info():
             self.gallery.grid(column=0, row=0, sticky=tk.NSEW)

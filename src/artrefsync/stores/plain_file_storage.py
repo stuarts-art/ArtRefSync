@@ -34,7 +34,6 @@ class PlainLocalStorage(ImageStoreHandler):
     def __init__(self):
         logger.info("Plain File Store Handler Init Start")
         self.artist_base_folder = Path.cwd() / f"{config[TABLE.LOCAL][LOCAL.ARTIST_DIR]}"
-        print(self.artist_base_folder.absolute())
         self.dir_base_map = {}
         self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = str_dict(str_dict)
         self.dir_board_folder_map = str_dict(str_dict)

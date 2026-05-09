@@ -8,7 +8,6 @@ def ui():
     parser.add_argument(
         "--config_path", type=str, help="Your name", default="config/config.toml"
     )
-    parser.add_argument("--age", type=int, help="Your age", default=18)
     args = parser.parse_args()
-    print(args)
+    print(f"ARGS: {args}")
     App().start()

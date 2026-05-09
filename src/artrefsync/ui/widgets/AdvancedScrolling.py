@@ -11,6 +11,7 @@ from PIL import Image, ImageTk
 
 import logging
 from artrefsync.config import config
+from artrefsync.utils.image_utils import ImageUtils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -36,7 +37,8 @@ class AutoScrollbar(ttk.Scrollbar):
 class CanvasImage:
     """Display and zoom image"""
 
-    def __init__(self, placeholder, path):
+    # def __init__(self, placeholder, path):
+    def __init__(self, placeholder):
         """Initialize the ImageFrame"""
         self.imscale = 1.0  # scale for the canvas image zoom, public for outer classes
         self.__delta = 1.3  # zoom magnitude
@@ -93,7 +95,11 @@ class CanvasImage:
         )
         self.__image = None
         self.container = None
-        self.set_image(path)
+        # self.set_image(path)
+
+    def open_image(self, path) -> Image:
+        return ImageUtils.get_cv2_pil_image(path)
+
 
     # Moved out of init to allow for hotswapping images
     def set_image(self, path):
@@ -106,7 +112,8 @@ class CanvasImage:
 
         with warnings.catch_warnings():  # suppress DecompressionBombWarning
             warnings.simplefilter("ignore")
-            self.__image = Image.open(self.path)  # open image, but down't load it
+            # self.__image = Image.open(self.path)  # open image, but down't load it
+            self.__image = ImageUtils.get_cv2_pil_image(self.path)
         self.imwidth, self.imheight = self.__image.size  # public for outer classes
         frame_width = self.__imframe.master.winfo_width()
         frame_height = self.__imframe.master.winfo_height()
@@ -126,7 +133,7 @@ class CanvasImage:
             ]  # list of arguments to the decoder
         self.__min_side = min(self.imwidth, self.imheight)  # get the smaller image side
         # Create image pyramid
-        self.__pyramid = [self.smaller()] if self.__huge else [Image.open(self.path)]
+        self.__pyramid = [self.smaller()] if self.__huge else [self.open_image(self.path)]
         # Set ratio coefficient for image pyramid
         self.__ratio = (
             max(self.imwidth, self.imheight) / self.__huge_size if self.__huge else 1.0
@@ -182,7 +189,7 @@ class CanvasImage:
                 self.__offset + self.imwidth * i * 3
             )  # tile offset (3 bytes per pixel)
             self.__image.close()
-            self.__image = Image.open(self.path)  # reopen / reset image
+            self.__image = self.open_image(self.path)  # reopen / reset image
             self.__image.size = (self.imwidth, band)  # set size of the tile band
             self.__image.tile = [self.__tile]  # set tile
             cropped = self.__image.crop((0, 0, self.imwidth, band))  # crop tile band
@@ -272,7 +279,7 @@ class CanvasImage:
                     self.__offset + self.imwidth * int(y1 / self.imscale) * 3
                 )
                 self.__image.close()
-                self.__image = Image.open(self.path)  # reopen / reset image
+                self.__image = self.open_image(self.path)  # reopen / reset image
                 self.__image.size = (self.imwidth, h)  # set size of the tile band
                 self.__image.tile = [self.__tile]
                 image = self.__image.crop(
@@ -395,7 +402,7 @@ class CanvasImage:
                 self.__offset + self.imwidth * bbox[1] * 3
             )  # set offset of the band
             self.__image.close()
-            self.__image = Image.open(self.path)  # reopen / reset image
+            self.__image = self.open_image(self.path)  # reopen / reset image
             self.__image.size = (self.imwidth, band)  # set size of the tile band
             self.__image.tile = [self.__tile]
             return self.__image.crop((bbox[0], 0, bbox[2], band))

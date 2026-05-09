@@ -41,6 +41,7 @@ class BINDING(StrEnum):
     ON_IMAGE_VISIBILITY = auto()
     ON_IMAGE_DOUBLE_CLICK = auto()
     ON_ARTIST_SELECT = auto()
+    ON_ARTIST_CLEAR = auto()
     ON_TAG_SELECT = auto()
     ON_TAG_MIDDLE = auto()
     ON_FILTER_UPDATE = auto()

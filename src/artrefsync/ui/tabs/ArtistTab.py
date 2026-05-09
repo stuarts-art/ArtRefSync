@@ -1,7 +1,9 @@
-from artrefsync.config import config
 import logging
-import ttkbootstrap as ttk
 import tkinter as tk
+
+import ttkbootstrap as ttk
+
+from artrefsync.config import config
 from artrefsync.constants import BINDING, BOARD, DANBOORU, E621, R34, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.utils.EventManager import ebinder
@@ -38,7 +40,7 @@ class ArtistTab(ttk.Frame):
         self.load_config()
         config.subscribe_reload(self.load_config)
 
-    def on_middle_tag(self, e=None):
+    def on_middle_tag(self, e: tk.Event):
         tag = self.tree.identify_row(e.y)
         logger.info("Middle click recieved for %s", tag)
         ebinder.event_generate(BINDING.ON_ARTIST_SELECT, tag, True)
@@ -84,6 +86,7 @@ class ArtistTab(ttk.Frame):
 
     def on_board_menu_select(self):
         selected_board = self.board_var.get()
+        logger.info('Selected "%s"', selected_board)
         if selected_board != "":
             selected_found = False
             for c in self.tree.get_children(""):
@@ -98,6 +101,9 @@ class ArtistTab(ttk.Frame):
         else:
             for i, b in enumerate(self.board_artists_map.keys()):
                 self.tree.move(b, "", i)
+            # ebinder.event_generate(BINDING.ON_TAG_SELECT, "")
+            self.tree.selection_set((selected_board,))
+            ebinder.event_generate(BINDING.ON_ARTIST_CLEAR)
 
     def query_by_artist(self, e=None):
         if self.tree.selection():
@@ -125,6 +131,7 @@ class ArtistTab(ttk.Frame):
                     sorted_board_artists.append((board, artists))
 
             for board, artists in sorted_board_artists:
+                self.board_set.add(board)
                 board_str = str(board)
                 count = postdb.tag_posts.count(str(board_str))
                 count = count if count else 0
@@ -141,6 +148,7 @@ class ArtistTab(ttk.Frame):
                         open=True,
                     )
                 for artist in artists:
+                    self.board_set.add(artist)
                     if self.tree.exists(artist):
                         continue
                     try:
@@ -165,3 +173,4 @@ class ArtistTab(ttk.Frame):
                             e,
                         )
                         pass
+        ebinder.event_generate(BINDING.ARTIST_SET, self.artist_set)

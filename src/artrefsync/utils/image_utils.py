@@ -28,12 +28,11 @@ class ImageUtils:
     @classmethod
     @functools.lru_cache(maxsize=100)
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def getPilImage(cls, file: str, height=None, width=None):
+    def getPilImage(cls, file: str, height=None, width=None) -> Image.Image:
         logger.debug("Cache-Miss, Getting Image")
         if not os.path.exists(file):
-            logger.error("Cannot open path: %s", file)
-            return None
-
+            # logger.error("Cannot open path: %s", file)
+            raise FileNotFoundError
         with cls._lock:
             image = Image.open(file)
         if height and width and height < image.height:
@@ -197,7 +196,6 @@ class ImageUtils:
 
     @staticmethod
     def get_cv2_frame(file, size=(1080, 1080)):
-        print(f"Getting single frames for {file}")
         gif = cv2.VideoCapture(file)
         ret, frame = gif.read()
         if not ret:
@@ -212,10 +210,8 @@ class ImageUtils:
     @staticmethod
     def get_cv2_frames(file, size=(1080, 1080)):
         duration = 0
-        print(f"Getting frames for {file}")
         frames = []
         if not ImageUtils.is_multiple_frames(file):
-            print(f"{file} is not a video or gif")
             frames = [
                 ImageUtils.get_cv2_pil_image(file, size),
             ]
@@ -236,7 +232,6 @@ class ImageUtils:
                 frames.append(frame)
             else:
                 break
-        print(f"Returning {len(frames)} frames")
         return frames, duration, file
 
     @staticmethod
@@ -253,6 +248,8 @@ class ImageUtils:
 
     @staticmethod
     def is_multiple_frames(file):
+        if not os.path.exists(file):
+            raise FileNotFoundError
         ext = file.rsplit(".", 1)[-1]
         if ext in ["mp4", "mov", "webm", "gif"]:
             return True

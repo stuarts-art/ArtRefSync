@@ -1,23 +1,21 @@
+import logging
+import os
 import platform
-
-import ttkbootstrap as ttk
-from ttkbootstrap.tooltip import ToolTip
 import tkinter as tk
 from tkinter.font import nametofont
-import os
+
+import ttkbootstrap as ttk
 from tkinterdnd2 import COPY, DND_FILES
+from ttkbootstrap.tooltip import ToolTip
 
 from artrefsync.boards.board_handler import Post, PostFile
+from artrefsync.config import config
 from artrefsync.constants import BINDING
 from artrefsync.db.post_db import PostDb
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
 from artrefsync.utils.EventManager import ebinder
-from artrefsync.config import config
-
-import logging
-
 from artrefsync.utils.image_utils import ImageUtils
+from artrefsync.utils.TkThreadCaller import TkThreadCaller
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -75,9 +73,7 @@ class PostInfo(ttk.Frame):
         self.tags_frame = ttk.Frame(self)
         self.tags_frame.grid(column=0, row=5, sticky=tk.NSEW)
 
-        self.tags = ttk.Text(
-            self.tags_frame, wrap=tk.WORD, width=text_width
-        )
+        self.tags = ttk.Text(self.tags_frame, wrap=tk.WORD, width=text_width)
         self.tags.pack(fill="both", expand=True)
         self.grid_propagate(False)
 
@@ -90,6 +86,7 @@ class PostInfo(ttk.Frame):
         self.file.bind("<Double-1>", self.start_file)
         self.file.bind("<Button-2>", self.start_file_dir)
         self.tags.bind("<Double-Button-1>", self.tags_double)
+        self.tags.bind("<Button-2>", self.tags_double)
 
     def start_file(self, event):
         file = self.file.cget("text")
@@ -127,29 +124,33 @@ class PostInfo(ttk.Frame):
             self.after(0, self.after_on_post_select, post, post_file)
 
     def after_on_post_select(self, post: Post, post_file: PostFile):
-        if post_file:
-            if post_file.preview:
-                file_name = post_file.preview
-            elif post_file.sample:
-                file_name = post_file.sample
-            else:
-                file_name = post_file.file if post.ext not in ("webm", "mp4") else ""
+        if not post_file:
+            return
+        if post_file.preview:
+            file_name = post_file.preview
+        elif post_file.sample:
+            file_name = post_file.sample
+        else:
+            file_name = post_file.file if post.ext not in ("webm", "mp4") else ""
 
         if file_name:
             if not os.path.exists(file_name):
                 return
-            thumbnail = ImageUtils.get_cv2_pil_image(file_name, (190, 190), as_photoimage=True)
+            thumbnail = ImageUtils.get_cv2_pil_image(
+                file_name, (190, 190), as_photoimage=True
+            )
             self.thumbnail.config(image=thumbnail)
             self.thumbnail.image = thumbnail
 
+    def tags_double(self, event: tk.Event):
+        widget: tk.Text = event.widget  # pyright: ignore[reportAssignmentType]
+        middle = event.num == 2
 
-    def tags_double(self, event):
-        widget: tk.Text = event.widget
         try:
             index = widget.index(f"@{event.x},{event.y}")
             word = self.get_word(widget, index).strip()
             if word:
-                self.query_by_tag(word)
+                self.query_by_tag(word, middle)
         except Exception:
             pass
 
@@ -161,11 +162,11 @@ class PostInfo(ttk.Frame):
         except Exception:
             return ""
 
-    def query_by_tag(self, tag):
-        if tag in ebinder[BINDING.ARTIST_SET]:
-            ebinder.event_generate(BINDING.ON_ARTIST_SELECT, tag)
-        else:
+    def query_by_tag(self, tag, middle_click):
+        if not middle_click:
             ebinder.event_generate(BINDING.ON_TAG_SELECT, tag)
+        else:
+            ebinder.event_generate(BINDING.ON_TAG_MIDDLE, tag)
 
     def drag_init(self, event):
         file = self.file.cget("text")

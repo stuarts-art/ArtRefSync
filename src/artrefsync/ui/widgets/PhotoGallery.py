@@ -78,11 +78,12 @@ class PhotoImageGallery(ttk.Frame):
                     break
 
     def change_tags(self, tags=None):
-        if tags is None:
-            tags = []
         if self.tags == tags:
             return
+        if tags is None:
+            tags = []
         self.tags = tags
+        logger.info("Updating tags to be %s", self.tags)
         self.update_posts()
 
     def update_posts(self, *args, **kwargs):
@@ -94,7 +95,6 @@ class PhotoImageGallery(ttk.Frame):
             sort_dir,
             self.tags,
         )
-
         with PostDb() as post_db:
             order_query = (
                 f" id IN (SELECT id from PostFile) ORDER BY {sort_by} {sort_dir}"
@@ -109,12 +109,12 @@ class PhotoImageGallery(ttk.Frame):
                     conditions=None, suffix=f" WHERE {order_query} LIMIT 1000"
                 )
 
-            self.simple_frames.change_posts(sorted_posts)
+        self.simple_frames.change_posts(sorted_posts)
 
 
 class SimpleFrames:
     frames: list["SimplePhotoLabel"] = []
-    frame_map: map = {}
+    frame_map: dict = {}
 
     # @staticmethod
 
@@ -145,7 +145,7 @@ class SimpleFrames:
     def __class_getitem__(cls, index) -> SimpleFrames:
         if index is not None and index >= 0 and index < len(SimpleFrames.frames):
             return SimpleFrames.frames[index]
-            
+
     def init_bindings(self):
         ebinder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         ebinder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
@@ -209,14 +209,11 @@ class SimpleFrames:
         self.scrolling = Event()
 
     def bind_b2(self, e: tk.Event):
-        print(e)
         edict = {k: v for k, v in e.__dict__.items() if k not in ["num"]}
         self.text.event_generate("<ButtonPress-2>", **edict)
 
     def bind_b2_motion(self, e: tk.Event):
         edict = {k: v for k, v in e.__dict__.items() if k not in ["num"]}
-
-        print(e)
         self.text.event_generate("<B2-Motion>", **edict)
 
     def bind_scroll(self, event):
@@ -258,7 +255,6 @@ class SimpleFrames:
     def update(self):
         logger.debug("Updating Image Gallery")
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
-        # for i, frame in enumerate(self.frames):
         for i, frame in enumerate(self.frames):
             if frame.bbox:
                 frame.get_image()
@@ -501,7 +497,6 @@ class ImageCache:
         while len(self.deque) > self.max_size:
             rkey = self.deque.pop()
             self.cache.pop(rkey)
-            logger.info("Popping id: %s", rkey)
 
 
 class SimplePhotoLabel(tk.Label):
@@ -590,7 +585,6 @@ class SimplePhotoLabel(tk.Label):
 
     @property
     def next_row(self):
-        print(f"next Row for {self.idx}")
         if not self:
             return None
         next = self.next
@@ -644,7 +638,7 @@ class SimplePhotoLabel(tk.Label):
             self.config(image=None)
             self.thumbsize = (self.width_var.get(), self.height_var.get())
             if self.file.ext not in ["webm", "mp4"] and self.image_h > 400:
-                logger.info("Upscaling file %s to the full file", self.file_name)
+                logger.debug("Upscaling file %s to the full file", self.file_name)
                 self.file_name = self.file.file
 
             thread_caller.add(
