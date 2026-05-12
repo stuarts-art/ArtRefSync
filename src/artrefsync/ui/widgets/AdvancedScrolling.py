@@ -113,7 +113,7 @@ class CanvasImage:
         with warnings.catch_warnings():  # suppress DecompressionBombWarning
             warnings.simplefilter("ignore")
             # self.__image = Image.open(self.path)  # open image, but down't load it
-            self.__image = ImageUtils.get_cv2_pil_image(self.path)
+            self.__image = self.open_image(self.path)
         self.imwidth, self.imheight = self.__image.size  # public for outer classes
         frame_width = self.__imframe.master.winfo_width()
         frame_height = self.__imframe.master.winfo_height()

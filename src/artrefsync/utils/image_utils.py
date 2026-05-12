@@ -163,36 +163,62 @@ class ImageUtils:
         return Image.fromarray(cv_image_rgb)
 
     @staticmethod
-    @functools.lru_cache(maxsize=50)
     def cv2_image_open(file) -> cv2.typing.MatLike | None:
         cv_image = cv2.imread(file)
         return cv_image
 
+    k_size = 20 
+
     @staticmethod
     @functools.lru_cache(maxsize=50)
-    def get_cv2_rgb_array(file, size) -> cv2.typing.MatLike:
+    def get_cv2_rgb_array(file, size, blur=False) -> cv2.typing.MatLike:
         cv_image = ImageUtils.cv2_image_open(file)
         if cv_image is None:
             error_message = "Failed to open image " + file
             logger.error(error_message)
             raise AttributeError
+        h, w = cv_image.shape[:2]
         if size:
-            h, w = cv_image.shape[:2]
             thumb_size = ImageUtils.get_cv_thumb_size((w, h), size)
             cv_image = cv2.resize(cv_image, thumb_size, interpolation=cv2.INTER_AREA)
+
+        if blur:
+            h, w = cv_image.shape[:2]
+            offset = .01
+            blur_intensity = 55
+            h_start = int (h * offset)
+            w_start = int(w*offset)
+            h_end = int(h*(1.0-offset))
+            w_end = int(w*(1.0-offset))
+            blur_region = cv_image[h_start: h_end, w_start: w_end]
+            blur_region = cv2.GaussianBlur(blur_region,(blur_intensity,blur_intensity), ImageUtils.k_size)
+            cv_image[h_start: h_end, w_start: w_end] = blur_region
+
+            text = "Censored"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = .75
+            thickness = 2                
+            text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+
+            text_x = (w - text_size[0]) // 2
+            text_y = (h + text_size[1]) // 2
+            cv2.putText(cv_image, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
         cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         return cv_image_rgb
 
     @staticmethod
     def get_cv2_pil_image(
-        file: str, size=(1440, 1440), as_photoimage=False
+        file: str, size=(1440, 1440), as_photoimage=False, blur = False
     ) -> Image.Image | ImageTk.PhotoImage:
-        image_array = ImageUtils.get_cv2_rgb_array(file, size)
-        img = Image.fromarray(image_array)
-        if as_photoimage:
-            return ImageTk.PhotoImage(img)
+        if ImageUtils.is_multiple_frames(file):
+            return ImageUtils.get_cv2_frame(file)
         else:
-            return img
+            image_array = ImageUtils.get_cv2_rgb_array(file, size, blur)
+            img = Image.fromarray(image_array)
+            if as_photoimage:
+                return ImageTk.PhotoImage(img)
+            else:
+                return img
 
     @staticmethod
     def get_cv2_frame(file, size=(1080, 1080)):

@@ -98,6 +98,7 @@ class Config:
             APP.THUMBNAIL_HEIGHT: 720,
             APP.ONLY_RECENT_ENABLED: True,
             APP.MAX_DOWNLOAD_THREADS: 8,
+            APP.BLUR_UNSAFE_ENABLED: False,
         },
         TABLE.R34: {
             R34.ENABLED: False,

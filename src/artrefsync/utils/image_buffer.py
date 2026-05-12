@@ -13,6 +13,7 @@ from tkinterdnd2 import DND_FILES, TkinterDnD
 from artrefsync.config import config
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.IntegerVar import IntegerVar
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -23,6 +24,7 @@ class ImageCache:
         self.cache = OrderedDict()
         self.deque = deque()
         self.max_size = 50
+        self.pop_count = 0
 
     def __contains__(self, key):
         return self.cache.__contains__(key)
@@ -43,15 +45,18 @@ class ImageCache:
         self.cache[key] = value
         while len(self.deque) > self.max_size:
             rkey = self.deque.pop()
+            self.pop_count += 1
 
             self.cache.pop(rkey)
-            logger.info("Popping id: %s", rkey)
+            if self.pop_count % 20 == 0:
+                logger.info("Popped id: %s, total popped: %s", rkey, self.pop_count)
 
     def clear(self):
         self.deque.clear()
         while self.cache:
             k, v = self.cache.popitem()
-            v.close()
+
+    #         v.close()
 
 
 class ImageBuffer:
@@ -80,6 +85,13 @@ class ImageBuffer:
         except Exception:
             return 0
 
+    def __contains__(self, index):
+        if not self.gif:
+            return None
+        index %= self.frame_count
+        key = self.get_key(index)
+        return self.frames.__contains__(key)
+
     def __len__(self):
         if self.frame_count:
             return self.frame_count
@@ -94,22 +106,21 @@ class ImageBuffer:
         if not self.gif:
             return None
         index %= self.frame_count
-        index = self.get_key(index)
-        if index not in self.frames:
-            image, _ = self.get_curr_frame(index)
-            pil_image = ImageUtils.cv_array_to_image(image)
-            self.frames[index] = pil_image
-        return self.frames[index]
+        key = self.get_key(index)
+        if key not in self.frames:
+            image, _ = self.get_frame(key)
+            self.frames[key] = image
+        return self.frames[key]
 
     def __setitem__(self, key, value):
         key = self.get_key(key)
         self.frames[key] = value
 
     def get_key(self, index):
-        # return f"{self.path}.{index}"
         return index
 
-    def set_image(self, path, size=(720, 720)):
+    def update_file(self, path, size=(720, 720)):
+        logger.info("Updating file to be %s", path)
         if path == self.path:
             return
         self.path = path
@@ -120,14 +131,16 @@ class ImageBuffer:
         self.size = size
         self.prev = -1
 
-
-        if ImageUtils.is_multiple_frames:
+        if ImageUtils.is_multiple_frames(path):
             try:
-                with self.lock():
-                    self.frame_count = int(max(int(self.gif.get(cv2.CAP_PROP_FRAME_COUNT)), 1))
+                with self.lock:
+                    self.frame_count = int(
+                        max(int(self.gif.get(cv2.CAP_PROP_FRAME_COUNT)), 1)
+                    )
                     self.fps = int(self.gif.get(cv2.CAP_PROP_FPS))
                     self.delay = int(1000 / self.fps)
             except Exception:
+                logger.exception("Failed to read video")
                 self.frame_count = 1
                 self.fps = 1
                 self.delay = 1
@@ -136,100 +149,36 @@ class ImageBuffer:
             self.frame_count = 1
             self.delay = None
 
-    def get_frame(self, index=0):
-        if index != 0:
-            index %= self.frame_count
-        logger.debug(f"Getting Frame {index}")
-        key = self.get_key(index)
-        if key in self.frames:
-            for i in range(5):
-                next_index = (index + i) % self.frame_count
-                next_key = self.get_key(next_index)
-                if next_key not in self.queued and next_key not in self.frames:
-                    logger.info(f"Adding frame {next_key}")
-                    self.frame_queue.put(next_key)
-                    self.queued.add(next_key)
-            self.prev = index
-            return self.frames[key], index
-
-        if self.prev + 1 != index:
-            self.gif.set(cv2.CAP_PROP_POS_FRAMES, index)
-
-        with self.lock:
-            ret, frame = self.gif.read()
-        if not ret:
-            return (self.frames[key], 0)
-
-        image = ImageUtils.cv_array_to_image(frame)
-
-        self.frames[key] = image
-        for i in range(5):
-            next_index = (index + i) % self.frame_count
-            if next_index not in self.queued:
-                self.queued.add(next_index)
-                self.frame_queue.put(next_index)
-
-        return image, index
-
-    def get_curr_frame(self, index):
-        key = self.get_key(index)
-        if key in self.frames:
-            return self.frames[key], index
-
+    def get_frame(self, index):
         index = int(index)
         index %= self.frame_count
         if index == self.prev:
             return
-        if self.lock.locked():
-            return None, index
+
+        key = self.get_key(index)
+        if key in self.frames:
+            return self.frames[key], index
 
         with self.lock:
             if self.current_frame() != index:
                 self.current_frame(index)
-                # return self.get_curr_frame(index)
             ret, frame = self.gif.read()
 
         if not ret:
             if self.frame_count > 1:
                 with self.lock:
                     self.current_frame(0)
-                    return self.get_curr_frame(index)
+                return self.get_frame(index)
             else:
                 return None, index
-
         if self.size:
             h, w = frame.shape[:2]
             thumb_size = ImageUtils.get_cv_thumb_size((w, h), self.size)
             frame = cv2.resize(frame, thumb_size, interpolation=cv2.INTER_AREA)
+        frame = ImageUtils.cv_array_to_image(frame)
+        self.frames[key] = frame
         self.prev = index
         return frame, index
-
-    def process_queue(self):
-        self.process_queue_active = True
-        logger.info(f"Processing Queue {self.frame_queue}")
-        try:
-            while index := self.frame_queue.get(timeout=0.1):
-                index %= self.frame_count
-                key = self.get_key(index)
-                if key not in self.frames:
-                    if self.prev + 1 != index:
-                        self.gif.set(cv2.CAP_PROP_POS_FRAMES, index)
-                    with self.lock:
-                        ret, frame = self.gif.read()
-                    if ret:
-                        image = ImageUtils.cv_array_to_image(frame)
-                        if self.size:
-                            h, w = frame.shape[:2]
-                            thumb_size = ImageUtils.get_cv_thumb_size((w, h), self.size)
-                            frame = cv2.resize(
-                                frame, thumb_size, interpolation=cv2.INTER_AREA
-                            )
-                            image = ImageUtils.cv_array_to_image(frame)
-                        self.frames[key] = image
-                self.prev = index
-        except Empty:
-            pass
-        self.process_queue()
 
     def _read_frame(self, path):
         return None
@@ -242,131 +191,161 @@ class ImageBuffer:
 
 
 class ImagePlayer:
-    def __init__(self):
-        self.size = 740
-        self.app = ttk.Window(size=(self.size, self.size))
-        TkinterDnD._require(self.app)
+    def __init__(
+        self, parent, threadcaller: TkThreadCaller, size: int, index: IntegerVar
+    ):
+        self.parent = parent
+        self.threadcaller: TkThreadCaller = threadcaller
+        self.size = size
+        self.index: IntegerVar = index
+        self.__init_vars()
+        self.__init_widgets()
+        self.__init_bindings()
 
-        self.index = ttk.IntVar(value=0)
-        self.threadcaller = TkThreadCaller(self.app, __name__)
-        self.label: ttk.Label = ttk.Label(self.app)
-
-        self.buffer = ImageBuffer(self.size, self.index, self.threadcaller)
-        self.ui_frame = ttk.Frame(self.app)
-        self.scale = ttk.Scale(
-            self.ui_frame,
-            from_=0,
-            to=100,
-            variable=self.index,
-            length=400,
-            command=self.on_scale,
-        )
-        self.index_label = ttk.Label(self.ui_frame, textvariable=self.index)
-
-        # Packing
-        self.app.rowconfigure(0, weight=1)
-        self.app.columnconfigure(0, weight=1)
-
-        self.label.grid(row=0, column=0, sticky="nsew")
-        self.ui_frame.grid(row=1, column=0)
-
-        self.scale.grid(row=0, column=0, sticky="ew")
-        self.index_label.grid(row=0, column=1, sticky="")
-
-        self.label.drop_target_register(DND_FILES)
-        self.label.dnd_bind("<<Drop>>", self.handle_drop)
-
+    def __init_vars(self):
+        logger.info("Image Buffer Init Vars")
+        self.scaling = False
+        self.last_scale = time.time()
         self.path = ""
         self.after_id = None
         self.set_future = None
         self.playing = True
+        self.play_lock = Lock()
+        self.after_map = {}
+        self.start = time.time()
+        self.displayed_index = -1
 
-        # self.label.bind("<Space>")
+    def __init_widgets(self):
+        logger.info("Image Buffer Init Widgets")
+
+        self.root = ttk.Frame(self.parent)
+        self.root.pack(expand=True, fill="both")
+        self.root.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=1)
+
+        self.label: ttk.Label = ttk.Label(self.root)
+        self.buffer = ImageBuffer(self.size, self.index, self.threadcaller)
+        self.ui_frame = ttk.Frame(self.root)
+        self.ui_frame.rowconfigure(0, weight=1)
+
+        self.scale = ttk.Scale(
+            self.ui_frame,
+            from_=0,
+            to=100,
+            variable=self.index.dummyvar,
+            length=400,
+            command=self.on_scale,
+        )
+        self.index_label = ttk.Label(self.ui_frame, textvariable=self.index)
+        self.label.grid(row=0, column=0, sticky="nsew")
+        self.ui_frame.grid(row=1, column=0, sticky="s")
+        self.scale.grid(row=0, column=0, sticky="ew")
+        self.index_label.grid(row=0, column=1, sticky="e")
+        self.prev_index = -1
+
+    def __init_bindings(self):
+        logger.info("Image Buffer Init Bindings")
+        self.label.drop_target_register(DND_FILES)
+        self.label.dnd_bind("<<Drop>>", self.handle_drop)
         self.label.bind("<space>", self.on_space)
-        # self.app.bind("<space>", self.on_space)
-
-        with self.threadcaller:
-            self.app.mainloop()
+        self.scale.bind("<ButtonRelease-1>", self.on_scale_release)
 
     def on_space(self, e=None):
         if self.playing:
-            if self.set_future is not None:
-                # self.set_future.cancel()
-                self.threadcaller.cancel("play")
-            if self.after_id:
-                self.label.after_cancel(self.after_id)
-
+            logger.info("Toggle play on")
             self.playing = False
+            self.cancel_after_map()
         else:
+            logger.info("Toggle play off")
             self.playing = True
-            self.play()
+            self.index += 1
+            self.schedule_play()
 
     def on_scale(self, e=None):
-        if self.index.get() == self.buffer.prev:
+        if time.time() - self.last_scale < 0.2:
             return
-        self.playing = False
+        else:
+            self.last_scale = time.time()
+        self.scaling = True
+        if self.index.get() == int(self.buffer.prev):
+            return
+        self.schedule_play()
 
-        self.threadcaller.cancel("scale")
-        self.set_future = self.threadcaller.add(self.play, None, "scale")
+    def on_scale_release(self, e=None):
+        logger.info("On Scale Release")
+        self.scaling = False
+        if self.playing:
+            self.schedule_play()
 
     def handle_drop(self, e: tk.Event):
         file = e.data
         if file == self.path:
             return None
+        self.playing = False
+        self.index.set(0)
         self.label.focus()
-        if self.after_id:
-            self.label.after_cancel(self.after_id)
-        self.buffer.set_image(file)
+        self.cancel_after_map()
+
+        self.buffer.update_file(file)
         self.count = self.buffer.frame_count
         self.scale.config(to=self.count)
 
-        # self.threadcaller.cancel("play")
+        self.playing = True
+        self.schedule_play()
 
-        self.play()
+    def cancel_after_map(self):
+        while self.after_map:
+            index, after_id = self.after_map.popitem()
+            self.label.after_cancel(after_id)
+            logger.info("index %s cancelled.", index)
 
     def play(self, _=None):
-        self.start = time.time()
-        try:
-            if self.set_future is not None:
-                # self.set_future.cancel()
-                self.threadcaller.cancel("play")
-            self.set_future = self.threadcaller.add(
-                self.buffer.get_curr_frame, self.set_image, "play", self.index.get()
-            )
-
-            cframe = self.buffer.get_curr_frame(self.index.get())
-            self.set_image(cframe)
-            self.index.set((self.index.get() + 1) % self.count)
-        except Exception as e:
-            logger.error(e)
-
-    def set_image(self, data):
-        if data is None:
+        index = self.index.get()
+        if index in self.after_map:
             return
-
-        image, index = data
-        index %= self.buffer.frame_count
+        image = self.buffer[index]
         if image is None:
             return
-        key = self.buffer.get_key(index)
-        if key in self.buffer.frames:
-            photo = self.buffer.frames[key]
+        delay = int(self.buffer.delay - 100 * (time.time() - self.start))
+        delay = max(10, delay)
+        after_id = self.label.after(delay, self.set_image, index)
+        self.after_map[index] = after_id
+
+    def set_image(self, index):
+        if index not in self.after_map:
+            return
+        if index in self.after_map:
+            self.after_map.pop(index)
+        if self.displayed_index == index:
+            pass
+
         else:
-            pil_image = ImageUtils.cv_array_to_image(image)
-            logger.info(f"Setting image for index {index}")
+            pil_image = self.buffer[index]
+            if pil_image is None:
+                logger.warning("index %s not in buffer", index)
+                return
             photo = ImageTk.PhotoImage(pil_image)
-            self.buffer.frames[key] = photo
 
-        self.label.config(image=photo)
-        self.label.image = photo  # pyright: ignore[reportAttributeAccessIssue]
+            self.label.config(image=photo)
+            self.label.image = photo
+            self.displayed_index = index
 
-        if self.after_id:
-            self.label.after_cancel(self.after_id)
+            self.start = time.time()
+            if len(self.buffer) > 1:
+                if self.playing and not self.scaling:
+                    self.index += 1
+                    self.index %= len(self.buffer)
+                self.schedule_play()
 
-        if self.playing and self.buffer.frame_count > 1:
-            delay = int(self.buffer.delay - (time.time() - self.start))
-            self.after_id = self.after_id = self.label.after(delay, self.play)
+    def schedule_play(self):
+        self.set_future = self.threadcaller.add(self.play, None, "play")
 
 
 if __name__ == "__main__":
-    ImagePlayer()
+    size = 1080
+    app = ttk.Window(size=(size, size))
+    TkinterDnD._require(app)
+    index = IntegerVar(value=0)
+    with TkThreadCaller(app, __name__) as threadcaller:
+        player = ImagePlayer(app, threadcaller, 1080, index)
+        app.mainloop()

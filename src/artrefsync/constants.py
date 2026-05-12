@@ -102,6 +102,7 @@ class APP(StrEnum):
     THUMBNAIL_HEIGHT = auto()
     ONLY_RECENT_ENABLED = auto()
     MAX_DOWNLOAD_THREADS = auto()
+    BLUR_UNSAFE_ENABLED = auto()
 
 
 class BOARD(StrEnum):

@@ -10,7 +10,7 @@ from ttkbootstrap.tooltip import ToolTip
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
-from artrefsync.constants import BINDING
+from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import ebinder
@@ -133,11 +133,16 @@ class PostInfo(ttk.Frame):
         else:
             file_name = post_file.file if post.ext not in ("webm", "mp4") else ""
 
+        blur = False
+        if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
+            blur = "rating_s" not in post.tags
+
+
         if file_name:
             if not os.path.exists(file_name):
                 return
             thumbnail = ImageUtils.get_cv2_pil_image(
-                file_name, (190, 190), as_photoimage=True
+                file_name, (190, 190), as_photoimage=True, blur = blur
             )
             self.thumbnail.config(image=thumbnail)
             self.thumbnail.image = thumbnail

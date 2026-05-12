@@ -9,9 +9,9 @@ from PIL import ImageTk
 from tkinterdnd2 import COPY, DND_FILES
 from ttkbootstrap.widgets.scrolled import ScrolledText
 
-from artrefsync.boards.board_handler import PostFile
+from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
-from artrefsync.constants import BINDING
+from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.utils.EventManager import ebinder
 from artrefsync.utils.image_utils import ImageUtils
@@ -509,6 +509,12 @@ class SimplePhotoLabel(tk.Label):
     get_image_cancel_key = "photo_label_get_image"
 
     @staticmethod
+    def get_post(pid) -> Post:
+        with PostDb() as post_db:
+            post = post_db.posts[pid]
+        return post
+
+    @staticmethod
     def get_post_file(pid) -> PostFile:
         if pid not in SimplePhotoLabel.post_files:
             with PostDb() as post_db:
@@ -524,6 +530,7 @@ class SimplePhotoLabel(tk.Label):
             root, height=self.default_height, width=self.default_width, padx=5, pady=5
         )
         self.image_h = None
+        self.post = None
 
     @property
     def pid(self):
@@ -641,6 +648,13 @@ class SimplePhotoLabel(tk.Label):
                 logger.debug("Upscaling file %s to the full file", self.file_name)
                 self.file_name = self.file.file
 
+            if not self.post or self.post.id != self.file.id:
+                self.post = self.get_post(self.file.id)
+
+            blur = False
+            if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
+                blur = "rating_s" not in self.post.tags
+
             thread_caller.add(
                 ImageUtils.get_cv2_pil_image,
                 self.set_image,
@@ -648,6 +662,7 @@ class SimplePhotoLabel(tk.Label):
                 self.file_name,
                 (self.width_var.get(), self.height_var.get()),
                 False,
+                blur,
             )
 
     def set_image(self, image):
