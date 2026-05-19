@@ -5,6 +5,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
+from artrefsync.boards.TagType import TagType
 from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile
 from artrefsync.boards.danbooru_handler import Danbooru_Handler
 from artrefsync.boards.e621_handler import E621Handler
@@ -46,8 +47,6 @@ def sync_config(event: Event):
             store = PlainLocalStorage()
 
         only_recent = config[TABLE.APP][APP.ONLY_RECENT_ENABLED]
-
-        # EAGLE Overrides the normal FS storage.
 
         if store is None:
             logger.warning("NO STORE ENABLED. ENDING SYNC")
@@ -109,14 +108,12 @@ def sync_from_store(event: Event):
                     artist,
                     len(updated),
                 )
-            sync_coordinator.update_board_tag_count(board, handler.artist_list)
+            sync_coordinator.update_board_artist_tag_counts(board, handler.artist_list)
 
     except Exception as e:
-        logger.warning(e)
-        traceback.print_exc()
+        logger.exception("Failed to sync from store.")
 
 
-# TODO: Remove old Sync file
 def sync(
     board: ImageBoardHandler,
     store: ImageStoreHandler,
@@ -149,12 +146,13 @@ class SyncCoordinator:
         self.cache = LinkCache()
         self.download_count = 0
         self.max_download_threads = int(config[TABLE.APP][APP.MAX_DOWNLOAD_THREADS])
+        self.artist_list = self.board_handler.get_artist_list()
 
     def sync(self):
         try:
-            artist_list = self.board_handler.get_artist_list()
-            ebinder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(artist_list))
-            for artist in artist_list:
+            self.artist_list = self.board_handler.get_artist_list()
+            ebinder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+            for artist in self.artist_list:
                 if self.stop_event.is_set():
                     return
                 ebinder.event_generate(
@@ -164,11 +162,12 @@ class SyncCoordinator:
 
             with PostDb() as post_db:
                 ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
-                post_db.artist_tags.dumps_blob(str(self.board), self.board_tag_counts)
                 for tag, posts in self.tag_post_dict.items():
                     if self.stop_event.is_set():
                         return
                     post_db.tag_posts.union_update(tag, posts)
+            self.update_tag_types()
+            self.update_board_artist_tag_counts(self.board, self.artist_list)
         except Exception:
             logger.exception("Sync Failed.")
 
@@ -183,31 +182,23 @@ class SyncCoordinator:
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
         ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
-
         updated_posts = []
-        artist_tag_count = defaultdict(int)
-        posts: dict[str, Post] = self.board_handler.get_posts(
+        board_posts: dict[str, Post] = self.board_handler.get_posts(
             artist, self.max_per_artist, self.stop_event
         )
         logger.info(
             "Recieved %d metadata posts for %s from board %s",
-            len(posts) if posts else 0,
+            len(board_posts) if board_posts else 0,
             artist,
             self.board,
         )
         with PostDb() as post_db:
-            for pid, post in posts.items():
-                inserted = post_db.posts.insert(post)
+            for pid, board_post in board_posts.items():
+                board_post.tags.append(board_post.ext)
+                board_post.tags.append(board_post.artist_name)
+                inserted = post_db.posts.insert(board_post)
                 if inserted:
-                    updated_posts.append(post)
-                post.tags.append(post.ext)
-                post.tags.append(post.artist_name)
-                for tag in post.tags:
-                    self.tag_post_dict[tag].add(pid)
-                    self.board_tag_counts[tag] += 1
-                    artist_tag_count[tag] += 1
-            post_db.artist_tags.dumps_blob(artist, artist_tag_count)
-            post_db.artist_tags.commit()
+                    updated_posts.append(board_post)
         logger.info(
             "Updated %d metadata posts for %s from board %s",
             len(updated_posts) if updated_posts else 0,
@@ -234,45 +225,6 @@ class SyncCoordinator:
                         missing_ids.append(pid)
             return missing_ids
 
-    def update_board_tag_count(self, board, artists):
-        board_tags_count = {}
-
-        with PostDb() as post_db:
-            for artist in artists:
-                artist_tags_count = self.update_artist_tag_tables(board, artist)
-                if artist_tags_count:
-                    for tag, count in artist_tags_count.items():
-                        if tag not in board_tags_count:
-                            self.board_tag_counts[tag] = count
-                        else:
-                            self.board_tag_counts[tag] += count
-
-                        # board_tags_count[tag] = self.board_tag_counts[tag] + count
-            post_db.artist_tags.dumps_blob(str(board), board_tags_count)
-
-    def update_artist_tag_tables(self, board, artist):
-        board = str(board)
-        artist_tag_counts = defaultdict(dict)
-        tag_posts = defaultdict(set)
-        with PostDb() as post_db:
-            posts = post_db.posts.select(
-                conditions=[("artist_name", artist), ("board", board)],
-                select_fields=["id", "tags", "ext"],
-            )
-            for post in posts:
-                pid = post["id"]
-                ext = post["ext"]
-                tags = set(post["tags"] + [board, artist, ext])
-
-                for tag in tags:
-                    if tag not in artist_tag_counts[artist]:
-                        artist_tag_counts[artist][tag] = 0
-                    artist_tag_counts[artist][tag] += 1
-                    tag_posts[tag].add(pid)
-            for tag, posts in tag_posts.items():
-                post_db.tag_posts.union_update(tag, posts)
-        return artist_tag_counts
-
     def download_missing_ids(self, artist):
         ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Downloading missing")
 
@@ -284,11 +236,12 @@ class SyncCoordinator:
         with PostDb() as post_db:
             missing_posts = [post_db.posts[id] for id in missing_ids]
         if not missing_posts:
+            ebinder.event_generate(
+                BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), ""
+            )
             return
 
         logger.info("Downloading %d missing posts for %s", len(missing_posts), artist)
-
-        # thread_caller = TkThreadCaller()
         with ThreadPoolExecutor(max_workers=self.max_download_threads) as executor:
             future_to_pid = {}
             for post in missing_posts:
@@ -349,7 +302,6 @@ class SyncCoordinator:
             file=store_post.file,
         )
         return post_db.files.insert(post_file)
-        # return post_file
 
     def update_post_file_table(self, artist, repair=False):
         logger.info(
@@ -376,6 +328,35 @@ class SyncCoordinator:
             artist,
         )
         return inserted_list
+
+    def update_board_artist_tag_counts(self, board, artist_list):
+        board_map = defaultdict(int)
+        tag_posts = defaultdict(set)
+        with PostDb() as postdb:
+            for artist in artist_list:
+                artist_map = defaultdict(int)
+                posts = postdb.posts.select([("artist_name", artist), ("board", board)])
+                for post in posts:
+                    try:
+                        id = post.id
+                        for tag in post.tags:
+                            artist_map[tag] += 1
+                            board_map[tag] += 1
+                            tag_posts[id].add(post)
+
+                    except Exception:
+                        pass
+                postdb.artist_tags.dumps_blob(artist, artist_map)
+            postdb.artist_tags.dumps_blob(str(board), board_map)
+            for tag, posts in tag_posts.items():
+                postdb.tag_posts.union_update(tag, posts)
+    
+    def update_tag_types(self):
+        type_tags = self.board_handler.get_type_tags()
+        with PostDb() as post_db:
+            for type, tags in type_tags.items():
+                for tag in tags:
+                    post_db.tag_types.insert(TagType(tag, type))
 
 
 if __name__ == "__main__":

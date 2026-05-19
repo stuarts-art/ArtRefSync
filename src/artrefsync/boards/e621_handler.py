@@ -1,4 +1,5 @@
 import base64
+from collections import defaultdict
 import logging
 from threading import Event
 
@@ -20,11 +21,12 @@ def main():
 class E621Handler(ImageBoardHandler):
     """Class to handle messages from the image board E621"""
 
-    def __init__(self, only_recent = False):
+    def __init__(self, only_recent=False):
         logger.info("Initialize E621 Handler")
         self.only_recent = only_recent
         self.reload()
         config.subscribe_reload(self.reload)
+        self.type_tags = defaultdict(set)
 
     def reload(self):
         username = config[BOARD.E621][E621.USERNAME]
@@ -41,6 +43,9 @@ class E621Handler(ImageBoardHandler):
             "Authorization": f"Basic {base64.b64encode(user_string.encode('utf-8')).decode('utf-8')}",
             "User-Agent": f"MyProject/1.0 (by {username} on e621)",
         }
+
+    def get_type_tags(self) -> dict[str, str]:
+        return self.tag_types
 
     def get_board(self) -> BOARD:
         return BOARD.E621
@@ -60,7 +65,7 @@ class E621Handler(ImageBoardHandler):
             tag = tag.split()[0]  # Remove query and metatags
 
         for e_post in e621_posts:
-            tags = []
+            tags = set()
             general = e_post.tags.general
             species = e_post.tags.species
             artists = e_post.tags.artist
@@ -84,7 +89,6 @@ class E621Handler(ImageBoardHandler):
                 ]
                 + pools
             )
-
             try:
                 created_datetime = e_post.created_at
                 create_timestamp = int(created_datetime.timestamp())
@@ -119,6 +123,14 @@ class E621Handler(ImageBoardHandler):
             if is_black_listed:
                 continue
 
+            # Add after blacklist
+            self.type_tags["species"].update(e_post.tags.species)
+            self.type_tags["artist"].update(e_post.tags.artist)
+            self.type_tags["copyright"].update(e_post.tags.copyright)
+            self.type_tags["character"].update(e_post.tags.character)
+            self.type_tags["metadata"].update(e_post.tags.meta)
+            self.type_tags["lore"].update(e_post.tags.lore)
+
             height = e_post.file.height
             width = e_post.file.width
             ratio = None
@@ -129,9 +141,10 @@ class E621Handler(ImageBoardHandler):
                 ext_id=e_post.id,
                 name=name,
                 artist_name=tag,
-                tags=tags,
+                tags=list(dict.fromkeys(tags)),
                 score=e_post.score.up,
                 url=url,
+                md5=e_post.file.md5,
                 update_timestamp=update_timestamp,
                 create_timestamp=create_timestamp,
                 website=website,

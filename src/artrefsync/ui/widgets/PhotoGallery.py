@@ -1,8 +1,10 @@
 import logging
+import subprocess
 import time
 import tkinter as tk
 from collections import deque
-from threading import Event
+from threading import Event, Lock
+import platform
 
 import ttkbootstrap as ttk
 from PIL import ImageTk
@@ -25,36 +27,52 @@ thread_caller: TkThreadCaller = None
 
 class PhotoImageGallery(ttk.Frame):
     def __init__(self, root: ttk.Frame, thread_caller_arg=None):
-        logger.info("Creating Photo Image Gallery.")
-        global thread_caller
-        super().__init__(root)
-        self.tags = ["Initial Value"]
-        self.scrolled_text = ScrolledText(self, autohide=True)
-        self.text = self.scrolled_text.text
-        self.colors = ttk.Style().colors
+        logger.info("Init Photo Image Gallery.")
 
+        global thread_caller
+        self.root = root
+        thread_caller = thread_caller_arg
+        super().__init__(root)
+
+        self.init_vars()
+        self.init_widgets()
+        self.init_scafolding()
+        self.init_bindings()
+        logger.info("Init Photo Image Complete.")
+        ebinder[BINDING.GALLERY_WIDGET] = self
+
+    def init_vars(self):
+        logger.info("Init vars")
+        self.colors = ttk.Style().colors
+        self.tags = ["Initial Value"]
+        self.tag_sets: dict[str, set] = {}
+        self.frame_height = ttk.IntVar(self, value=500)
+        self.frame_width = ttk.IntVar(self, value=500)
+        self.color = ttk.Style().colors
+
+    def init_widgets(self):
+        logger.info("Init widgets")
+        self.scrolled_text = ScrolledText(self, autohide=False)
+        self.text = self.scrolled_text.text
+        self.simple_frames = SimpleFrames(
+            self.text, self.frame_width, self.frame_height, self.scrolled_text
+        )
+        self.text.tag_configure(
+            "sel", background=self.color.warning, foreground=self.color.warning, underline=1
+        )
+        self.text.tag_configure("center", justify="center")
+        self.text.config(state="disabled")
+
+    def init_scafolding(self):
+        logger.info("Init safolding")
         self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
         self.scrolled_text.grid(row=1, column=0, sticky=tk.NSEW)
 
-        self.tag_sets: dict[str, set] = {}
-        self.root = root
-        thread_caller = thread_caller_arg
-
-        color = ttk.Style().colors
-        self.text.tag_configure(
-            "sel", background=color.warning, foreground=color.warning, underline=1
-        )
-        self.text.tag_configure("center", justify="center")
-
-        self.frame_height = ttk.IntVar(self, value=500)
-        self.frame_width = ttk.IntVar(self, value=500)
-
-        self.simple_frames = SimpleFrames(
-            self.text, self.frame_width, self.frame_height, self.scrolled_text
-        )
-        self.text.config(state="disabled")
+    def init_bindings(self):
+        logger.info("Init bindings")
         self.bind("<Configure>", self.update_width)
+        self.bind("<FocusIn>", self.simple_frames.on_swap)
         ebinder.bind(BINDING.ON_FILTER_UPDATE, self.change_tags, self)
         ebinder.bind(BINDING.ON_SORT_BY_UPDATE, self.update_posts, self)
 
@@ -123,6 +141,9 @@ class SimpleFrames:
     ):
         SimplePhotoLabel.text = text
         self.text = text
+        self.space_lock = Lock()
+        self.last_space = time.time() - 1000
+
         self.width_var = width_var
         self.height_var = height_var
         self.post_ids = []
@@ -139,6 +160,7 @@ class SimpleFrames:
         self.color = ttk.Style().colors
         self.init_bindings()
         self.increase_frames()
+        self.last_event = ()
         if self.frames:
             self.add_select_tag(self.frames[0], False, False)
 
@@ -150,63 +172,109 @@ class SimpleFrames:
         ebinder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         ebinder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
         ebinder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
-        self.text.bind(
-            "q", lambda _: ebinder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
-        )
-        self.text.bind(
-            "e", lambda _: ebinder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
-        )
-        self.text.bind("z", lambda _: ebinder.event_generate(BINDING.ON_TEXT_Z))
-        self.text.bind("x", lambda _: ebinder.event_generate(BINDING.ON_TEXT_X))
-        self.text.bind("c", lambda _: ebinder.event_generate(BINDING.ON_TEXT_C))
-        self.text.bind(
-            "w", lambda e: self.text.event_generate("<MouseWheel>", delta=120)
-        )
-        self.text.bind(
-            "s", lambda e: self.text.event_generate("<MouseWheel>", delta=-120)
-        )
-        self.text.bind("a", self.throttled_focus_prev)
-        self.text.bind("d", self.throttled_focus_next)
-        self.text.bind(
-            "<Escape>", lambda _: ebinder.event_generate(BINDING.ON_TEXT_ESCAPE)
-        )
-        self.text.bind("<space>", self.on_space)
+        self.text.bind("<Key>", lambda e: self.text.after_idle(self.__keystroke, e))
+        self.text.bind("<KeyRelease-space>", self.on_space)
+        self.text.bind("<FocusIn>", lambda e: self.text.after(100, self.add_escape_binding))
+        self.text.bind("<FocusOut>", self.unbind_canvas_escape)
 
-    def on_space(self, e):
+    # def __keystroke(self, event)
+    def __keystroke(self, event: tk.Event):
+        keycode = event.keycode
+        keysym = event.keysym
+        state = event.state
 
-        if self.selected.bbox:
+        ctrl_pressed = (state & 0x4) != 0
+        shift_pressed = (state & 0x1) != 0
+
+        if keysym == "q":
+            ebinder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
+        elif keysym == "e":
+            ebinder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
+        elif keysym in ["w", "Up"]:
+            self.text.event_generate("<MouseWheel>", delta=120)
+        elif keysym in ["a", "Left"]:
+            self.throttled_focus_prev()
+        elif keysym in ["s", "Down"]:
+            self.text.event_generate("<MouseWheel>", delta=-120)
+        elif keysym in ["d", "Right"]:
+            self.throttled_focus_next()
+        elif keysym == "z":
+            ebinder.event_generate(BINDING.ON_TEXT_Z)
+        elif keysym == "x":
+            ebinder.event_generate(BINDING.ON_TEXT_X)
+        elif keysym == "c":
+            if ctrl_pressed:
+                self.on_ctrl_c()
+            else:
+                ebinder.event_generate(BINDING.ON_TEXT_C)
+        elif keysym == "grave":
+            ebinder.event_generate(BINDING.ON_TEXT_ESCAPE)
+
+        else:
+            return ""
+        
+        logger.debug(
+            "KeyCode: %s, KeySym: %s, State: %s",
+            event.keycode,
+            event.keysym,
+            event.state,
+        )
+        return "break"  # Prevents old bindings from triggering.
+
+    def on_swap(self, *e):
+        self.text.focus_set()
+
+        if self.selected and self.selected.bbox:
+            self.text.see(self.selected)
+        else:
+            for frame in self.frames:
+                if frame.bbox:
+                    self.text.see(frame)
+                    self.add_select_tag(frame, False, False)
+
+    def on_space(self, *e):
+        logger.info("ON SPACE")
+        if self.selected and self.selected.bbox:
             ebinder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid)
         else:
             for frame in self.frames:
                 if frame.bbox:
-                    self.add_select_tag(frame, False, False)
                     self.text.see(frame)
+                    self.add_select_tag(frame, False, False)
                     ebinder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid)
                     break
+
+    def unbind_canvas_escape(self, *_):
+        pass
+
+
+    def add_escape_binding(self, *_):
+        if self.selected:
+            self.text.see(self.selected)
+        else:
+            self.text.after_idle(lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
 
     def create_frame(self):
         idx = len(self.frames) if self.frames else 0
         label = SimplePhotoLabel(self.text, idx, self.height_var, self.width_var)
         self.frames.append(label)
         self.frame_map[f"1.{idx}"] = label
-        bindtags = list(label.bindtags())
         label.bind("<Visibility>", self.on_visibility)
         label.bind("<MouseWheel>", self.bind_scroll)
-        bindtags.insert(1, self.text)
-        label.bindtags(tuple(bindtags))
         label.bind("<ButtonRelease-1>", self.add_select_tag_handler)
-        label.bind(
-            "<Double-Button-1>",
-            lambda e: ebinder.event_generate(
-                BINDING.ON_IMAGE_DOUBLE_CLICK, self.post_ids[e.widget.idx]
-            ),
-        )
+        label.bind("<Double-Button-1>", self.on_double_button_1)
         label.drag_source_register(DND_FILES)
         label.dnd_bind("<<DragInitCmd>>", self.drag_binding)
         self.text.window_create(tk.END, window=label, padx=3, pady=3)
         self.text.tag_add("center", label)
 
         self.scrolling = Event()
+
+    def on_double_button_1(self, e):
+        self.text.focus_set()
+        ebinder.event_generate(
+            BINDING.ON_IMAGE_DOUBLE_CLICK, self.post_ids[e.widget.idx]
+        )
 
     def bind_b2(self, e: tk.Event):
         edict = {k: v for k, v in e.__dict__.items() if k not in ["num"]}
@@ -233,7 +301,7 @@ class SimpleFrames:
         if new_height != old_height:
             self.height_var.set(new_height)
             self.update()
-        self.text.after(300, self.clear_zoom)
+        self.text.after_idle(self.clear_zoom)
 
     def clear_zoom(self):
         self.zooming = False
@@ -245,7 +313,6 @@ class SimpleFrames:
             return
         ebinder.event_generate(BINDING.ON_POST_COUNT, len(posts) if posts else "0")
 
-        self.text.focus_set()
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts
         self.text.see(self.frames[0])
@@ -306,17 +373,33 @@ class SimpleFrames:
             return self.frame_map[first]
         return None
 
+    def get_selected_files(self):
+        files = []
+        first = self.text.index("sel.first")
+        last = self.text.index("sel.last")
+        for text_char in self.text.dump(first, last, window=True):
+            name = text_char[1]
+            photo: SimplePhotoLabel = self.text.nametowidget(name)
+            if "sel" in self.text.tag_names(photo):
+                if photo.file:
+                    files.append(photo.file.file)
+        return files
+
+    def copy_files_to_clipboard(self, file_paths):
+        if platform.system() == "Windows":
+            files = ",".join([f"'{path}'" for path in file_paths])
+            command = f'powershell -command "Set-Clipboard -Path {files}"'
+            subprocess.run(command, shell=True)
+        else:
+            logger.warning("Copy not implemented for OS %s", platform.system())
+
+    def on_ctrl_c(self, *e):
+        files = self.get_selected_files()
+        self.copy_files_to_clipboard(files)
+
     def drag_binding(self, event):
         try:
-            files = []
-            first = self.text.index("sel.first")
-            last = self.text.index("sel.last")
-            for text_char in self.text.dump(first, last, window=True):
-                name = text_char[1]
-                photo: SimplePhotoLabel = self.text.nametowidget(name)
-                if "sel" in self.text.tag_names(photo):
-                    if photo.file:
-                        files.append(photo.file.file)
+            files = self.get_selected_files()
             if files:
                 data = tuple(file for file in files)
                 dnd_packet = (COPY, DND_FILES, data)
@@ -366,11 +449,11 @@ class SimpleFrames:
             return
         self.focussing_prev = True
         time_since_last_prev = time.time() - self.last_focus_prev
-
         wait_time_ms = min(
             max(0, int((0.3 - time_since_last_prev) * 1000)), self.min_focus_delay
         )
         self.text.after(wait_time_ms, self.focus_prev)
+        return "break"
 
     def focus_prev(self, e=None):
         self.focussing_prev = False
@@ -397,6 +480,7 @@ class SimpleFrames:
             max(0, int((0.3 - time_since_last_next) * 1000)), self.min_focus_delay
         )
         self.text.after(wait_time_ms, self.focus_next)
+        return "break"
 
     def focus_next(self, e=None):
         self.focussing_next = False
@@ -479,10 +563,10 @@ class ImageCache:
         self.max_size = 50
 
     def __contains__(self, item):
-        self.cache.__contains__(item)
+        return item in self.cache
 
     def __len__(self):
-        return self.cache.__len__()
+        return len(self.cache)
 
     def __getitem__(self, key):
         if key in self.cache:
@@ -491,18 +575,19 @@ class ImageCache:
         return self.cache.get(key, None)
 
     def __setitem__(self, key, value):
-        if key in self:
-            self.cache.move_to_end(key, last=False)
+        if key in self.deque:
+            self.deque.remove(key)
+        self.deque.append(key)
         self.cache[key] = value
-        while len(self.deque) > self.max_size:
-            rkey = self.deque.pop()
+        while len(self.deque) > self.max_size - 1:
+            rkey = self.deque.popleft()
             self.cache.pop(rkey)
 
 
 class SimplePhotoLabel(tk.Label):
     post_ids = list()
     post_files: dict[str, PostFile] = {}
-    photos = ImageCache()
+    photo_cache = ImageCache()
     text: ttk.Text = None
     default_height = 30
     default_width = 40
@@ -625,8 +710,8 @@ class SimplePhotoLabel(tk.Label):
         if self.pid is None or not self.post_file:
             self.config(image=None)
             return
-        if self.pid in SimplePhotoLabel.photos:
-            photo = SimplePhotoLabel.photos[self.pid]
+        if self.pid in SimplePhotoLabel.photo_cache:
+            photo = SimplePhotoLabel.photo_cache[self.pid]
             self.config(image=photo, height=photo.height(), width=photo.width())
             return
 
@@ -671,7 +756,7 @@ class SimplePhotoLabel(tk.Label):
         photo = ImageTk.PhotoImage(image)
         if not photo:
             return None
-        SimplePhotoLabel.photos[self.pid] = photo
+        SimplePhotoLabel.photo_cache[self.pid] = photo
         self.config(image=photo, height=photo.height(), width=photo.width())
         self.loading = False
         logger.debug("Setting Image")

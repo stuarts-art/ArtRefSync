@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 from datetime import datetime
 from threading import Event
@@ -32,8 +33,14 @@ class R34Handler(ImageBoardHandler):
         self.r34_api_string = config[BOARD.R34][R34.API_KEY]
         self.black_list = config[BOARD.R34][R34.BLACK_LIST]
         self.artist_list = list(set(config[BOARD.R34][R34.ARTISTS]))
-        self.client = R34_Client(api_string=self.r34_api_string, only_recent=self.only_recent)
+        self.client = R34_Client(
+            api_string=self.r34_api_string, only_recent=self.only_recent
+        )
         self.board = BOARD.R34
+        self.type_tags = defaultdict(set)
+
+    def get_type_tags(self) -> dict[str, str]:
+        return self.type_tags
 
     def get_artist_list(self):
         return self.artist_list
@@ -87,6 +94,8 @@ class R34Handler(ImageBoardHandler):
             try:
                 updated_datetime = datetime.fromtimestamp(rpost.change)
                 update_timestamp = int(updated_datetime.timestamp())
+                if created_datetime == 0:
+                    create_timestamp = update_timestamp
             except Exception:
                 update_timestamp = 0
 
@@ -95,11 +104,12 @@ class R34Handler(ImageBoardHandler):
                 ext_id=rpost.id,
                 name=f"{post_id}-{tag}",
                 artist_name=tag,
-                tags=tags,
+                tags=list(dict.fromkeys(tags)),
                 board=self.board,
                 score=rpost.score,
                 url=rpost.file_url,
                 website=website,
+                md5=rpost.hash,
                 update_timestamp=update_timestamp,
                 create_timestamp=create_timestamp,
                 height=rpost.height,
@@ -118,10 +128,14 @@ class R34Handler(ImageBoardHandler):
             posts[post_id] = post
             stats.add(STATS.POST_COUNT)
 
+            for info in rpost.tag_info:
+                if info.type == "tag":
+                    continue
+                self.type_tags[info.type].add(info.type)
+
         logger.info("Returning %d posts for artist %s", len(posts), tag)
         return posts
 
 
-# r34_handler = R34Handler()
 if __name__ == "__main__":
     main()

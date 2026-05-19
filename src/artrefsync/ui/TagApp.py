@@ -21,12 +21,10 @@ from artrefsync.ui.widgets.LoadingBar import LoadingBars
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
 from artrefsync.ui.widgets.PhotoGallery import PhotoImageGallery
 from artrefsync.ui.widgets.PostInfo import PostInfo
-from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import ebinder
 from artrefsync.utils.TkThreadCaller import TkThreadCaller
 
 logger = logging.getLogger(__name__)
-config = Config()
 
 
 def main():
@@ -46,15 +44,20 @@ class App(ttk.Window):
                 The name of the ttkbootstrap theme to apply to the
                 application.
         """
+        global config
+        config = Config(config_path=config_path, config_file_name=config_file_name)
+        self.load_config()
 
+    def load_config(self):
         logger.setLevel(config.log_level)
         logger.info("Starting App")
         self.init_scaffolding()
         self.init_top_bar_vars()
         self.init_tabs()
         self.init_views()
-        self.init_bindings()
         self.after_idle(ebinder.event_generate, BINDING.ON_FILTER_UPDATE)
+        self.gallery.text.focus_set()
+        self.init_bindings()
         logger.info("App Init Complete")
 
     def start(self):
@@ -62,10 +65,7 @@ class App(ttk.Window):
             try:
                 self.mainloop()
             except Exception:
-                # logger.error(e)
                 logger.exception("Exception Raised")
-                # traceback.print_exc()
-                # traceback.
 
     def init_scaffolding(self):
         logger.info("Init Scafolding")
@@ -81,7 +81,6 @@ class App(ttk.Window):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.bar = ModernTopBar(self, False)
-        # self.bar = ModernTopBar(self, True)
         self.stime = time.time()
         self.thread_caller = TkThreadCaller(self)
 
@@ -91,39 +90,43 @@ class App(ttk.Window):
 
         self.bar.mid_left.rowconfigure(0, weight=1)
         self.bar.mid_left.columnconfigure(0, weight=1, minsize=250)
+
         self.bar.mid_right.rowconfigure(0, weight=1)
         self.bar.mid_right.columnconfigure(0, weight=1, minsize=250)
-        self.left_tabs = ttk.Frame(self.bar.mid_left)
-        self.right = ttk.Frame(self.bar.mid_mid)
 
-        self.left_tabs.grid(row=0, column=0, sticky=tk.NSEW)
+        self.right = ttk.Frame(self.bar.mid_mid)
         self.right.grid(row=0, column=1, sticky=tk.NSEW)
         self.right.rowconfigure(0, weight=1)
         self.right.columnconfigure(0, weight=1)
 
+        self.left_tabs = ttk.Frame(self.bar.mid_left)
+        self.left_tabs.grid(row=0, column=0, sticky=tk.NSEW)
         self.left_tabs.rowconfigure(3, weight=1)
         self.left_tabs.columnconfigure(0, weight=1)
 
-        self.button_frame = ttk.Frame(self.left_tabs)
-        self.button_frame.grid(column=0, row=1, padx=5)
+        self.notebook = ttk.Notebook(self.left_tabs)
+        self.notebook.grid(column=0, row=3, padx=5, sticky=tk.NSEW)
 
-        self.artists_button = RoundedIcon(
-            self.button_frame, text="Artists", size=(100, 30)
-        )
-        self.artists_button.grid(column=0, row=0, sticky=tk.EW, padx=5)
-        self.tags_button = RoundedIcon(self.button_frame, text="Tags", size=(100, 30))
-        self.tags_button.grid(column=1, row=0, sticky=tk.EW, padx=5)
+    def swap_to_notebook_entry(self, *e):
+        tab = self.notebook.nametowidget(self.notebook.select())
+        tab.entry.focus_set()
+        return "break"
+
+    def swap_to_notebook_tree(self, *e):
+        tab = self.notebook.nametowidget(self.notebook.select())
+        tab.tree.focus_set()
+        return "break"
 
     def init_tabs(self):
         logger.info("Init tabs")
-        self.artist_tab = ArtistTab(self.left_tabs)
-        self.artist_tab.grid(column=0, row=3, sticky=tk.NSEW)
-        self.tag_tab = TagTab(self.left_tabs)
-        self.tag_tab.grid(column=0, row=3, sticky=tk.NSEW)
+        self.artist_tab = ArtistTab(self.notebook)
+        self.notebook.add(self.artist_tab, text="Artists")
+        self.tag_tab = TagTab(self.notebook)
+        self.notebook.add(self.tag_tab, text="Tags")
         self.tag_tab.grid_forget()
         self.active_tab = ActiveTagsTab(self.left_tabs)
-        self.sort_by_tab = SortByTab(self.left_tabs)
-        self.sort_by_tab.grid(column=0, row=4, sticky=tk.E)
+        self.sort_by_tab = SortByTab(self.bar.top_right)
+        self.sort_by_tab.pack(side="right", padx=5)
         self.post_info = PostInfo(self.bar.mid_right, self.thread_caller)
         self.loading_bar = LoadingBars(self.bar._bot)
 
@@ -160,14 +163,18 @@ class App(ttk.Window):
         logger.info("Init Bindings")
         self.bind(self.bar.menu_event_name, self.toggle_config)
         self.config_tab.clear_button.bind("<Button-1>", self.toggle_config)
+        self.bind_all("<Control-Key-1>", lambda e: self.notebook.select(0))
+        self.bind_all("<Control-Key-2>", lambda e: self.notebook.select(1))
+        self.bind_all("<Control-Key-3>", self.toggle_config)
+        self.bind_all("<Control-comma>", self.toggle_config)
+        self.gallery.scrolled_text.text.bind("<Tab>", self.swap_to_notebook_entry)
+        self.gallery.scrolled_text.text.bind("<Shift-Tab>", self.swap_to_notebook_tree)
+        self.artist_tab.entry.bind("<Shift-Tab>", self.focus_galery)
+        self.tag_tab.entry.bind("<Shift-Tab>", self.focus_galery)
 
-        self.artists_button.bind("<Button-1>", self.toggle_artists)
-        self.tags_button.bind("<Button-1>", self.toggle_tags)
-
-    def taskedGetImage(self, file_name, size):
-        image = Image.open(file_name)
-        image.thumbnail(size)
-        return ImageTk.PhotoImage(image)
+    def focus_galery(self, e):
+        self.gallery.scrolled_text.text.focus_set()
+        return "break"
 
     def toggle_config(self, event=None):
         if self.config_tab.grid_info():
@@ -176,22 +183,6 @@ class App(ttk.Window):
         else:
             self.config_tab.grid(column=0, row=0, sticky=tk.NSEW)
             self.gallery.grid_forget()
-
-    def toggle_artists(self, event=None):
-        logger.info("Toggling Artist")
-        if len(self.artist_tab.grid_info()) == 0:
-            self.artist_tab.grid(column=0, row=3, sticky=tk.NSEW)
-            self.artists_button.configure(bootstyle="secondary-inverse")
-            self.tags_button.configure(bootstyle="normal")
-            self.tag_tab.grid_forget()
-
-    def toggle_tags(self, event=None):
-        logger.info("Toggling Tags")
-        if len(self.tag_tab.grid_info()) == 0:
-            self.artists_button.configure(bootstyle="normal")
-            self.tags_button.configure(bootstyle="secondary-inverse")
-            self.tag_tab.grid(column=0, row=3, sticky=tk.NSEW)
-            self.artist_tab.grid_forget()
 
     def toggle_side_bar(self, event):
         logger.info("Toggling Sidebar")

@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 from datetime import datetime
 from threading import Event
@@ -26,6 +27,7 @@ class Danbooru_Handler(ImageBoardHandler):
         logger.info("Initialize Danbooru Handler")
         self.reload()
         config.subscribe_reload(self.reload)
+        self.type_tags = defaultdict(set)
 
     def reload(self):
         self.danbooru_api_key = config[BOARD.DANBOORU][DANBOORU.API_KEY]
@@ -38,6 +40,9 @@ class Danbooru_Handler(ImageBoardHandler):
             only_recent=self.only_recent,
         )
         self.board = BOARD.DANBOORU
+
+    def get_type_tags(self) -> dict[str, str]:
+        return self.type_tags
 
     def get_artist_list(self):
         return self.artist_list
@@ -93,13 +98,20 @@ class Danbooru_Handler(ImageBoardHandler):
             if is_black_listed:
                 continue
 
+
+            self.type_tags["metadata"].update(dpost.tag_string_meta)
+            self.type_tags["artist"].update(dpost.tag_string_artist)
+            self.type_tags["character"].update(dpost.tag_string_character)
+            self.type_tags["copyright"].update(dpost.tag_string_copyright)
+
             post = Post(
                 id=post_id,
                 ext_id=dpost.id,
                 name=f"{post_id}-{tag}",
                 artist_name=tag,
-                tags=tags,
+                tags=list(dict.fromkeys(tags)),
                 board=self.board,
+                md5=dpost.md5,
                 update_timestamp=update_timestamp,
                 create_timestamp=create_timestamp,
                 score=dpost.score,

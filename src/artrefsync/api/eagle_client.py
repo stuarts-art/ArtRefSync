@@ -4,6 +4,7 @@ import threading
 
 import dacite
 import requests
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.eagle_model import EagleFolder, EagleItem, EagleLibrary
 from artrefsync.config import config
@@ -57,8 +58,6 @@ class EagleClient:
                 EagleFolder.CreatedFolder, json.loads(response.content)["data"]
             )
             return created_file
-
-        # If no args given, returns info on folder id
 
         # @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def update(
@@ -165,7 +164,7 @@ class EagleClient:
             data = json.loads(response.content)["data"]
             return data
 
-        # @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
+        @retry(stop=stop_after_attempt(4), wait=wait_exponential(min=1))
         def info(self, pid) -> EagleItem.UpdatedItem:
             with self.lock:
                 response = self.session.get(

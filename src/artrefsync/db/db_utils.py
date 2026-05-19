@@ -61,7 +61,7 @@ class DbUtils:
 
     @functools.cache
     @staticmethod
-    def get_sql_fields(cls):
+    def get_sql_fields(cls, *key_list):
         logger.debug("Getting sql fields for class: %s", cls.__name__)
         field_type = {}
         table_fields = []
@@ -95,11 +95,18 @@ class DbUtils:
                 if mapped:
                     break
 
-            if i == 0:
-                primary_key = name
-                field_suffix = " PRIMARY KEY"
+
+            field_suffix = ""
+            if key_list:
+                primary_key = key_list[0]
+                if name not in key_list:
+                    field_suffix = "" if any(x is NoneType for x in types) else " NOT NULL"
             else:
-                field_suffix = "" if any(x is NoneType for x in types) else " NOT NULL"
+                if i == 0 :
+                    primary_key = name
+                    field_suffix = " PRIMARY KEY"
+                else:
+                    field_suffix = "" if any(x is NoneType for x in types) else " NOT NULL"
 
             default = ""
             if field.default is not MISSING:

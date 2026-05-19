@@ -35,6 +35,7 @@ class ConfigTab(ttk.Frame):
         self.sync_event = Event()
         self.store_sync_running = False
         self.store_sync_event = Event()
+        self.frames = {}
 
         for table in TABLE:
             logger.info("Initializing %s tab.", table)
@@ -44,14 +45,19 @@ class ConfigTab(ttk.Frame):
                 tab_frame,
                 text=table.capitalize().ljust(6),
             )
+            self.frames[table] = tab_frame
 
-            self.clear_button = RoundedIcon(self, text="✕", size=(25, 25), command=self.toggle_console_window)
-            self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
+
+        self.clear_button = RoundedIcon(self, text="✕", size=(25, 25), command=self.toggle_console_window)
+        self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
+
 
     def reload(self):
         config.reload_config()
-        for child in self.config_notebook.winfo_children():
-            child.destroy()
+        for table, frame in self.frames.items():
+            logger.info("Destroying config table: %s", table)
+            frame.destroy()
+
         self.load()
 
     def init_config_tabs(self, table, tab_frame):

@@ -6,31 +6,37 @@ import dacite
 config = dacite.Config(cast=[int], type_hooks={List[str]: (lambda x: x.split())})
 
 @dataclass
+class TagInfo:
+    count: int
+    type: str
+    tag: str
+
+@dataclass
 class R34_Post:
     height: int | None
     score: int | None
     file_url: str
-    parent_id: str
+    parent_id: str | int
     sample_url: str
     sample_width: int | None
     sample_height: int | None
-    change: str
     preview_url: str
     rating: str
     tags: List[str]
-    id: str
+    id: int
     width: int | None
     change: int | None
-    md5: str
+    hash: str
     creator_id: int | None
     has_children: str | None
-    created_at: str
     status: str
     source: str
-    has_notes: str
-    has_comments: str
+    has_notes: bool
+    has_comments: str | None
     preview_width: int | None
     preview_height: int | None
+    tag_info: List[TagInfo] | None
+
 
     @staticmethod
     def parse_r34_post(post_dict) -> "R34_Post":

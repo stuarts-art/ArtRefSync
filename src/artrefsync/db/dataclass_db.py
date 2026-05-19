@@ -26,6 +26,7 @@ class Dataclass_DB(Generic[T]):
         table_name=None,
         db_name=None,
         lazy=False,
+        key_list=[],
     ):
         """Stripped down sqlite dataclass connector
         Args:
@@ -40,6 +41,13 @@ class Dataclass_DB(Generic[T]):
         self.connection = connection
         self.connection_owner = False
         self.table_name = table_name if table_name else cls.__name__
+        self.key_list = key_list  # Overrides default singular key
+        if len(self.key_list) == 1:
+            self.key_list = []
+            self.logger.warning(
+                "Key_list must have one or more values. Defaulting back to the first index."
+            )
+
         self.db_name = (
             db_name
             if db_name
@@ -51,7 +59,7 @@ class Dataclass_DB(Generic[T]):
             self.connection_owner = True
         self.commit = self.connection.commit
         self.field_types, self.table_fields, self.primary_key = DbUtils.get_sql_fields(
-            cls
+            cls, *self.key_list
         )
         if not lazy:
             self.create_or_update_table(cls)
@@ -122,11 +130,21 @@ class Dataclass_DB(Generic[T]):
             cur.execute(query)
 
         if create_table_flag:
-            query = f"CREATE TABLE IF NOT EXISTS {self.table_name} (\n{',\n'.join(self.table_fields)}\n);"
-            self.logger.debug('Creating Table with Query "%s"', query)
+            query = (
+                f"CREATE TABLE IF NOT EXISTS {self.table_name} (\n{',\n'.join(self.table_fields)}"
+                + (
+                    f",\nPRIMARY KEY ({', '.join(self.key_list)}));"
+                    if self.key_list
+                    else ");"
+                )
+            )
+
+            self.logger.info('Creating Table with Query "%s"', query)
+
             cur.execute(query)
             self.commit()
 
+        if not self.key_list:
             auto_update_query = f"""
                 CREATE TRIGGER IF NOT EXISTS update_{self.table_name}_updated
                 AFTER UPDATE ON {self.table_name}
@@ -146,7 +164,10 @@ class Dataclass_DB(Generic[T]):
         Returns True if inserted, false if updated.
         """
         item_dict = asdict(item)
-        exists = str(item_dict[self.primary_key]) in self
+        primary_key = self.key_list[0] if self.key_list else self.primary_key
+
+        exists = str(item_dict[primary_key]) in self
+
         query_values = tuple(
             pickle.dumps(kv[1]) if self.field_types[kv[0]] == "BLOB" else kv[1]
             for kv in item_dict.items()
@@ -285,7 +306,9 @@ class Dataclass_DB(Generic[T]):
         else:
             cur.execute(query)
         items = cur.fetchall()
-        self.logger.debug("%d items returned for conditions: %s", len(items), conditions)
+        self.logger.debug(
+            "%d items returned for conditions: %s", len(items), conditions
+        )
         return [row[0] for row in items]
 
     def update(self, item_id: str, item: T, item_fields: list[str] = None):

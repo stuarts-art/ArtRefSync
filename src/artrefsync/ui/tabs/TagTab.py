@@ -2,7 +2,7 @@ import fnmatch
 import ttkbootstrap as ttk
 import tkinter as tk
 
-from artrefsync.constants import BINDING
+from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.utils.EventManager import ebinder
 from artrefsync.config import config
@@ -17,7 +17,7 @@ class TagTab(ttk.Frame):
         logger.info("Init Tag Tab")
         super().__init__(root, *args, **kwargs)
         self.entry = ttk.Entry(self)
-        self.tree = ttk.Treeview(self, columns=("Count"), show="tree", *kwargs)
+        self.tree = ttk.Treeview(self, columns=("Count"), show="tree", takefocus=True, *kwargs)
         self.curr_artist = ""
         self.artist_tag_count_map = {}
         self.artist_tags = []
@@ -27,12 +27,46 @@ class TagTab(ttk.Frame):
         self.tree.column("#0", width=0, anchor="w", stretch=True)
         self.tree.column("#1", width=80, stretch=0, anchor="e")
         self.entry.bind("<KeyRelease>", self.on_key_release)
-        self.tree.bind("<<TreeviewSelect>>", self.query_by_tag)
-        self.tree.bind("<Button-2>", self.on_middle_tag)
+        self.vowel_table = str.maketrans("aeiou", "*****")
         self.tree.config(selectmode=tk.BROWSE)
         ebinder.bind(BINDING.ON_ARTIST_SELECT, self.update_artist, self)
         self.after(100, self.on_key_release)
         config.subscribe_reload(self.on_key_release)
+        self.tree.bind("<FocusIn>", self.on_tree_focusin)
+        self.tree.bind("<Button-1>", self.query_by_tag)
+        self.tree.bind("<Button-2>", self.on_middle_tag)
+        self.tree.bind("<Key>", self.__keystroke)
+
+    def __keystroke(self, event: tk.Event):
+        keycode = event.keycode
+        keysym = event.keysym
+        state = event.state
+        ctrl_pressed = (state & 0x4) != 0
+        shift_pressed = (state & 0x1) != 0
+
+        if keysym in ["Return", "grave"]:
+            self.query_by_tag()
+        elif keysym == 'w':
+            self.tree.event_generate("<Up>")
+        elif keysym == 'a':
+            self.tree.event_generate("<Shift-Tab>")
+        elif keysym == 's':
+            self.tree.event_generate("<Down>")
+        elif keysym == 'd':
+            self.tree.event_generate("<Tab>")
+        else:
+            return ""
+        return "break"
+
+    def on_tree_focusin(self, e):
+        self.tree.focus_get()
+        if not self.tree.selection():
+            children = self.tree.get_children()
+            if children:
+                child = children[0]
+                self.tree.focus(child)
+                self.tree.selection_set(child)
+
 
     def update_artist(self, artist, middle=False):
         if artist != self.curr_artist:
@@ -79,9 +113,14 @@ class TagTab(ttk.Frame):
         for item in self.tree.get_children():
             self.tree.delete(item)
 
+        repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
         for i, (tag, count) in enumerate(tags):
             if not self.is_artist(tag):
-                self.tree.insert("", "end", iid=tag, text=tag, values=(count,))
+                tag_text:str = tag
+                if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
+                    repl_split = "_".join([split[0] + repl_text[len(split):2*len(split)-2] + split[-1] for split in tag_text.split("_")])
+                    tag_text = tag_text[0] + repl_split[1:-1] + tag_text[-1]
+                self.tree.insert("", "end", iid=tag, text=tag_text, values=(count,))
 
     def query_by_tag(self, e=None):
         if self.tree.selection():
@@ -90,6 +129,10 @@ class TagTab(ttk.Frame):
                 ebinder.event_generate(BINDING.ON_ARTIST_SELECT, tag)
             else:
                 ebinder.event_generate(BINDING.ON_TAG_SELECT, tag)
+        else:
+            children = self.tree.children
+            if children:
+                self.tree.selection_set(children[0])
 
     def on_middle_tag(self, e=None):
         tag = self.tree.identify_row(e.y)

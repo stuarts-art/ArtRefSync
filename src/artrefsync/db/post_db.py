@@ -2,6 +2,7 @@ import logging
 import os
 import sqlite3
 
+from artrefsync.boards.TagType import TagType
 from artrefsync.config import config
 from artrefsync.db.db_utils import BlobDb, DbUtils
 from artrefsync.db.dataclass_db import  Dataclass_DB
@@ -51,6 +52,7 @@ class PostDb:
 
         self.posts = Dataclass_DB(Post, self.connection, lazy=lazy)
         self.files = Dataclass_DB(PostFile, self.connection, lazy=lazy)
+        self.tag_types = Dataclass_DB(TagType, self.connection, lazy=lazy, key_list=["tag", "type"])
         self.tag_posts = BlobDb(self.connection, "tag_posts", lazy=lazy)
         self.artist_tags = BlobDb(self.connection, "artist_tags", lazy=lazy)
         logger.debug("Opening PostDB")

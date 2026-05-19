@@ -5,13 +5,14 @@ import math
 import warnings
 import tkinter as tk
 
-
 from tkinter import ttk
 from PIL import Image, ImageTk
 
 import logging
 from artrefsync.config import config
+from artrefsync.constants import BINDING
 from artrefsync.utils.image_utils import ImageUtils
+from artrefsync.utils.EventManager import ebinder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -84,7 +85,7 @@ class CanvasImage:
         # Handle keystrokes in idle mode, because program slows down on a weak computers,
         # when too many key stroke events in the same time
 
-        # self.canvas.bind('<Key>', lambda event: self.canvas.after_idle(self.__keystroke, event))
+        self.canvas.bind('<Key>', lambda event: self.canvas.after_idle(self.__keystroke, event))
 
         # Decide if this image huge or not
         self.__huge = False  # huge or not
@@ -234,82 +235,89 @@ class CanvasImage:
 
     def __show_image(self):
         """Show image on the Canvas. Implements correct image zoom almost like in Google Maps"""
-        box_image = self.canvas.coords(self.container)  # get image area
-        box_canvas = (
-            self.canvas.canvasx(0),  # get visible area of the canvas
-            self.canvas.canvasy(0),
-            self.canvas.canvasx(self.canvas.winfo_width()),
-            self.canvas.canvasy(self.canvas.winfo_height()),
-        )
-        box_img_int = tuple(
-            map(int, box_image)
-        )  # convert to integer or it will not work properly
-        # Get scroll region box
-        box_scroll = [
-            min(box_img_int[0], box_canvas[0]),
-            min(box_img_int[1], box_canvas[1]),
-            max(box_img_int[2], box_canvas[2]),
-            max(box_img_int[3], box_canvas[3]),
-        ]
-        # Horizontal part of the image is in the visible area
-        if box_scroll[0] == box_canvas[0] and box_scroll[2] == box_canvas[2]:
-            box_scroll[0] = box_img_int[0]
-            box_scroll[2] = box_img_int[2]
-        # Vertical part of the image is in the visible area
-        if box_scroll[1] == box_canvas[1] and box_scroll[3] == box_canvas[3]:
-            box_scroll[1] = box_img_int[1]
-            box_scroll[3] = box_img_int[3]
-        # Convert scroll region to tuple and to integer
-        self.canvas.configure(
-            scrollregion=tuple(map(int, box_scroll))
-        )  # set scroll region
-        x1 = max(
-            box_canvas[0] - box_image[0], 0
-        )  # get coordinates (x1,y1,x2,y2) of the image tile
-        y1 = max(box_canvas[1] - box_image[1], 0)
-        x2 = min(box_canvas[2], box_image[2]) - box_image[0]
-        y2 = min(box_canvas[3], box_image[3]) - box_image[1]
-        if (
-            int(x2 - x1) > 0 and int(y2 - y1) > 0
-        ):  # show image if it in the visible area
-            if self.__huge and self.__curr_img < 0:  # show huge image
-                h = int((y2 - y1) / self.imscale)  # height of the tile band
-                self.__tile[1][3] = h  # set the tile band height
-                self.__tile[2] = (
-                    self.__offset + self.imwidth * int(y1 / self.imscale) * 3
-                )
-                self.__image.close()
-                self.__image = self.open_image(self.path)  # reopen / reset image
-                self.__image.size = (self.imwidth, h)  # set size of the tile band
-                self.__image.tile = [self.__tile]
-                image = self.__image.crop(
-                    (int(x1 / self.imscale), 0, int(x2 / self.imscale), h)
-                )
-            else:  # show normal image
-                image = self.__pyramid[
-                    max(0, self.__curr_img)
-                ].crop(  # crop current img from pyramid
-                    (
-                        int(x1 / self.__scale),
-                        int(y1 / self.__scale),
-                        int(x2 / self.__scale),
-                        int(y2 / self.__scale),
+        try:
+            if self.container is None:
+                return
+
+            box_image = self.canvas.coords(self.container)  # get image area
+            box_canvas = (
+                self.canvas.canvasx(0),  # get visible area of the canvas
+                self.canvas.canvasy(0),
+                self.canvas.canvasx(self.canvas.winfo_width()),
+                self.canvas.canvasy(self.canvas.winfo_height()),
+            )
+            box_img_int = tuple(
+                map(int, box_image)
+            )  # convert to integer or it will not work properly
+            # Get scroll region box
+            box_scroll = [
+                min(box_img_int[0], box_canvas[0]),
+                min(box_img_int[1], box_canvas[1]),
+                max(box_img_int[2], box_canvas[2]),
+                max(box_img_int[3], box_canvas[3]),
+            ]
+            # Horizontal part of the image is in the visible area
+            if box_scroll[0] == box_canvas[0] and box_scroll[2] == box_canvas[2]:
+                box_scroll[0] = box_img_int[0]
+                box_scroll[2] = box_img_int[2]
+            # Vertical part of the image is in the visible area
+            if box_scroll[1] == box_canvas[1] and box_scroll[3] == box_canvas[3]:
+                box_scroll[1] = box_img_int[1]
+                box_scroll[3] = box_img_int[3]
+            # Convert scroll region to tuple and to integer
+            self.canvas.configure(
+                scrollregion=tuple(map(int, box_scroll))
+            )  # set scroll region
+            x1 = max(
+                box_canvas[0] - box_image[0], 0
+            )  # get coordinates (x1,y1,x2,y2) of the image tile
+            y1 = max(box_canvas[1] - box_image[1], 0)
+            x2 = min(box_canvas[2], box_image[2]) - box_image[0]
+            y2 = min(box_canvas[3], box_image[3]) - box_image[1]
+            if (
+                int(x2 - x1) > 0 and int(y2 - y1) > 0
+            ):  # show image if it in the visible area
+                if self.__huge and self.__curr_img < 0:  # show huge image
+                    h = int((y2 - y1) / self.imscale)  # height of the tile band
+                    self.__tile[1][3] = h  # set the tile band height
+                    self.__tile[2] = (
+                        self.__offset + self.imwidth * int(y1 / self.imscale) * 3
                     )
+                    self.__image.close()
+                    self.__image = self.open_image(self.path)  # reopen / reset image
+                    self.__image.size = (self.imwidth, h)  # set size of the tile band
+                    self.__image.tile = [self.__tile]
+                    image = self.__image.crop(
+                        (int(x1 / self.imscale), 0, int(x2 / self.imscale), h)
+                    )
+                else:  # show normal image
+                    image = self.__pyramid[
+                        max(0, self.__curr_img)
+                    ].crop(  # crop current img from pyramid
+                        (
+                            int(x1 / self.__scale),
+                            int(y1 / self.__scale),
+                            int(x2 / self.__scale),
+                            int(y2 / self.__scale),
+                        )
+                    )
+                #
+                imagetk = ImageTk.PhotoImage(
+                    image.resize((int(x2 - x1), int(y2 - y1)), self.__filter)
                 )
-            #
-            imagetk = ImageTk.PhotoImage(
-                image.resize((int(x2 - x1), int(y2 - y1)), self.__filter)
-            )
-            imageid = self.canvas.create_image(
-                max(box_canvas[0], box_img_int[0]),
-                max(box_canvas[1], box_img_int[1]),
-                anchor="nw",
-                image=imagetk,
-            )
-            self.canvas.lower(imageid)  # set image into background
-            self.canvas.imagetk = (
-                imagetk  # keep an extra reference to prevent garbage-collection
-            )
+                imageid = self.canvas.create_image(
+                    max(box_canvas[0], box_img_int[0]),
+                    max(box_canvas[1], box_img_int[1]),
+                    anchor="nw",
+                    image=imagetk,
+                )
+                self.canvas.lower(imageid)  # set image into background
+                self.canvas.imagetk = (
+                    imagetk  # keep an extra reference to prevent garbage-collection
+                )
+        except Exception as e:
+            logger.exception("Error when showing image")
+            logger.debug(e)
 
     def __move_from(self, event):
         """Remember previous coordinates for scrolling with the mouse"""
@@ -392,6 +400,32 @@ class CanvasImage:
                 98,
             ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
                 self.__scroll_y("scroll", 1, "unit", event=event)
+            elif event.keysym in [
+                "q", "minus"
+            ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+                self.canvas.event_generate("<MouseWheel>", delta=-120)
+            elif event.keysym in [
+                "e", "equal"
+            ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+                self.canvas.event_generate("<MouseWheel>", delta=+120)
+            elif event.keysym in [
+                "z"
+            ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+                ebinder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE)
+            elif event.keysym in [
+                "c"
+            ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+                ebinder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE)
+
+            else:
+                logger.info(
+                    "KeyCode: %s, KeySym: %s, State: %s",
+                    event.keycode,
+                    event.keysym,
+                    event.state,
+                )
+                return ""
+            return "break"
 
     def crop(self, bbox):
         """Crop rectangle from the image and return it"""

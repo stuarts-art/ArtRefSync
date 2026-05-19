@@ -21,6 +21,8 @@ class NAMES(StrEnum):
 
 
 class BINDING(StrEnum):
+    GALLERY_WIDGET = auto()
+    VIEWER_WIDGET = auto()
     # Mapped vars
     SELECTED_ARTIST = auto()
     ARTIST_SET = auto()
@@ -53,6 +55,8 @@ class BINDING(StrEnum):
     ON_TEXT_Z = auto()
     ON_TEXT_X = auto()
     ON_TEXT_C = auto()
+    ON_TEXT_TAB = auto()
+    ON_TEXT_SHIFT_TAB = auto()
 
 
 class DB(StrEnum):

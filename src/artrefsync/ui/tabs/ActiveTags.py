@@ -29,8 +29,6 @@ class ActiveTagsTab(ttk.Frame):
         self.tabs_frame.pack(side=tk.TOP, fill="both", expand=True)
         self.clear_button = RoundedIcon(self, text="✕", size=(25, 25))
         self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
-        self.sep = ttk.Separator(self, orient=tk.HORIZONTAL)
-        self.sep.pack(side=tk.BOTTOM, fill=tk.X, pady=15)
 
         self.add_bindings()
 
@@ -58,13 +56,15 @@ class ActiveTagsTab(ttk.Frame):
                 self.remove_tag(self.artist)
                 return
 
-        if artist in self.active_tags:
-            return
         if not self.is_artist(artist):
             return self.on_tag_middle(artist)
 
+        if artist in self.active_tags:
+            self.remove_tag(artist)
+            return
+
         if not middle_click and self.active_tags:
-            self.clear_active()
+            self.clear_active(update=False)
 
         if self.artist:
             self.remove_tag(self.artist)
@@ -81,6 +81,7 @@ class ActiveTagsTab(ttk.Frame):
         # Replace any non-artist tag.
         logger.info("Tag Recieved: %s", tag)
         if tag in self.active_tags:
+            self.remove_tag(tag)
             return
         if self.is_artist(tag):
             return self.on_artist(tag)
@@ -118,8 +119,12 @@ class ActiveTagsTab(ttk.Frame):
     def remove_tag(self, tag) -> bool:
         if tag not in self.active_tags:
             return False
+        if tag == self.artist:
+            self.artist = None
         widget = self.active_tags.pop(tag)
         widget.destroy()
+        if not self.active_tags:
+            self.forget_self()
         return True
 
     def add_tag(self, tag, color=None):
@@ -137,11 +142,20 @@ class ActiveTagsTab(ttk.Frame):
         if not self.grid_info():
             self.place_self()
         tag_icon = RoundedIcon.from_text(self.tabs_frame, tag, color)
-        tag_icon.pack(side=tk.TOP, anchor=tk.NW)
         self.active_tags[tag] = tag_icon
+
+        if tag == self.artist:
+            cwidgets = self.active_tags.values()
+            for w in cwidgets:
+                w.pack_forget()
+            tag_icon.pack(side=tk.TOP, anchor=tk.NW)
+            for w in cwidgets:
+                w.pack(side=tk.TOP, anchor=tk.NW)
+        else:
+            tag_icon.pack(side=tk.TOP, anchor=tk.NW)
         tag_icon.bind("<Double-Button-1>", self.on_remove_tag)
 
-    def clear_active(self, event=None):
+    def clear_active(self, event=None, update=True):
         while self.active_tags and (item := self.active_tags.popitem()):
             logger.debug("Removing %s from active tags", item[0])
             if self.is_artist(item[0]):

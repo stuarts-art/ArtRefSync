@@ -1,4 +1,6 @@
 import logging
+from threading import Lock
+import time
 import tkinter as tk
 import ttkbootstrap as ttk
 
@@ -23,6 +25,7 @@ class ViewerTab(ttk.Frame):
         self.rowconfigure(0, weight=1)
         self.pid = None
         self.cancle_key = "ViewerTab"
+        self.closing = Lock()
 
         self.file = ""
         self.thread_caller = TkThreadCaller(self)
@@ -33,6 +36,9 @@ class ViewerTab(ttk.Frame):
         self.init_widgets()
         self.init_bindings()
         self.gif_top = False
+        self.curr_focus = None
+        self.after_add_binding_id = None
+        ebinder[BINDING.VIEWER_WIDGET] = self
 
     def init_widgets(self):
         self.rowconfigure(0, weight=1)
@@ -73,32 +79,50 @@ class ViewerTab(ttk.Frame):
 
     def init_bindings(self):
         self.clear_button.bind("<Button-1>", self.close_image_viewer)
+        self.canvas_image.canvas.bind("<FocusIn>", self.on_focus_in)
+        self.canvas_image.canvas.bind("<FocusOut>", self.unbind_canvas_escape)
         ebinder.bind(BINDING.ON_IMAGE_DOUBLE_CLICK, self.open_image_viewer, self)
         ebinder.bind(BINDING.ON_POST_SELECT, self.update_viewer_image, self)
         ebinder.bind(BINDING.ON_FILTER_UPDATE, self.close_image_viewer, self)
         ebinder.bind(BINDING.ON_TEXT_ESCAPE, self.close_image_viewer, self)
 
+    def on_focus_in(self, e):
+        if self.after_add_binding_id:
+            self.after_cancel(self.after_add_binding_id)
+        self.after_add_binding_id = self.after(100, self.add_escape_binding)
+
     def open_image_viewer(self, pid):
         if pid is None:
             return
+        self.canvas_image.canvas.focus_set()
+
         self.grid(column=0, row=0, sticky=tk.NSEW)
         self.lift()
-        self.after(50, self.update_viewer_image, pid)
+        self.update_viewer_image(pid)
 
     def close_image_viewer(self, _=None):
-        if self.gif_top:
-            # self.gif_viewer.unload()
-            self.gif_top = False
+        if self.after_add_binding_id:
+            self.after_cancel(self.after_add_binding_id)
+        ebinder[BINDING.GALLERY_WIDGET].text.focus_set()
         if self.grid_info():
             logger.info("Closing Image Viewer")
+            ebinder[BINDING.GALLERY_WIDGET].lift()
             self.grid_forget()
 
-    def update_viewer_image(self, pid):
-        self.thread_caller.cancel(__name__)
+    def unbind_canvas_escape(self, *_):
+        if self.after_add_binding_id:
+            self.after_cancel(self.after_add_binding_id)
+        self.canvas_image.canvas.unbind("<KeyRelease-space>")
+        self.canvas_image.canvas.unbind("<Escape>")
 
-        if self.pid == pid:
-            self.close_image_viewer()
-            self.pid = None
+    def add_escape_binding(self, *_):
+        logger.info("Adding space binding")
+        self.canvas_image.canvas.bind("<KeyRelease-space>", self.close_image_viewer)
+        self.canvas_image.canvas.bind("<Escape>", self.close_image_viewer)
+
+    def update_viewer_image(self, pid):
+        self.last_open_time = time.time()
+        self.thread_caller.cancel(__name__)
 
         if not pid:
             logger.error("Missing PID in viewer")
@@ -113,13 +137,18 @@ class ViewerTab(ttk.Frame):
                     return
             filename = post_file.file
             self.thread_caller.cancel(self.cancle_key)
-            self.thread_caller.add(
+            self.curr_focus = self.canvas_image.canvas.focus_get()
+            self.canvas_image.canvas.focus_set()
+            self.cancle_key = self.thread_caller.add(
                 self.canvas_image.set_image,
-                self.clear_button.lift,
+                self.on_canvas_set_image,
                 self.cancle_key,
                 filename,
             )
             self.pid = pid
+
+    def on_canvas_set_image(self, *args):
+        self.clear_button.lift()
 
     def prev_frame(self, e=None):
         if self.grid_info() and self.canvas_image:

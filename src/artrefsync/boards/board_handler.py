@@ -18,6 +18,7 @@ class Post:
     score: int | None = 0
     url: str | None = ""
     website: str = ""
+    md5:str = ""   
     update_timestamp: int | None = 0
     create_timestamp: int | None = 0
     height: int | None = 0
@@ -81,5 +82,10 @@ class ImageBoardHandler(ABC):
     def get_board(self) -> BOARD:
         pass
 
+    @abstractmethod
     def get_artist_list(self) -> list[str]:
+        pass
+
+    @abstractmethod
+    def get_type_tags(self) -> dict[str,str]:
         pass

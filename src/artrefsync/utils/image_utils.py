@@ -183,35 +183,36 @@ class ImageUtils:
             cv_image = cv2.resize(cv_image, thumb_size, interpolation=cv2.INTER_AREA)
 
         if blur:
-            h, w = cv_image.shape[:2]
-            offset = .01
-            blur_intensity = 55
-            h_start = int (h * offset)
-            w_start = int(w*offset)
-            h_end = int(h*(1.0-offset))
-            w_end = int(w*(1.0-offset))
-            blur_region = cv_image[h_start: h_end, w_start: w_end]
-            blur_region = cv2.GaussianBlur(blur_region,(blur_intensity,blur_intensity), ImageUtils.k_size)
-            cv_image[h_start: h_end, w_start: w_end] = blur_region
-
-            text = "Censored"
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = .75
-            thickness = 2                
-            text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-
-            text_x = (w - text_size[0]) // 2
-            text_y = (h + text_size[1]) // 2
-            cv2.putText(cv_image, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
+            ImageUtils.cv2_image_blur(cv_image)
         cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         return cv_image_rgb
+    
+    def cv2_image_blur(cv_image, offset = 0, blur_intensity = 55):
+        h, w = cv_image.shape[:2]
+        h_start = int (h * offset)
+        w_start = int(w*offset)
+        h_end = int(h*(1.0-offset))
+        w_end = int(w*(1.0-offset))
+        blur_region = cv_image[h_start: h_end, w_start: w_end]
+        blur_region = cv2.GaussianBlur(blur_region,(blur_intensity,blur_intensity), ImageUtils.k_size)
+        cv_image[h_start: h_end, w_start: w_end] = blur_region
+
+        text = "Censored"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = .75
+        thickness = 2                
+        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+
+        text_x = (w - text_size[0]) // 2
+        text_y = (h + text_size[1]) // 2
+        cv2.putText(cv_image, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
 
     @staticmethod
     def get_cv2_pil_image(
         file: str, size=(1440, 1440), as_photoimage=False, blur = False
     ) -> Image.Image | ImageTk.PhotoImage:
         if ImageUtils.is_multiple_frames(file):
-            return ImageUtils.get_cv2_frame(file)
+            return ImageUtils.get_cv2_frame(file, size, blur)
         else:
             image_array = ImageUtils.get_cv2_rgb_array(file, size, blur)
             img = Image.fromarray(image_array)
@@ -221,7 +222,7 @@ class ImageUtils:
                 return img
 
     @staticmethod
-    def get_cv2_frame(file, size=(1080, 1080)):
+    def get_cv2_frame(file, size=(1080, 1080), blur = False):
         gif = cv2.VideoCapture(file)
         ret, frame = gif.read()
         if not ret:
@@ -230,6 +231,8 @@ class ImageUtils:
             h, w = frame.shape[:2]
             thumb_size = ImageUtils.get_cv_thumb_size((w, h), size)
             frame = cv2.resize(frame, thumb_size, interpolation=cv2.INTER_AREA)
+        if blur:
+            ImageUtils.cv2_image_blur(frame)
         image_frame = ImageUtils.cv_array_to_image(frame)
         return image_frame
 

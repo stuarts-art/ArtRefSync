@@ -36,6 +36,7 @@ class RoundedIcon(ttk.Label):
         )
 
     def update_text(self, text):
+        self.text=text
         width = RoundedIcon.font.measure(text)
         self.width = (width // 20 + 1) * 20
         self.set_image()

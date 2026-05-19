@@ -56,9 +56,9 @@ class InputTreeviewFrame(ttk.Frame):
         self.entry.pack(side="left", fill="x", expand=True)
 
     def setup_tree(self, input_list: Iterable, ascending=True):
-        self.tree_frame = ttk.Frame(self, takefocus=True)
+        self.tree_frame = ttk.Frame(self, takefocus=False)
         self.tree = InputTreeview(
-            self.tree_frame, input_list, columns=("Delete"), show="tree"
+            self.tree_frame, input_list, columns=("Delete"), show="tree", takefocus=True
         )
         self.scroll = ttk.Scrollbar(
             self.tree_frame, orient="vertical", command=self.tree.yview
