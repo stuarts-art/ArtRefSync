@@ -50,11 +50,6 @@ class ActiveTagsTab(ttk.Frame):
 
     def on_artist(self, artist, middle_click=False):
         logger.debug("Artist Recieved: %s, Middle Clicked: %d", artist, middle_click)
-        if not artist:
-            if self.artist:
-                self.artist = None
-                self.remove_tag(self.artist)
-                return
 
         if not self.is_artist(artist):
             return self.on_tag_middle(artist)
@@ -179,4 +174,4 @@ class ActiveTagsTab(ttk.Frame):
         self.grid_forget()
 
     def place_self(self):
-        self.grid(column=0, row=0, sticky=tk.NSEW)
+        self.grid(column=0, row=4, sticky=tk.NSEW)

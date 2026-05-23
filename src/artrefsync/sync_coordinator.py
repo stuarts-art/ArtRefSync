@@ -1,11 +1,10 @@
 import concurrent
 import logging
-import traceback
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
-from artrefsync.boards.TagType import TagType
+from artrefsync.db.TagType import TagType
 from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile
 from artrefsync.boards.danbooru_handler import Danbooru_Handler
 from artrefsync.boards.e621_handler import E621Handler
@@ -173,10 +172,8 @@ class SyncCoordinator:
 
     def sync_artist(self, artist):
         logger.info("Starting sync artist %s", artist)
+
         self.update_metadata(artist)
-        self.update_post_file_table(artist)
-        self.download_missing_ids(artist)
-        self.update_post_file_table(artist=artist)
         logger.debug("Ending sync artist %s", artist)
 
     def update_metadata(self, artist) -> list[Post]:
@@ -337,17 +334,22 @@ class SyncCoordinator:
                 artist_map = defaultdict(int)
                 posts = postdb.posts.select([("artist_name", artist), ("board", board)])
                 for post in posts:
-                    try:
-                        id = post.id
-                        for tag in post.tags:
-                            artist_map[tag] += 1
-                            board_map[tag] += 1
-                            tag_posts[id].add(post)
+                    # try:
+                    id = post.id
+                    for tag in post.tags:
+                        artist_map[tag] += 1
+                        board_map[tag] += 1
+                        tag_posts[tag].add(id)
 
-                    except Exception:
-                        pass
-                postdb.artist_tags.dumps_blob(artist, artist_map)
-            postdb.artist_tags.dumps_blob(str(board), board_map)
+                    # except Exception:
+                    #     pass
+                # postdb.artist_tags.dumps_blob(artist, dict(artist_map))
+                artist_tag_count_list = [(artist, tag, count) for tag, count in artist_map.items()]
+                postdb.artist_tag_counts.insert_many(artist_tag_count_list)
+
+            board_tag_count_list = [(board, tag, count) for tag, count in board_map.items()]
+            postdb.artist_tag_counts.insert_many(board_tag_count_list)
+            # postdb.artist_tags.dumps_blob(str(board), dict(board_map))
             for tag, posts in tag_posts.items():
                 postdb.tag_posts.union_update(tag, posts)
     
@@ -356,7 +358,10 @@ class SyncCoordinator:
         with PostDb() as post_db:
             for type, tags in type_tags.items():
                 for tag in tags:
-                    post_db.tag_types.insert(TagType(tag, type))
+                    try:
+                        post_db.tag_types.insert(TagType(tag, type))
+                    except Exception:
+                        logger.warning("Failed to add TagType (%s, %s)", tag, type)
 
 
 if __name__ == "__main__":

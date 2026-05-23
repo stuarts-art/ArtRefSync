@@ -1,9 +1,6 @@
 from collections.abc import Iterable
 from artrefsync.constants import STATS
 
-# module enforced singleton
-
-
 class __Stats:
     def __init__(self):
         self._stats = {}

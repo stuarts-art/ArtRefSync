@@ -2,10 +2,10 @@ import logging
 import os
 import sqlite3
 
-from artrefsync.boards.TagType import TagType
+from artrefsync.db.TagType import ArtistTagCount, TagType
 from artrefsync.config import config
 from artrefsync.db.db_utils import BlobDb, DbUtils
-from artrefsync.db.dataclass_db import  Dataclass_DB
+from artrefsync.db.dataclass_db import Dataclass_DB
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.constants import APP, BOARD, DB, TABLE
 
@@ -52,10 +52,42 @@ class PostDb:
 
         self.posts = Dataclass_DB(Post, self.connection, lazy=lazy)
         self.files = Dataclass_DB(PostFile, self.connection, lazy=lazy)
-        self.tag_types = Dataclass_DB(TagType, self.connection, lazy=lazy, key_list=["tag", "type"])
+        self.tag_types = Dataclass_DB(
+            TagType, self.connection, lazy=lazy, key_list=["tag", "type"]
+        )
+        self.artist_tag_counts = Dataclass_DB(
+            ArtistTagCount, self.connection, lazy=lazy, key_list=["artist", "tag"]
+        )
+
         self.tag_posts = BlobDb(self.connection, "tag_posts", lazy=lazy)
         self.artist_tags = BlobDb(self.connection, "artist_tags", lazy=lazy)
+
         logger.debug("Opening PostDB")
+
+    def select(
+        self,
+        select_args,
+        from_args,
+        join_str="",
+        where_str="",
+        suffix_str="",
+        as_tupple=False,
+        as_scalar=False,
+    ):
+        query = f"SELECT {select_args} FROM {from_args} {join_str} {where_str} {suffix_str};"
+        logger.debug(query)
+        cur = self.connection.cursor()
+        if not as_tupple:
+            cur.row_factory = DbUtils.dict_factory
+
+        cur.execute(query)
+        rows = cur.fetchall()
+        if not rows:
+            return []
+        else:
+            if as_tupple and as_scalar:
+                return [row[0] for row in rows]
+            return rows
 
     def get_last_id(self, artist, board):
         max_id = self.posts.select_freeform(
@@ -125,6 +157,50 @@ class PostDb:
         )
         return missing_ids
 
+    def get_tag_counts(self, artist = "", search = "", type = "", as_tupple = True, limit = 1000, offset = 0):
+
+        select_args="t1.tag as tag, t1.count as count"
+        from_args= "ArtistTagCount as t1"
+        join_str=""
+        suffix_str = ""
+        conditions = []
+
+        if artist != "":
+            conditions.append(f"t1.artist = \"{artist}\"")
+        else:
+            # Handle No Artist:
+            select_args = "t1.tag as tag, SUM(t1.count) as count"
+            suffix_str =  "GROUP BY t1.tag"
+            conditions.append("t1.artist in ('e621', 'danbooru', 'r34')")
+
+        if search != "":
+            conditions.append(f"t1.tag LIKE \"%{search}%\"")
+
+        if type != "":
+            # select_args += ", t2.type"
+            join_str="INNER JOIN TagType as t2 ON t1.tag = t2.tag"
+            conditions.append(f"t2.type = \"{type}\"")
+
+        suffix_str += " ORDER BY count DESC"
+        if limit:
+            suffix_str += f" LIMIT {limit}"
+        
+        if offset:
+            suffix_str += f" OFFSET {offset}"
+        where_str = f"WHERE {" AND ".join(conditions)}"
+
+        tag_counts = self.artist_tag_counts.select_freeform(
+            select_args=select_args,
+            from_args=from_args,
+            join_str= join_str,
+            where_str=where_str,
+            suffix_str=suffix_str,
+            as_tupple=as_tupple)
+
+        return tag_counts
+
+
+
     def __enter__(self):
         logger.debug("PostDB Enter")
         return self
@@ -133,6 +209,8 @@ class PostDb:
         self.connection.commit()
         logger.debug("Closing PostDB")
         self.connection.close()
+
+        
 
 
 if __name__ == "__main__":

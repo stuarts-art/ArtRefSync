@@ -45,7 +45,7 @@ class E621Handler(ImageBoardHandler):
         }
 
     def get_type_tags(self) -> dict[str, str]:
-        return self.tag_types
+        return self.type_tags
 
     def get_board(self) -> BOARD:
         return BOARD.E621
@@ -74,8 +74,9 @@ class E621Handler(ImageBoardHandler):
             meta = e_post.tags.meta
             rating = f"rating_{e_post.rating.value}"
             pools = [f"pool_e621_{pool_id}" for pool_id in e_post.pools]
-            tags = (
-                general
+            ext = e_post.file.ext
+            tags = ( []
+                + general
                 + species
                 + artists
                 + franchise
@@ -130,6 +131,11 @@ class E621Handler(ImageBoardHandler):
             self.type_tags["character"].update(e_post.tags.character)
             self.type_tags["metadata"].update(e_post.tags.meta)
             self.type_tags["lore"].update(e_post.tags.lore)
+
+            self.type_tags["artist"].add(str(tag))
+            self.type_tags["rating"].add(str(rating))
+            self.type_tags["format"].add(str(ext))
+            self.type_tags["board"].add(str(self.get_board()))
 
             height = e_post.file.height
             width = e_post.file.width

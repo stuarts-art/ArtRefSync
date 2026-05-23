@@ -46,7 +46,13 @@ class Bm(object):
         size_lines = ""
         new_locals = sys._getframe(1).f_locals
         for local in new_locals.keys() - self.old_locals.keys():
-            size_lines += f"\n- {local}: {obj_size(new_locals[local])}"
+            obj = new_locals[local]
+            obj_str = str(obj)
+            if isinstance(obj, list) and len(obj) > 5:
+                obj_str = f"Sample: {obj[:5]}. Total Count: {len(obj)}"
+                
+
+            size_lines += f"\n- {local}: {obj_str}"
 
         if self.pretty:
             line_size = int(min(80, shutil.get_terminal_size((80, 50)).columns))

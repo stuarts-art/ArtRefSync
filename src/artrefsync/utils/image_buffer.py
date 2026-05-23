@@ -125,13 +125,13 @@ class ImageBuffer:
             return
         self.path = path
         self.frames.clear()
-        if self.gif and self.gif.isOpened():
-            self.gif.release()
-        self.gif = cv2.VideoCapture(path)
         self.size = size
         self.prev = -1
 
         if ImageUtils.is_multiple_frames(path):
+            if self.gif and self.gif.isOpened():
+                self.gif.release()
+            self.gif = cv2.VideoCapture(path)
             try:
                 with self.lock:
                     self.frame_count = int(
@@ -147,6 +147,8 @@ class ImageBuffer:
         else:
             self.frames[0] = [ImageUtils.get_cv2_pil_image(path)]
             self.frame_count = 1
+            self.fps=1
+            self.delay=1
             self.delay = None
 
     def get_frame(self, index):
@@ -300,16 +302,19 @@ class ImagePlayer:
             logger.info("index %s cancelled.", index)
 
     def play(self, _=None):
-        index = self.index.get()
+        index = self.index.get() % len(self.buffer)
         if index in self.after_map:
             return
+
+
         image = self.buffer[index]
         if image is None:
             return
-        delay = int(self.buffer.delay - 100 * (time.time() - self.start))
-        delay = max(10, delay)
-        after_id = self.label.after(delay, self.set_image, index)
-        self.after_map[index] = after_id
+        if len(self.buffer) > 1:
+            delay = int(self.buffer.delay - 100 * (time.time() - self.start))
+            delay = max(10, delay)
+            after_id = self.label.after(delay, self.set_image, index)
+            self.after_map[index] = after_id
 
     def set_image(self, index):
         if index not in self.after_map:
@@ -335,7 +340,7 @@ class ImagePlayer:
                 if self.playing and not self.scaling:
                     self.index += 1
                     self.index %= len(self.buffer)
-                self.schedule_play()
+        self.schedule_play()
 
     def schedule_play(self):
         self.set_future = self.threadcaller.add(self.play, None, "play")

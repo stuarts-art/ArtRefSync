@@ -9,10 +9,6 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
-
-run = True
-
-
 def main():
     root = ttk.Window(themename="darkly", size=(1080, 1080))
     frame_left = ttk.Frame(root)
@@ -168,5 +164,4 @@ class InputTreeview(ttk.Treeview):
 
 
 if __name__ == "__main__":
-    if run:
-        main()
+    main()

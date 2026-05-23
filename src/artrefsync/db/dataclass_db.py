@@ -1,10 +1,9 @@
 import logging
 import pickle
 import sqlite3
-from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from enum import StrEnum
-from typing import Generic, Type, TypeVar
+from typing import Generic, MutableSequence, Type, TypeVar
 
 import dacite
 
@@ -61,23 +60,32 @@ class Dataclass_DB(Generic[T]):
         self.field_types, self.table_fields, self.primary_key = DbUtils.get_sql_fields(
             cls, *self.key_list
         )
+
+        self.table_field_names = [field.split()[0] for field in self.table_fields]
+
+
         if not lazy:
             self.create_or_update_table(cls)
 
     def select_freeform(
         self,
         select_args,
-        from_args,
+        from_args = "",
         join_str="",
         where_str="",
         suffix_str="",
         as_tupple=False,
         as_scalar=False,
     ):
+        if from_args == "":
+            from_args = self.table_name
+
+
         query = f"SELECT {select_args} FROM {from_args} {join_str} {where_str} {suffix_str};"
         cur = self.connection.cursor()
         if not as_tupple:
             cur.row_factory = DbUtils.dict_factory
+
         cur.execute(query)
         rows = cur.fetchall()
 
@@ -181,9 +189,23 @@ class Dataclass_DB(Generic[T]):
         cur.execute(query, query_values)
         return not exists
 
+    def insert_many(self, items: list[tuple]):
+        """Inserts tupples without doing type conversions. Only basic types are supported.
+
+        Args:
+            items (list[tuple]): _description_
+        """
+
+        placeholders = DbUtils.placeholder(len(self.table_field_names))
+        query = f"INSERT OR REPLACE INTO {self.table_name} ({', '.join(self.table_field_names)}) VALUES ({placeholders});"
+        cur = self.connection.cursor()
+        cur.executemany(query, items)
+        self.connection.commit()
+
     def get_all(
         self,
         id_list=list[str],
+        conditions: list[tuple] = [],
         select_fields=None,
         as_tupple=False,
         as_scalar=False,
@@ -197,22 +219,22 @@ class Dataclass_DB(Generic[T]):
         suffix: suffix to append to query
 
         """
-        if isinstance(id_list, Iterable):
-            id_list = tuple(id_list)
+        if isinstance(id_list, MutableSequence):
+            id_list = list(id_list)
         else:
-            id_list = tuple(
-                id,
+            id_list = list(
+                id_list,
             )
 
         if as_scalar:
             select_fields = [
-                "id",
+                f"{self.primary_key}",
             ]
             as_tupple = True
 
         field_str = "*" if not select_fields else ", ".join(select_fields)
 
-        query = f"SELECT {field_str} FROM {self.table_name}  WHERE (id) IN ({', '.join('?' * len(id_list))}) {suffix}"
+        query = f"SELECT {field_str} FROM {self.table_name}  WHERE ({self.primary_key}) IN ({', '.join('?' * len(id_list))}) {suffix}"
         cur = self.connection.cursor()
         if not as_tupple:
             cur.row_factory = DbUtils.dict_factory
@@ -253,7 +275,7 @@ class Dataclass_DB(Generic[T]):
             )
 
     def select(
-        self, conditions: list[tuple] = [], select_fields: list[str] = None, suffix=""
+        self, conditions: list[tuple] = [], select_fields: list[str] = None, suffix="", as_tupple = False
     ) -> list[T]:
         if conditions:
             condition_fields, condition_vals = zip(*conditions)
@@ -266,10 +288,11 @@ class Dataclass_DB(Generic[T]):
 
         has_select_fields = select_fields is not None
         select_fields = "*" if not select_fields else ", ".join(select_fields)
-        query = f"SELECT {select_fields} FROM {self.table_name}{condition_query_str}{suffix}"
+        query = f"SELECT {select_fields} FROM {self.table_name} {condition_query_str} {suffix}"
 
         cur = self.connection.cursor()
-        cur.row_factory = DbUtils.dict_factory
+        if not as_tupple:
+            cur.row_factory = DbUtils.dict_factory
 
         if condition_vals:
             cur.execute(query, (*condition_vals,))
@@ -277,7 +300,7 @@ class Dataclass_DB(Generic[T]):
             cur.execute(query)
         items = cur.fetchall()
 
-        if has_select_fields:
+        if has_select_fields or as_tupple:
             return items
         elif not items:
             return []
@@ -346,6 +369,7 @@ class Dataclass_DB(Generic[T]):
         cur.execute(query, (key,))
         result = cur.fetchone()
         return result is not None
+
 
     def __getitem__(self, key) -> T:
         return self.get(key)

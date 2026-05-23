@@ -68,6 +68,8 @@ class Danbooru_Handler(ImageBoardHandler):
             post_id = Post.make_storage_id(dpost.id, self.get_board())
             is_black_listed = False
             tags = dpost.tag_string
+            rating = "rating_{dpost.rating}"
+            ext = dpost.file_ext
 
             try:
                 created_datetime = datetime.fromisoformat(dpost.created_at)
@@ -82,9 +84,9 @@ class Danbooru_Handler(ImageBoardHandler):
             except Exception:
                 update_timestamp = 0
 
-            tags.append(f"rating_{dpost.rating}")
+            tags.append(rating)
             tags.append(f"{self.get_board().value}")
-            tags.append(dpost.file_ext)
+            tags.append(ext)
             tags.append(tag)
 
             for black_listed in self.black_list:
@@ -103,6 +105,11 @@ class Danbooru_Handler(ImageBoardHandler):
             self.type_tags["artist"].update(dpost.tag_string_artist)
             self.type_tags["character"].update(dpost.tag_string_character)
             self.type_tags["copyright"].update(dpost.tag_string_copyright)
+
+            self.type_tags["artist"].add(str(tag))
+            self.type_tags["rating"].add(str(rating))
+            self.type_tags["format"].add(str(ext))
+            self.type_tags["board"].add(str(self.get_board()))
 
             post = Post(
                 id=post_id,

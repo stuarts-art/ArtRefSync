@@ -5,7 +5,6 @@ import tkinter as tk
 import ttkbootstrap as ttk
 
 # import sv_ttk
-from PIL import Image, ImageTk
 from tkinterdnd2 import TkinterDnD
 
 from artrefsync.config import Config

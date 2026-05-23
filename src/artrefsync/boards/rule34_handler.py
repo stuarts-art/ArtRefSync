@@ -20,7 +20,7 @@ def main():
 
 class R34Handler(ImageBoardHandler):
     """
-    Class to handle requesting and handling messages from the image board E621
+    Class to handle requesting and handling messages from the image board R34
     """
 
     def __init__(self, only_recent=False):
@@ -72,7 +72,10 @@ class R34Handler(ImageBoardHandler):
                 BOARD.R34.value,
                 ext,
             ]
-            tags.append(f"rating_{rpost.rating}")
+
+            rating = f"rating_{rpost.rating}"
+
+            tags.append(rating)
             for black_listed in self.black_list:
                 if black_listed in rpost.tags:
                     stats.add(STATS.SKIP_COUNT, 1)
@@ -81,6 +84,18 @@ class R34Handler(ImageBoardHandler):
                     break
             if skip_rpost:
                 continue
+
+            for info in rpost.tag_info:
+                if info.type == "tag":
+                    continue
+                self.type_tags[info.type].add(info.tag)
+            self.type_tags["artist"].add(tag)
+            self.type_tags["rating"].add(str(rating))
+            self.type_tags["format"].add(str(ext))
+            self.type_tags["board"].add(str(self.get_board()))
+            # self.type_tags["format"].add(ext)
+
+            
 
             try:
                 created_datetime = datetime.strptime(
@@ -128,10 +143,6 @@ class R34Handler(ImageBoardHandler):
             posts[post_id] = post
             stats.add(STATS.POST_COUNT)
 
-            for info in rpost.tag_info:
-                if info.type == "tag":
-                    continue
-                self.type_tags[info.type].add(info.type)
 
         logger.info("Returning %d posts for artist %s", len(posts), tag)
         return posts

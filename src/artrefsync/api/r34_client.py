@@ -4,7 +4,6 @@ from threading import Event
 import re
 
 import requests
-from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.config import cache, config
