@@ -1,10 +1,6 @@
 name: UV sync and create executable
 
 on: [push, pull_request]
-
-# env:
-#   UV_SYSTEM_PYTHON: 1
-
 jobs:
   build:
     name: Build distribution 📦
