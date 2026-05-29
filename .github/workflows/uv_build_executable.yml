@@ -2,8 +2,8 @@ name: UV sync and create executable
 
 on: [push, pull_request]
 
-env:
-  UV_SYSTEM_PYTHON: 1
+# env:
+#   UV_SYSTEM_PYTHON: 1
 
 jobs:
   build:
@@ -12,25 +12,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-    - name: "Set up Python"
-      uses: actions/setup-python@v6
-      with:
-        python-version-file: "pyproject.toml"
     - name: Install uv
-      uses: astral-sh/setup-uv@v7
-      # with:
-      #   enable-cache: true
-    # - name: Sync Dependencies
-    #   run: uv lock
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+    - name: Set up Python
+      run: uv python install
     - name: Sync Dependencies
-      run: uv sync
+      run: uv sync --locked --all-extras --dev
     - name: Install package
       run: uv pip install .
-    - name: source uv
-      run: .\.venv\Scripts\activate.ps1
     - name: Build executable
-      # run: uv run pyinstaller --collect-all ttkbootstrap --name ArtRefSync  main.py
-      run: uv run pyinstaller main.spec
+      run: uv run pyinstaller --collect-all ttkbootstrap --name ArtRefSync  main.py
     - name: Store the distribution packages
       uses: actions/upload-artifact@v6
       with:
