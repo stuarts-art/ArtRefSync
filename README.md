@@ -69,12 +69,6 @@ uvx --from git+https://github.com/stuarts-art/ArtRefSync sync_cli
 - [ ] Fix VIdeo/gif support
 - [ ] Non-Image Board Files
 
-
-## Installation
-
-### Non Coders (EXE file in zip folder)
-Download the zip file from the last [workflow](https://github.com/stuarts-art/ArtRefSync/actions/workflows/windows_pyinstaller.yml) run. Extract the zip and run the exe.
-
 ### Other useful commands
 ```bash
 # exporting a requirements.txt instead of a uv.lock file.
