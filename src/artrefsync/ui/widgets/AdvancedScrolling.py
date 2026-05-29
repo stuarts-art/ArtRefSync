@@ -12,7 +12,7 @@ import logging
 from artrefsync.config import config
 from artrefsync.constants import BINDING
 from artrefsync.utils.image_utils import ImageUtils
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -411,11 +411,11 @@ class CanvasImage:
             elif event.keysym in [
                 "z"
             ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
-                ebinder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE)
+                e_binder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE)
             elif event.keysym in [
                 "c"
             ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
-                ebinder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE)
+                e_binder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE)
 
             else:
                 logger.info(

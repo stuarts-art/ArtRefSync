@@ -18,6 +18,7 @@ logger = logging.getLogger()
 logger.setLevel(config.log_level)
 
 
+
 class DbUtils:
     @staticmethod
     def table_exists(connection: sqlite3.Connection, table_name):
@@ -37,6 +38,11 @@ class DbUtils:
             )
             for idx, col in enumerate(cursor.description)
         }
+
+
+    @staticmethod
+    def scalor_row_factory(cursor, row):
+        return row[0]
 
     @staticmethod
     def placeholder(count):
@@ -243,17 +249,29 @@ class BlobDb:
         else:
             return 0
 
-    def count_list(self, starts_with=None, limit=100, count_order="DESC"):
+    def count_list(self, starts_with=None, count_order="DESC", limit=100,  offset = None):
+
+        query = []
+        query.append(f"SELECT ID, count from {self.table_name} ")
+        query.append(f"WHERE {self.primary_key} LIKE ? " if starts_with else "")
+        query.append(f"ORDER BY count {count_order} ")
+        query.append(f"LIMIT {limit} " if limit else "")
+        query.append(f"OFFSET {offset} " if offset else "")
+        query_str = "".join(query).strip()
+
         if starts_with:
             query = f"SELECT id, count FROM {self.table_name} WHERE {self.primary_key} LIKE ? ORDER BY count DESC LIMIT ?"
+
+
+
             cur = self.connection.cursor()
-            cur.execute(query, (f"%{starts_with}%", limit))
+            cur.execute(query_str, (f"%{starts_with}%", limit))
         else:
             query = (
                 f"SELECT id, count FROM {self.table_name} ORDER BY count DESC LIMIT ?"
             )
             cur = self.connection.cursor()
-            cur.execute(query, (limit,))
+            cur.execute(query_str )
 
         result = cur.fetchall()
         logger.debug(f" QUERY RESULT for key {starts_with} - {result}")

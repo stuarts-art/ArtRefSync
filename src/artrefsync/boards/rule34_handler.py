@@ -9,13 +9,14 @@ from artrefsync.boards.board_handler import ImageBoardHandler, Post
 from artrefsync.config import config
 from artrefsync.constants import BOARD, R34, STATS
 from artrefsync.stats import stats
+from artrefsync.utils.benchmark import pretty_wrap
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)                                                                                    
 logger.setLevel(config.log_level)
 
 
 def main():
-    pass
+    handler = R34Handler()
 
 
 class R34Handler(ImageBoardHandler):
@@ -23,8 +24,9 @@ class R34Handler(ImageBoardHandler):
     Class to handle requesting and handling messages from the image board R34
     """
 
-    def __init__(self, only_recent=False):
+    def __init__(self, only_recent=False, stop_event:Event=None):
         self.only_recent = only_recent
+        self.stop_event = stop_event
         logger.info("Initialize R34 Handler")
         self.reload()
         config.subscribe_reload(self.reload)
@@ -34,7 +36,7 @@ class R34Handler(ImageBoardHandler):
         self.black_list = config[BOARD.R34][R34.BLACK_LIST]
         self.artist_list = list(set(config[BOARD.R34][R34.ARTISTS]))
         self.client = R34_Client(
-            api_string=self.r34_api_string, only_recent=self.only_recent
+            api_string=self.r34_api_string, only_recent=self.only_recent, stop_event=self.stop_event
         )
         self.board = BOARD.R34
         self.type_tags = defaultdict(set)
@@ -49,12 +51,12 @@ class R34Handler(ImageBoardHandler):
         return BOARD.R34
 
     def get_posts(
-        self, tag, post_limit=None, stop_event: Event = None
+        self, tag, post_limit=None
     ) -> dict[str, Post]:
         posts = {}
 
-        r34_posts: list[R34_Post] = self.client.get_posts(tag, post_limit, stop_event)
-        if stop_event and stop_event.is_set():
+        r34_posts: list[R34_Post] = self.client.get_posts(tag, post_limit)
+        if self.stop_event and self.stop_event.is_set():
             return None
 
         if " " in tag:
@@ -70,11 +72,9 @@ class R34Handler(ImageBoardHandler):
             tags = rpost.tags + [
                 tag,
                 BOARD.R34.value,
-                ext,
+                ext
             ]
-
             rating = f"rating_{rpost.rating}"
-
             tags.append(rating)
             for black_listed in self.black_list:
                 if black_listed in rpost.tags:

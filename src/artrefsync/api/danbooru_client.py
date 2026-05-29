@@ -11,7 +11,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.api.danbooru_model import (
     Danbooru_Post,
 )
-from artrefsync.config import cache, config
+from artrefsync.config import config
 from artrefsync.constants import DANBOORU, TABLE
 from artrefsync.db.post_db import PostDb
 
@@ -20,6 +20,7 @@ logger.setLevel(config.log_level)
 
 
 def main():
+    client = Danbooru_Client()
     pass
 
 class Danbooru_Client:
@@ -27,7 +28,7 @@ class Danbooru_Client:
     Class to handle requesting and handling messages from the image board E621
     """
 
-    def __init__(self, username=None, api_key=None, only_recent=False):
+    def __init__(self, username=None, api_key=None, only_recent=False, stop_event:Event = None):
         logger.info("Creating Danbooru Client")
         self.username = (
             username if username else config[TABLE.DANBOORU][DANBOORU.USERNAME]
@@ -39,6 +40,7 @@ class Danbooru_Client:
             "User-Agent": f"ArtRefSync/1.0 ({username})",
         }
         self.only_recent = only_recent
+        self.stop_event = stop_event
         self.base_url = "https://danbooru.donmai.us"
         self.post_base_url = f"{self.base_url}/posts.json"
         self.tags_base_url = f"{self.base_url}/tags.json"
@@ -47,7 +49,7 @@ class Danbooru_Client:
         self.retries = 3
         self.last_run = time.time()
 
-    def _build_post_url_request(self, tag, page, last_id) -> str:
+    def _build_post_url_request(self, tag, page = 1, last_id = None) -> str:
         url_request = f"{self.post_base_url}?tags={tag}{f'+id:>{last_id}' if last_id else ''}&limit={self.limit}&page={page}"
         return url_request
 
@@ -56,7 +58,7 @@ class Danbooru_Client:
         return url_request
 
     def get_posts(
-        self, tag, post_limit=10000, stop_event: Event = Event()
+        self, tag, post_limit=10000
     ) -> list[Danbooru_Post]:
         logger.debug("Getting posts for %s", tag)
 
@@ -76,7 +78,7 @@ class Danbooru_Client:
         # Starts at index 1 (Index 0 returns page 1)
         posts_data = []
         for page in range(1, 20):
-            if stop_event and stop_event.is_set():
+            if self.stop_event and self.stop_event.is_set():
                 return []
             page_data = self.get_page(tag, page, last_id)
             posts_data.extend(page_data)
@@ -107,9 +109,9 @@ class Danbooru_Client:
 
         return posts
 
-    @cache.memoize(expire=config.cache_ttl())
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def get_page(self, tag: str, page: int, last_id):
+    @config.cache("danbooru").memoize(expire=config.cache_ttl())
+    def get_page(self, tag: str, page: int=1, last_id = None):
         delta_time = time.time() - self.last_run
         if delta_time < 0.1:
             time.sleep(0.1 - delta_time)

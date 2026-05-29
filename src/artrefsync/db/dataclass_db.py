@@ -18,6 +18,8 @@ def main():
 
 
 class Dataclass_DB(Generic[T]):
+    query_map = {}
+
     def __init__(
         self,
         cls: Type[T],
@@ -66,6 +68,7 @@ class Dataclass_DB(Generic[T]):
 
         if not lazy:
             self.create_or_update_table(cls)
+
 
     def select_freeform(
         self,
@@ -169,7 +172,7 @@ class Dataclass_DB(Generic[T]):
     def insert(self, item: T):
         """
         If the item does not exist, insert, else replace.
-        Returns True if inserted, false if updated.
+        Returns True if inserted, false if pdated.
         """
         item_dict = asdict(item)
         primary_key = self.key_list[0] if self.key_list else self.primary_key
@@ -195,12 +198,39 @@ class Dataclass_DB(Generic[T]):
         Args:
             items (list[tuple]): _description_
         """
+        query_key = (self.cls, "insert_many")
 
-        placeholders = DbUtils.placeholder(len(self.table_field_names))
-        query = f"INSERT OR REPLACE INTO {self.table_name} ({', '.join(self.table_field_names)}) VALUES ({placeholders});"
+        if query_key not in Dataclass_DB.query_map:
+            placeholders = DbUtils.placeholder(len(self.table_field_names))
+            query = []
+            query.append(f"INSERT INTO {self.table_name}")
+            query.append(f"({', '.join(self.table_field_names)}) VALUES ({placeholders})")
+            query.append(f'ON CONFLICT({", ".join(self.key_list) if self.key_list else self.primary_key}) DO')
+            if len(self.table_field_names) == len(self.key_list) or len(self.table_field_names) == 1:
+                query.append('NOTHING')
+            else:
+                query.append('UPDATE SET ')
+                field_query = []
+                for field in self.table_field_names:
+                    if field not in self.key_list:
+                        field_query.append(f"{field} = excluded.{field}")
+                query.append(", ".join(field_query))
+            query_str = " ".join(query)
+            self.logger.info("Setting Insert Many query string to \"%s\"", query_str)
+            Dataclass_DB.query_map[query_key]  = query_str
+
         cur = self.connection.cursor()
-        cur.executemany(query, items)
-        self.connection.commit()
+        cur.executemany(Dataclass_DB.query_map[query_key], tuple(items))
+        return cur.rowcount
+
+    def get_row_ids(self, id_list: list):
+        placeholders = DbUtils.placeholder(len(id_list))
+        query = f"SELECT rowid FROM {self.table_name} WHERE {self.primary_key} IN ({placeholders});"
+        cur = self.connection.cursor()
+        cur.row_factory = DbUtils.scalor_row_factory
+        cur.execute(query, tuple(id_list))
+        rows = cur.fetchall()
+        return rows
 
     def get_all(
         self,

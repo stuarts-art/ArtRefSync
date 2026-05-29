@@ -211,6 +211,9 @@ class ImageUtils:
     def get_cv2_pil_image(
         file: str, size=(1440, 1440), as_photoimage=False, blur = False
     ) -> Image.Image | ImageTk.PhotoImage:
+        if not file or not os.path.exists(file):
+            raise FileNotFoundError()
+
         if ImageUtils.is_multiple_frames(file):
             return ImageUtils.get_cv2_frame(file, size, blur)
         else:

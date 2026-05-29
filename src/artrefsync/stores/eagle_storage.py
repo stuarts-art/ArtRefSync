@@ -19,6 +19,7 @@ logger.setLevel(config.log_level)
 
 
 def main():
+    handler = EagleHandler()
     pass
 
 

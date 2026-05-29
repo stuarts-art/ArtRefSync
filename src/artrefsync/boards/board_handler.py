@@ -74,7 +74,7 @@ class PostFile:
 class ImageBoardHandler(ABC):
     @abstractmethod
     def get_posts(
-        self, tag, post_limit=None, stop_event: Event = None
+        self, tag, post_limit=None
     ) -> dict[str, Post]:
         pass
 

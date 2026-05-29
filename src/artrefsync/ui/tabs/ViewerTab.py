@@ -10,8 +10,8 @@ from artrefsync.constants import BINDING, NAMES
 from artrefsync.db.post_db import PostDb
 from artrefsync.ui.widgets.AdvancedScrolling import CanvasImage
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.EventManager import ebinder
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -28,7 +28,6 @@ class ViewerTab(ttk.Frame):
         self.closing = Lock()
 
         self.file = ""
-        self.thread_caller = TkThreadCaller(self)
         self.height = self.winfo_height()
         self.width = self.winfo_width()
         self.index_var = ttk.IntVar(value=0)
@@ -38,7 +37,7 @@ class ViewerTab(ttk.Frame):
         self.gif_top = False
         self.curr_focus = None
         self.after_add_binding_id = None
-        ebinder[BINDING.VIEWER_WIDGET] = self
+        e_binder[BINDING.VIEWER_WIDGET] = self
 
     def init_widgets(self):
         self.rowconfigure(0, weight=1)
@@ -59,13 +58,13 @@ class ViewerTab(ttk.Frame):
         self.leftleft_button = RoundedIcon(
             self.gif_controls,
             "˂˂",
-            command=lambda x: ebinder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE),
+            command=lambda x: e_binder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE),
         )
         self.right_button = RoundedIcon(self.gif_controls, "˃", command=self.next_frame)
         self.rightright_button = RoundedIcon(
             self.gif_controls,
             "˃˃",
-            command=lambda x: ebinder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE),
+            command=lambda x: e_binder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE),
         )
         self.leftleft_button.pack(side=tk.LEFT)
         self.left_button.pack(side=tk.LEFT)
@@ -73,18 +72,18 @@ class ViewerTab(ttk.Frame):
         self.right_button.pack(side=tk.LEFT)
         self.rightright_button.pack(side=tk.RIGHT)
 
-        ebinder.bind(BINDING.ON_TEXT_Z, self.prev_frame, self)
-        ebinder.bind(BINDING.ON_TEXT_X, self.toggle_play, self)
-        ebinder.bind(BINDING.ON_TEXT_C, self.next_frame, self)
+        e_binder.bind(BINDING.ON_TEXT_Z, self.prev_frame, self)
+        e_binder.bind(BINDING.ON_TEXT_X, self.toggle_play, self)
+        e_binder.bind(BINDING.ON_TEXT_C, self.next_frame, self)
 
     def init_bindings(self):
         self.clear_button.bind("<Button-1>", self.close_image_viewer)
         self.canvas_image.canvas.bind("<FocusIn>", self.on_focus_in)
         self.canvas_image.canvas.bind("<FocusOut>", self.unbind_canvas_escape)
-        ebinder.bind(BINDING.ON_IMAGE_DOUBLE_CLICK, self.open_image_viewer, self)
-        ebinder.bind(BINDING.ON_POST_SELECT, self.update_viewer_image, self)
-        ebinder.bind(BINDING.ON_FILTER_UPDATE, self.close_image_viewer, self)
-        ebinder.bind(BINDING.ON_TEXT_ESCAPE, self.close_image_viewer, self)
+        e_binder.bind(BINDING.ON_IMAGE_DOUBLE_CLICK, self.open_image_viewer, self)
+        e_binder.bind(BINDING.ON_POST_SELECT, self.update_viewer_image, self)
+        e_binder.bind(BINDING.ON_FILTER_UPDATE, self.close_image_viewer, self)
+        e_binder.bind(BINDING.ON_TEXT_ESCAPE, self.close_image_viewer, self)
 
     def on_focus_in(self, e):
         if self.after_add_binding_id:
@@ -103,10 +102,10 @@ class ViewerTab(ttk.Frame):
     def close_image_viewer(self, _=None):
         if self.after_add_binding_id:
             self.after_cancel(self.after_add_binding_id)
-        ebinder[BINDING.GALLERY_WIDGET].text.focus_set()
+        e_binder[BINDING.GALLERY_WIDGET].text.focus_set()
         if self.grid_info():
             logger.info("Closing Image Viewer")
-            ebinder[BINDING.GALLERY_WIDGET].lift()
+            e_binder[BINDING.GALLERY_WIDGET].lift()
             self.grid_forget()
 
     def unbind_canvas_escape(self, *_):
@@ -122,7 +121,7 @@ class ViewerTab(ttk.Frame):
 
     def update_viewer_image(self, pid):
         self.last_open_time = time.time()
-        self.thread_caller.cancel(__name__)
+        thread_caller.cancel(__name__)
 
         if not pid:
             logger.error("Missing PID in viewer")
@@ -136,10 +135,10 @@ class ViewerTab(ttk.Frame):
                     logger.info("Failed to load postFile for %s", pid)
                     return
             filename = post_file.file
-            self.thread_caller.cancel(self.cancle_key)
+            thread_caller.cancel(self.cancle_key)
             self.curr_focus = self.canvas_image.canvas.focus_get()
             self.canvas_image.canvas.focus_set()
-            self.cancle_key = self.thread_caller.add(
+            self.cancle_key = thread_caller.add(
                 self.canvas_image.set_image,
                 self.on_canvas_set_image,
                 self.cancle_key,

@@ -23,6 +23,15 @@ def wrap_line(lines, line_size, border_char="│"):
             wrapped_lines += f"│ {c_line.ljust(inner_line)} │\n"
     return wrapped_lines
 
+def pretty_wrap(header, body, line_size = 80):
+    lines = [
+        f"╭{'─' * (line_size - 2)}╮\n",
+        wrap_line(header, line_size),
+        f"├{'─' * (line_size - 2)}┤\n",
+        wrap_line(body, line_size),
+        f"╰{'─' * (line_size - 2)}╯",
+    ]
+    return "".join(lines)
 
 class Bm(object):
     def __init__(self, name="Benchmark", pretty=True, logger=None):
@@ -56,13 +65,7 @@ class Bm(object):
 
         if self.pretty:
             line_size = int(min(80, shutil.get_terminal_size((80, 50)).columns))
-            pretty_lines = (
-                f"╭{'─' * (line_size - 2)}╮\n"
-                + wrap_line(time_line, line_size)
-                + f"├{'─' * (line_size - 2)}┤\n"
-                + wrap_line(size_lines, line_size)
-                + f"╰{'─' * (line_size - 2)}╯"
-            )
+            pretty_lines = pretty_wrap(time_line, size_lines, line_size)
             if self.logger:
                 self.logger.info("\n%s", pretty_lines)
             else:

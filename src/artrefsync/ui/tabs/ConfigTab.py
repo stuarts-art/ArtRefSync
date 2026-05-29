@@ -11,7 +11,7 @@ from artrefsync.constants import TABLE, get_table_mapping
 from artrefsync.sync_coordinator import sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -22,7 +22,6 @@ class ConfigTab(ttk.Frame):
         logger.info("Init Config Tab")
         super().__init__(root, *args, **kwargs)
         self.configure_style(root)
-        self.thread_caller = TkThreadCaller(self)
         self.config_notebook = ttk.Notebook(self)
         self.config_notebook.pack(expand=True, fill="both", padx=5, pady=5)
         self.load()
@@ -179,7 +178,7 @@ class ConfigTab(ttk.Frame):
                 sync_from_store(self.sync_event)
                 self.finish_store_sync()
             else:
-                self.thread_caller.add(
+                thread_caller.add(
                     sync_from_store,
                     self.finish_store_sync,
                     __name__,
@@ -206,7 +205,7 @@ class ConfigTab(ttk.Frame):
                 sync_config(self.sync_event)
                 self.finish_sync()
             else:
-                self.thread_caller.add(
+                thread_caller.add(
                     sync_config, self.finish_sync, __name__, self.sync_event
                 )
         else:

@@ -3,13 +3,13 @@ import ttkbootstrap as ttk
 
 
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.TkThreadCaller import thread_caller
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.config import config
 
 from artrefsync.constants import BINDING
 
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
 from itertools import cycle
 
 import logging
@@ -17,7 +17,6 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(config.log_level)
 
-thread_caller: TkThreadCaller = None
 
 
 class RoundedDropDown(ttk.Label):
@@ -110,9 +109,9 @@ class SortByTab(ttk.Frame):
         self.update_dict()
 
     def update_dict(self):
-        ebinder.map[BINDING.SORT_BY] = self.sort_var.get()
-        ebinder.map[BINDING.SORT_DIR] = self.sort_dir_var.get()
+        e_binder.map[BINDING.SORT_BY] = self.sort_var.get()
+        e_binder.map[BINDING.SORT_DIR] = self.sort_dir_var.get()
 
     def update_posts(self, *args, **kwargs):
         self.update_dict()
-        ebinder.event_generate(BINDING.ON_SORT_BY_UPDATE)
+        e_binder.event_generate(BINDING.ON_SORT_BY_UPDATE)

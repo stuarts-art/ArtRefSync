@@ -74,3 +74,5 @@ class LinkCache:
         logger.info("Cleaning up Link Cache. Removing temp dir: %s.", self.temp_dir)
         self.temp_dir.cleanup()
         logger.info("Link Cache Closed.")
+
+link_cache = LinkCache()

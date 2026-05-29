@@ -15,23 +15,18 @@ from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.image_utils import ImageUtils
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger()
 logger.setLevel(config.log_level)
-
-thread_caller: TkThreadCaller = None
 
 
 class PhotoImageGallery(ttk.Frame):
     def __init__(self, root: ttk.Frame, thread_caller_arg=None):
         logger.info("Init Photo Image Gallery.")
-
-        global thread_caller
         self.root = root
-        thread_caller = thread_caller_arg
         super().__init__(root)
 
         self.init_vars()
@@ -39,7 +34,7 @@ class PhotoImageGallery(ttk.Frame):
         self.init_scafolding()
         self.init_bindings()
         logger.info("Init Photo Image Complete.")
-        ebinder[BINDING.GALLERY_WIDGET] = self
+        e_binder[BINDING.GALLERY_WIDGET] = self
 
     def init_vars(self):
         logger.info("Init vars")
@@ -58,7 +53,10 @@ class PhotoImageGallery(ttk.Frame):
             self.text, self.frame_width, self.frame_height, self.scrolled_text
         )
         self.text.tag_configure(
-            "sel", background=self.color.warning, foreground=self.color.warning, underline=1
+            "sel",
+            background=self.color.warning,
+            foreground=self.color.warning,
+            underline=1,
         )
         self.text.tag_configure("center", justify="center")
         self.text.config(state="disabled")
@@ -73,8 +71,8 @@ class PhotoImageGallery(ttk.Frame):
         logger.info("Init bindings")
         self.bind("<Configure>", self.update_width)
         self.bind("<FocusIn>", self.simple_frames.on_swap)
-        ebinder.bind(BINDING.ON_FILTER_UPDATE, self.change_tags, self)
-        ebinder.bind(BINDING.ON_SORT_BY_UPDATE, self.update_posts, self)
+        e_binder.bind(BINDING.ON_FILTER_UPDATE, self.change_tags, self)
+        e_binder.bind(BINDING.ON_SORT_BY_UPDATE, self.update_posts, self)
 
     def update_sort_var(self, e: tk.Event):
         self.sort_menu.post(
@@ -105,29 +103,31 @@ class PhotoImageGallery(ttk.Frame):
         self.update_posts()
 
     def update_posts(self, *args, **kwargs):
-        sort_by = ebinder.get_or_default(BINDING.SORT_BY, "id")
-        sort_dir = ebinder.get_or_default(BINDING.SORT_DIR, "DESC")
-        logger.debug(
+        cancle_key = "get_sorted_posts"
+        sort_by = e_binder.get_or_default(BINDING.SORT_BY, "id")
+        sort_dir = e_binder.get_or_default(BINDING.SORT_DIR, "DESC")
+        logger.info(
             "Displaying image gallery, sorted by: %s %s, with tags: %s",
             sort_by,
             sort_dir,
             self.tags,
         )
-        with PostDb() as post_db:
-            order_query = (
-                f" id IN (SELECT id from PostFile) ORDER BY {sort_by} {sort_dir}"
-            )
-            if self.tags:
-                posts = post_db.get_tag_intersection(self.tags)
-                sorted_posts = post_db.posts.get_all(
-                    posts, ["id"], as_scalar=True, suffix=f" AND {order_query}"
-                )
-            else:
-                sorted_posts = post_db.posts.select_id_list(
-                    conditions=None, suffix=f" WHERE {order_query} LIMIT 1000"
-                )
+        thread_caller.add(
+            self.get_sorted_posts,
+            self.simple_frames.change_posts,
+            cancle_key,
+            self.tags,
+            sort_by,
+            sort_dir,
+        )
+        # with PostDb() as post_db:
+        #     sorted_posts = post_db.posts_in_intersection(self.tags, sort_by, sort_dir)
+        # self.simple_frames.change_posts(sorted_posts)
 
-        self.simple_frames.change_posts(sorted_posts)
+    def get_sorted_posts(self, tags, sort_by, sort_dir):
+        with PostDb() as post_db:
+            sorted_posts = post_db.posts_in_intersection(tags, sort_by, sort_dir)
+        return sorted_posts
 
 
 class SimpleFrames:
@@ -169,12 +169,14 @@ class SimpleFrames:
             return SimpleFrames.frames[index]
 
     def init_bindings(self):
-        ebinder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
-        ebinder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
-        ebinder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
+        e_binder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
+        e_binder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
+        e_binder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
         self.text.bind("<Key>", lambda e: self.text.after_idle(self.__keystroke, e))
         self.text.bind("<KeyRelease-space>", self.on_space)
-        self.text.bind("<FocusIn>", lambda e: self.text.after(100, self.add_escape_binding))
+        self.text.bind(
+            "<FocusIn>", lambda e: self.text.after(100, self.add_escape_binding)
+        )
         self.text.bind("<FocusOut>", self.unbind_canvas_escape)
 
     # def __keystroke(self, event)
@@ -187,9 +189,9 @@ class SimpleFrames:
         shift_pressed = (state & 0x1) != 0
 
         if keysym == "q":
-            ebinder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
+            e_binder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
         elif keysym == "e":
-            ebinder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
+            e_binder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
         elif keysym in ["w", "Up"]:
             self.text.event_generate("<MouseWheel>", delta=120)
         elif keysym in ["a", "Left"]:
@@ -199,20 +201,20 @@ class SimpleFrames:
         elif keysym in ["d", "Right"]:
             self.throttled_focus_next()
         elif keysym == "z":
-            ebinder.event_generate(BINDING.ON_TEXT_Z)
+            e_binder.event_generate(BINDING.ON_TEXT_Z)
         elif keysym == "x":
-            ebinder.event_generate(BINDING.ON_TEXT_X)
+            e_binder.event_generate(BINDING.ON_TEXT_X)
         elif keysym == "c":
             if ctrl_pressed:
                 self.on_ctrl_c()
             else:
-                ebinder.event_generate(BINDING.ON_TEXT_C)
+                e_binder.event_generate(BINDING.ON_TEXT_C)
         elif keysym == "grave":
-            ebinder.event_generate(BINDING.ON_TEXT_ESCAPE)
+            e_binder.event_generate(BINDING.ON_TEXT_ESCAPE)
 
         else:
             return ""
-        
+
         logger.debug(
             "KeyCode: %s, KeySym: %s, State: %s",
             event.keycode,
@@ -235,24 +237,25 @@ class SimpleFrames:
     def on_space(self, *e):
         logger.info("ON SPACE")
         if self.selected and self.selected.bbox:
-            ebinder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid)
+            e_binder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid)
         else:
             for frame in self.frames:
                 if frame.bbox:
                     self.text.see(frame)
                     self.add_select_tag(frame, False, False)
-                    ebinder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid)
+                    e_binder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid)
                     break
 
     def unbind_canvas_escape(self, *_):
         pass
 
-
     def add_escape_binding(self, *_):
         if self.selected:
             self.text.see(self.selected)
         else:
-            self.text.after_idle(lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
+            self.text.after_idle(
+                lambda: self.frames[0].event_generate("<ButtonRelease-1>")
+            )
 
     def create_frame(self):
         idx = len(self.frames) if self.frames else 0
@@ -272,7 +275,7 @@ class SimpleFrames:
 
     def on_double_button_1(self, e):
         self.text.focus_set()
-        ebinder.event_generate(
+        e_binder.event_generate(
             BINDING.ON_IMAGE_DOUBLE_CLICK, self.post_ids[e.widget.idx]
         )
 
@@ -288,16 +291,16 @@ class SimpleFrames:
         self.text.event_generate("<MouseWheel>", delta=event.delta)
 
     def change_zoom(self, delta):
+        logger.info("Changing zoom by %s", delta)
         if self.zooming:
             return
         self.zooming = True
         old_height = self.height_var.get()
         new_height = old_height + delta
-        if new_height < 300:
-            new_height = 300
+        if new_height < 250:
+            new_height = 250
         if new_height > self.text.winfo_height():
             new_height = self.text.winfo_height()
-
         if new_height != old_height:
             self.height_var.set(new_height)
             self.update()
@@ -311,7 +314,7 @@ class SimpleFrames:
             posts = []
         if posts == SimplePhotoLabel.post_ids:
             return
-        ebinder.event_generate(BINDING.ON_POST_COUNT, len(posts) if posts else "0")
+        e_binder.event_generate(BINDING.ON_POST_COUNT, len(posts) if posts else "0")
 
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts
@@ -320,11 +323,11 @@ class SimpleFrames:
         self.text.after(100, lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
 
     def update(self):
-        logger.debug("Updating Image Gallery")
+        logger.info("Updating Image Gallery")
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
         for i, frame in enumerate(self.frames):
             if frame.bbox:
-                frame.get_image()
+                frame.get_image(True)
             else:
                 frame.reset()
 
@@ -363,7 +366,7 @@ class SimpleFrames:
     def updated_selected_post(self, pid):
         if self.last_selected != pid:
             self.last_selected = pid
-            ebinder.event_generate(BINDING.ON_POST_SELECT, self.selected.pid)
+            e_binder.event_generate(BINDING.ON_POST_SELECT, self.selected.pid)
 
     @property
     def selected(self) -> "SimplePhotoLabel":
@@ -557,10 +560,10 @@ class SimpleFrames:
 
 
 class ImageCache:
-    def __init__(self, max_size=50):
+    def __init__(self, max_size=200):
         self.cache = {}
         self.deque = deque()
-        self.max_size = 50
+        self.max_size = max_size
 
     def __contains__(self, item):
         return item in self.cache
@@ -582,6 +585,12 @@ class ImageCache:
         while len(self.deque) > self.max_size - 1:
             rkey = self.deque.popleft()
             self.cache.pop(rkey)
+
+    def remove(self, key):
+        if key in self.cache:
+            self.cache.pop(key)
+            if key in self.deque:
+                self.deque.remove(key)
 
 
 class SimplePhotoLabel(tk.Label):
@@ -692,9 +701,11 @@ class SimplePhotoLabel(tk.Label):
             return
         if self.pid:
             logger.debug("Resetting %s", self.pid)
+            self.photo_cache.remove(self.pid)
         self.file = None
         self.loading = False
-        self.config(image=None)
+        # self.config(image=None)
+        # self.photo_cache = ImageCache()
 
     def update_size(self):
         try:
@@ -706,11 +717,11 @@ class SimplePhotoLabel(tk.Label):
         except Exception:
             return (self.width_var.get(), self.height_var.get())
 
-    def get_image(self):
+    def get_image(self, force_update=False):
         if self.pid is None or not self.post_file:
             self.config(image=None)
             return
-        if self.pid in SimplePhotoLabel.photo_cache:
+        if not force_update and self.pid in SimplePhotoLabel.photo_cache:
             photo = SimplePhotoLabel.photo_cache[self.pid]
             self.config(image=photo, height=photo.height(), width=photo.width())
             return
@@ -745,7 +756,7 @@ class SimplePhotoLabel(tk.Label):
                 self.set_image,
                 self.get_image_cancel_key,
                 self.file_name,
-                (self.width_var.get(), self.height_var.get()),
+                self.thumbsize,
                 False,
                 blur,
             )

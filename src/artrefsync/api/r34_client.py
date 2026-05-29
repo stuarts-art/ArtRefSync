@@ -6,7 +6,7 @@ import re
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from artrefsync.config import cache, config
+from artrefsync.config import config
 from artrefsync.api.r34_model import R34_Post
 from artrefsync.constants import R34, TABLE
 from artrefsync.db.post_db import PostDb
@@ -25,7 +25,7 @@ class R34_Client:
     Class to handle requesting and handling messages from the image board E621
     """
 
-    def __init__(self, api_string=None, only_recent=False):
+    def __init__(self, api_string=None, only_recent=False, stop_event:Event = None):
         logger.info("R34 Init Start")
         self.r34_api_string = (
             api_string if api_string else config[TABLE.R34][R34.API_KEY]
@@ -38,12 +38,13 @@ class R34_Client:
         self.last_run = 0
         self.black_list = [f" -{x}" for x in config[TABLE.R34][R34.BLACK_LIST]]
         logger.info("R34 Init Complete")
+        self.stop_event = stop_event
 
     def _build_url_request(self, tag, page, last_id=None) -> str:
         return f"{self.base_url}{self.r34_api_string}&limit={self.limit}&tags={tag}{f'+id:>{last_id}' if last_id else ''}&fields=tag_info&pid={page}&json=1"
 
-    def get_posts(
-        self, tag, post_limit=10000, stop_event: Event = None
+    async def get_posts(
+        self, tag, post_limit=10000
     ) -> list[R34_Post]:
         posts = []
         posts_data = []
@@ -57,7 +58,7 @@ class R34_Client:
             with PostDb() as post_db:
                 last_id = post_db.get_last_id(tag, "r34")
         for page in range(50):
-            if stop_event and stop_event.is_set():
+            if self.stop_event and self.stop_event.is_set():
                 return None
             page_data = self.get_page(tag, page, last_id)
             posts_data.extend(page_data)
@@ -76,8 +77,8 @@ class R34_Client:
                 break
         return posts
 
-    @cache.memoize(expire=config.cache_ttl())
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
+    @config.cache("r34").memoize(expire=config.cache_ttl())
     def get_page(self, tag, page, last_id=None):
         response = requests.get(
             self._build_url_request(tag, page, last_id), timeout=2.0

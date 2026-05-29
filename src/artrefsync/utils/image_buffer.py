@@ -12,14 +12,13 @@ from tkinterdnd2 import DND_FILES, TkinterDnD
 
 from artrefsync.config import config
 from artrefsync.utils.image_utils import ImageUtils
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.TkThreadCaller import thread_caller
 from artrefsync.utils.IntegerVar import IntegerVar
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
-
-class ImageCache:
+class ImageCache: # WIP Video/Gif Viewer
     def __init__(self, max_size=50):
         self.cache = OrderedDict()
         self.deque = deque()
@@ -61,8 +60,7 @@ class ImageCache:
 
 class ImageBuffer:
     def __init__(
-        self, size=1080, index: ttk.IntVar = None, thread_caller: TkThreadCaller = None
-    ):
+        self, size=1080, index: ttk.IntVar = None):
         self.lock = Lock()
         self.frame_count = 1
         self.count = 0
@@ -194,10 +192,9 @@ class ImageBuffer:
 
 class ImagePlayer:
     def __init__(
-        self, parent, threadcaller: TkThreadCaller, size: int, index: IntegerVar
+        self, parent, size: int, index: IntegerVar
     ):
         self.parent = parent
-        self.threadcaller: TkThreadCaller = threadcaller
         self.size = size
         self.index: IntegerVar = index
         self.__init_vars()
@@ -226,7 +223,7 @@ class ImagePlayer:
         self.root.columnconfigure(0, weight=1)
 
         self.label: ttk.Label = ttk.Label(self.root)
-        self.buffer = ImageBuffer(self.size, self.index, self.threadcaller)
+        self.buffer = ImageBuffer(self.size, self.index)
         self.ui_frame = ttk.Frame(self.root)
         self.ui_frame.rowconfigure(0, weight=1)
 
@@ -343,7 +340,7 @@ class ImagePlayer:
         self.schedule_play()
 
     def schedule_play(self):
-        self.set_future = self.threadcaller.add(self.play, None, "play")
+        self.set_future = thread_caller.add(self.play, None, "play")
 
 
 if __name__ == "__main__":
@@ -351,6 +348,6 @@ if __name__ == "__main__":
     app = ttk.Window(size=(size, size))
     TkinterDnD._require(app)
     index = IntegerVar(value=0)
-    with TkThreadCaller(app, __name__) as threadcaller:
-        player = ImagePlayer(app, threadcaller, 1080, index)
+    with  thread_caller:
+        player = ImagePlayer(app, 1080, index)
         app.mainloop()

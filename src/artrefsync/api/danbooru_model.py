@@ -48,6 +48,7 @@ class Danbooru_Post:
         return post
 
 
+
 @dataclass
 class Danbooru_Tag:
     id: int

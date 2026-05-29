@@ -3,8 +3,9 @@ import tkinter as tk
 
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
 from artrefsync.config import config
+from artrefsync.utils.TkThreadCaller import thread_caller
 import logging
 
 
@@ -76,12 +77,13 @@ class TagTab(ttk.Frame):
         logger.info('Selected "%s"', selected_board)
 
     def init_bindings(self):
-        ebinder.bind(BINDING.ON_ARTIST_SELECT, self.update_artist, self)
+        e_binder.bind(BINDING.ON_ARTIST_SELECT, self.update_artist, self)
         self.entry.bind("<KeyRelease>", self.on_key_release)
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
         self.tree.bind("<Button-1>", self.query_by_tag)
         self.tree.bind("<Button-2>", self.on_middle_tag)
         self.tree.bind("<Key>", self.__keystroke)
+
         self.tag_type_var.trace_add("write", self.__on_tag_type_update)
 
     def __on_tag_type_update(self, *args):
@@ -95,7 +97,7 @@ class TagTab(ttk.Frame):
         shift_pressed = (state & 0x1) != 0  # noqa: F841
 
         if keysym in ["Return", "grave"]:
-            self.query_by_tag()
+            self.query_by_tag(event)
         elif keysym == "w":
             self.tree.event_generate("<Up>")
         elif keysym == "a":
@@ -122,63 +124,72 @@ class TagTab(ttk.Frame):
             self.curr_artist = artist
             if not artist:
                 self.curr_artist = ""
-                self.artist_tag_count_map = {}
-            else:
-                with PostDb() as post_db:
-                    if artist in post_db.artist_tags:
-                        self.artist_tag_count_map = post_db.artist_tags[artist]
-                        self.artist_tags = [
-                            str(k) for k in self.artist_tag_count_map.keys()
-                        ]
-                        self.artist_tags.sort(
-                            key=lambda tag: self.artist_tag_count_map[tag], reverse=True
-                        )
-                    else:
-                        self.artist_tag_count_map = {}
+        self.on_key_release()
 
     def is_artist(self, artist):
         if (
-            artist in ebinder[BINDING.ARTIST_SET]
-            or artist in ebinder[BINDING.BOARD_SET]
+            artist in e_binder[BINDING.ARTIST_SET]
+            or artist in e_binder[BINDING.BOARD_SET]
         ):
             return True
         else:
             return False
 
     def on_key_release(self, e=None):
+        cancel_key = "tagtab on_key_release"
         artist = self.curr_artist
         text = self.entry.get()
         type = self.tag_type_var.get()
         logger.debug("On Key Release for text = %s", text)
+        # thread_caller.cancel(cancel_key=cancel_key)
+        # thread_caller.add(
+        #     self.get_tag_counts,
+        #     self.update_tree_with_tags,
+        #     cancel_key=cancel_key,
+        #     artist=artist,
+        #     text=text,
+        #     type=type,
+        # )
+
         with PostDb() as post_db:
             tags = post_db.get_tag_counts(artist, text, type)
+        self.update_tree_with_tags(tags)
 
+
+    def update_tree_with_tags(self, tags):
         for item in self.tree.get_children():
-            self.tree.delete(item)
+            # if self.tree.exists(item):
+            if item not in tags:
+                self.tree.delete(item)
 
-        repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
+        # repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
         for i, (tag, count) in enumerate(tags):
             if not self.is_artist(tag):
                 tag_text: str = tag
                 if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
-                    repl_split = "_".join(
-                        [
-                            split[0]
-                            + repl_text[len(split) : 2 * len(split) - 2]
-                            + split[-1]
-                            for split in tag_text.split("_")
-                        ]
-                    )
-                    tag_text = tag_text[0] + repl_split[1:-1] + tag_text[-1]
-                self.tree.insert("", "end", iid=tag, text=tag_text, values=(count,))
+                    tag_text = config.censor_text(tag_text)
+                if self.tree.exists(tag):
+                    self.tree.move(tag, "", i)
+                else:
+                    self.tree.insert("", i, iid=tag, text=tag_text, values=(count,))
 
-    def query_by_tag(self, e=None):
+    def get_tag_counts(self, artist, text, type):
+        with PostDb() as post_db:
+            tags = post_db.get_tag_counts(artist, text, type, limit=50)
+        return tags
+
+    def query_by_tag(self, event:tk.Event=None):
+        state = event.state
+        ctrl_pressed = (state & 0x4) != 0  # noqa: F841
+        shift_pressed = (state & 0x1) != 0  # noqa: F841
+
+
         if self.tree.selection():
             tag = self.tree.selection()[0]
-            if tag in ebinder[BINDING.ARTIST_SET]:
-                ebinder.event_generate(BINDING.ON_ARTIST_SELECT, tag)
+            if tag in e_binder[BINDING.ARTIST_SET]:
+                e_binder.event_generate(BINDING.ON_ARTIST_SELECT, tag, shift_pressed)
             else:
-                ebinder.event_generate(BINDING.ON_TAG_SELECT, tag)
+                e_binder.event_generate(BINDING.ON_TAG_SELECT, tag, shift_pressed)
         else:
             children = self.tree.children
             if children:
@@ -187,4 +198,4 @@ class TagTab(ttk.Frame):
     def on_middle_tag(self, e=None):
         tag = self.tree.identify_row(e.y)
         logger.info("Middle click recieved for %s", tag)
-        ebinder.event_generate(BINDING.ON_TAG_MIDDLE, tag)
+        e_binder.event_generate(BINDING.ON_TAG_SELECT, tag, True)

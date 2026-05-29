@@ -2,12 +2,13 @@ import logging
 import os
 import sqlite3
 
-from artrefsync.db.TagType import ArtistTagCount, TagType
+from artrefsync.db.TagType import ArtistTagCount, PostTagLink, Tag, TagType
 from artrefsync.config import config
 from artrefsync.db.db_utils import BlobDb, DbUtils
 from artrefsync.db.dataclass_db import Dataclass_DB
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.constants import APP, BOARD, DB, TABLE
+from artrefsync.utils.benchmark import Bm
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -50,6 +51,7 @@ class PostDb:
         else:
             lazy = True
 
+        self.tags = Dataclass_DB(Tag, self.connection, lazy=lazy)
         self.posts = Dataclass_DB(Post, self.connection, lazy=lazy)
         self.files = Dataclass_DB(PostFile, self.connection, lazy=lazy)
         self.tag_types = Dataclass_DB(
@@ -58,11 +60,22 @@ class PostDb:
         self.artist_tag_counts = Dataclass_DB(
             ArtistTagCount, self.connection, lazy=lazy, key_list=["artist", "tag"]
         )
-
-        self.tag_posts = BlobDb(self.connection, "tag_posts", lazy=lazy)
-        self.artist_tags = BlobDb(self.connection, "artist_tags", lazy=lazy)
+        self.post_tag_link = Dataclass_DB(
+            PostTagLink, self.connection, lazy=lazy, key_list=["pid", "tid"]
+        )
 
         logger.debug("Opening PostDB")
+
+    def update_tag_tables(self, pid, tags):
+        post_row_id = self.posts.get_row_ids(
+            [
+                pid,
+            ]
+        )[0]
+        self.tags.insert_many([(tag,) for tag in tags])
+        tag_row_ids = self.tags.get_row_ids(tags)
+        query_args = tuple((post_row_id, tag_row_id) for tag_row_id in tag_row_ids)
+        row_count = self.post_tag_link.insert_many(query_args)
 
     def select(
         self,
@@ -157,49 +170,130 @@ class PostDb:
         )
         return missing_ids
 
-    def get_tag_counts(self, artist = "", search = "", type = "", as_tupple = True, limit = 1000, offset = 0):
+    def tags_from_post(self, pid):
+        query = [
+            "SELECT t1.tag",
+            "FROM PostTagLink pt",
+            f"JOIN {Post.__name__} p1 ON pt.pid = p1.rowid",
+            f"JOIN {Tag.__name__} t1 ON  pt.tid = t1.rowid",
+            "WHERE p1.id = ?",
+        ]
+        query_str = " ".join(query)
+        cur = self.connection.cursor()
+        cur.row_factory = DbUtils.scalor_row_factory
+        cur.execute(query_str, (pid,))
+        rows = cur.fetchall()
+        return rows
 
-        select_args="t1.tag as tag, t1.count as count"
-        from_args= "ArtistTagCount as t1"
-        join_str=""
+    def posts_from_tag(self, tag, as_count=False, order_by="id", order_dir="DESC"):
+        query = [
+            "SELECT",
+            "COUNT(*)" if as_count else "p1.id",
+            "FROM PostTagLink pt",
+            f"JOIN {Post.__name__} p1 ON pt.pid = p1.rowid",
+            f"JOIN {Tag.__name__} t1 ON  pt.tid = t1.rowid",
+            "WHERE t1.tag = ?",
+            "" if as_count else f"ORDER BY {order_by} {order_dir}",
+        ]
+        query_str = " ".join(query)
+        cur = self.connection.cursor()
+        cur.row_factory = DbUtils.scalor_row_factory
+        cur.execute(query_str, (tag,))
+        rows = cur.fetchall()
+        if as_count:
+            return rows[0] if rows else 0
+        return rows
+
+    def post_counts_for_tags(self, tags:list[str]):
+        query = [
+            "SELECT",
+            "t1.tag, COUNT(*)",
+            "FROM PostTagLink pt",
+            f"JOIN {Post.__name__} p1 ON pt.pid = p1.rowid",
+            f"JOIN {Tag.__name__} t1 ON  pt.tid = t1.rowid",
+            f"WHERE t1.tag IN ('{"', '".join(tags)}')",
+            "GROUP BY t1.tag"
+        ]
+        query_str = " ".join(query)
+        cur = self.connection.cursor()
+        cur.execute(query_str)
+        rows = cur.fetchall()
+
+        counts = {k:v for (k, v) in rows}
+        return counts
+
+    def posts_in_intersection(self, tags, order_by="id", order_dir="DESC"):
+        if not tags:
+            query = [
+                "SELECT id",
+                f"FROM {Post.__name__}",
+                f"ORDER BY {order_by} {order_dir}",
+            ]
+        elif len(tags) == 1:
+            return self.posts_from_tag(tags[0], order_by=order_by, order_dir=order_dir)
+        else:
+            query = [
+                "SELECT p1.id",
+                "FROM PostTagLink pt",
+                f"JOIN {Post.__name__} p1 ON pt.pid = p1.rowid",
+                f"JOIN {Tag.__name__} t1 ON  pt.tid = t1.rowid",
+                f"WHERE t1.tag IN ('{"', '".join(tags)}')",
+                "GROUP BY p1.id",
+                f"HAVING COUNT(DISTINCT t1.tag) = {len(tags)}",
+                f"ORDER BY p1.{order_by} {order_dir}",
+            ]
+
+        query_str = " ".join(query)
+        cur = self.connection.cursor()
+        cur.row_factory = DbUtils.scalor_row_factory
+        cur.execute(query_str)
+        rows = cur.fetchall()
+        return rows
+
+    def get_tag_counts(
+        self, artist="", search="", type="", as_tupple=True, limit=1000, offset=0
+    ):
+
+        select_args = "t1.tag as tag, t1.count as count"
+        from_args = "ArtistTagCount as t1"
+        join_str = ""
         suffix_str = ""
         conditions = []
 
         if artist != "":
-            conditions.append(f"t1.artist = \"{artist}\"")
+            conditions.append(f't1.artist = "{artist}"')
         else:
             # Handle No Artist:
             select_args = "t1.tag as tag, SUM(t1.count) as count"
-            suffix_str =  "GROUP BY t1.tag"
+            suffix_str = "GROUP BY t1.tag"
             conditions.append("t1.artist in ('e621', 'danbooru', 'r34')")
 
         if search != "":
-            conditions.append(f"t1.tag LIKE \"%{search}%\"")
+            conditions.append(f't1.tag LIKE "%{search}%"')
 
         if type != "":
             # select_args += ", t2.type"
-            join_str="INNER JOIN TagType as t2 ON t1.tag = t2.tag"
-            conditions.append(f"t2.type = \"{type}\"")
+            join_str = "INNER JOIN TagType as t2 ON t1.tag = t2.tag"
+            conditions.append(f't2.type = "{type}"')
 
         suffix_str += " ORDER BY count DESC"
         if limit:
             suffix_str += f" LIMIT {limit}"
-        
+
         if offset:
             suffix_str += f" OFFSET {offset}"
-        where_str = f"WHERE {" AND ".join(conditions)}"
+        where_str = f"WHERE {' AND '.join(conditions)}"
 
         tag_counts = self.artist_tag_counts.select_freeform(
             select_args=select_args,
             from_args=from_args,
-            join_str= join_str,
+            join_str=join_str,
             where_str=where_str,
             suffix_str=suffix_str,
-            as_tupple=as_tupple)
+            as_tupple=as_tupple,
+        )
 
         return tag_counts
-
-
 
     def __enter__(self):
         logger.debug("PostDB Enter")
@@ -209,8 +303,6 @@ class PostDb:
         self.connection.commit()
         logger.debug("Closing PostDB")
         self.connection.close()
-
-        
 
 
 if __name__ == "__main__":

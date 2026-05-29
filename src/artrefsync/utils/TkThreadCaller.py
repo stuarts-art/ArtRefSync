@@ -54,21 +54,14 @@ class TkThreadCaller:
         return future
 
     def cancel(self, cancel_key):
-        logger.debug(
-            "Cancel called for key: %s, Current thread count: %s",
-            cancel_key,
-            (
-                0
-                if cancel_key not in self.cancel_map
-                else len(self.cancel_map[cancel_key])
-            ),
-        )
-
-        if cancel_key in self.cancel_map:
-            for future in self.cancel_map.pop(cancel_key):
-                future.cancel()
-                if future in self.cancel_key_map:
-                    self.cancel_key_map.pop(future)
+        try:
+            if cancel_key in self.cancel_map:
+                for future in self.cancel_map.pop(cancel_key):
+                    future.cancel()
+                    if future in self.cancel_key_map:
+                        self.cancel_key_map.pop(future)
+        except Exception:
+            logger.exception("failed to cancel %s", cancel_key)
         return
 
     def call_on_finish(self, future: Future):
@@ -97,3 +90,5 @@ class TkThreadCaller:
         logger.info("Stopping active threads...")
         self.executor.shutdown(cancel_futures=True, wait=True)
         logger.info("Active Threads Stopped.")
+
+thread_caller = TkThreadCaller()

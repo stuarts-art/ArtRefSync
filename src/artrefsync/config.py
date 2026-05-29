@@ -1,4 +1,5 @@
 # Config Related setup
+import functools
 import logging
 import logging.handlers
 import os
@@ -34,6 +35,7 @@ class Config:
         }
         self._subscribed_reload = []
         self._reload_config()
+        self.__caches = {}
 
     def _reload_config(self):
         self.settings = Configuration(**self.kwargs)
@@ -55,6 +57,27 @@ class Config:
                 log_file_handler,
             ],
         )
+    
+    repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
+    @functools.lru_cache
+    def censor_text(self, text):
+        if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
+            repl_split = "_".join(
+                [
+                    split[0]
+                    + Config.repl_text[len(split) : 2 * len(split) - 2]
+                    + split[-1]
+                    for split in text.split("_")
+                ]
+            )
+            return text[0] + repl_split[1:-1] + text[-1]
+
+
+    def cache(self, subdir : str = "") -> Cache:
+        key = f"{config[TABLE.APP][APP.CACHE_DIR]}/{subdir}"
+        if key not in self.__caches:
+            self.__caches[key] = Cache(key)
+        return self.__caches[key]
 
     def subscribe_reload(self, func: callable):
         self._subscribed_reload.append(func)
@@ -86,7 +109,7 @@ class Config:
 
     default_config = {
         TABLE.APP: {
-            APP.LIMIT: 1000,
+            APP.LIMIT: 5000,
             APP.LOG_LEVEL: "INFO",
             APP.ID_LENGTH: 8,
             APP.CACHE_DIR: ".metadata_cache",
@@ -134,4 +157,6 @@ class Config:
 
 
 config = Config()
-cache: Cache = Cache(config[TABLE.APP][APP.CACHE_DIR])
+# config.cache(""): Cache = Cache(config[TABLE.APP][APP.CACHE_DIR])
+
+

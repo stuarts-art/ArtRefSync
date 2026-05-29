@@ -7,7 +7,7 @@ import ttkbootstrap as ttk
 from artrefsync.config import config
 from artrefsync.constants import BINDING
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -26,16 +26,19 @@ class ActiveTagsTab(ttk.Frame):
         self.colors = self.style.colors
 
         self.tabs_frame = ttk.Frame(self, cursor="star")
-        self.tabs_frame.pack(side=tk.TOP, fill="both", expand=True)
-        self.clear_button = RoundedIcon(self, text="✕", size=(25, 25))
-        self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
+        self.clear_button = RoundedIcon.from_text(self, text="✕")
+        self.clear_button.pack(side=tk.LEFT)
+        self.tabs_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         self.add_bindings()
 
+    def place_self(self):
+        self.pack(side=tk.LEFT, expand=tk.TRUE, fill=tk.X)
+
     def is_artist(self, artist):
         if (
-            artist in ebinder[BINDING.ARTIST_SET]
-            or artist in ebinder[BINDING.BOARD_SET]
+            artist in e_binder[BINDING.ARTIST_SET]
+            or artist in e_binder[BINDING.BOARD_SET]
         ):
             return True
         else:
@@ -43,10 +46,9 @@ class ActiveTagsTab(ttk.Frame):
 
     def add_bindings(self):
         self.clear_button.bind("<Button-1>", self.clear_active)
-        ebinder.bind(BINDING.ON_ARTIST_CLEAR, self.clear_active, self)
-        ebinder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist, self)
-        ebinder.bind(BINDING.ON_TAG_SELECT, self.on_tag, self)
-        ebinder.bind(BINDING.ON_TAG_MIDDLE, self.on_tag_middle, self)
+        e_binder.bind(BINDING.ON_ARTIST_CLEAR, self.clear_active, self)
+        e_binder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist, self)
+        e_binder.bind(BINDING.ON_TAG_SELECT, self.on_tag, self)
 
     def on_artist(self, artist, middle_click=False):
         logger.debug("Artist Recieved: %s, Middle Clicked: %d", artist, middle_click)
@@ -70,10 +72,11 @@ class ActiveTagsTab(ttk.Frame):
     def add_artist(self, artist):
         self.artist = artist
         self.add_tag(self.artist, self.colors.primary)
-        ebinder[BINDING.SELECTED_ARTIST] = self.artist
+        e_binder[BINDING.SELECTED_ARTIST] = self.artist
 
-    def on_tag(self, tag):
-        # Replace any non-artist tag.
+    def on_tag(self, tag, middle_clicked = False):
+        if middle_clicked:
+            return self.on_tag_middle(tag)
         logger.info("Tag Recieved: %s", tag)
         if tag in self.active_tags:
             self.remove_tag(tag)
@@ -107,7 +110,7 @@ class ActiveTagsTab(ttk.Frame):
             if self.remove_tag(tag):
                 self.update_filter()
             if self.is_artist(tag):
-                ebinder.event_generate(BINDING.ON_ARTIST_SELECT, None, False)
+                e_binder.event_generate(BINDING.ON_ARTIST_SELECT, None, False)
         if not self.active_tags:
             self.forget_self()
 
@@ -122,7 +125,9 @@ class ActiveTagsTab(ttk.Frame):
             self.forget_self()
         return True
 
-    def add_tag(self, tag, color=None):
+    def add_tag(self, tag="", color=None):
+        if not tag:
+            return
         if not color:
             color = self.colors.secondary
 
@@ -143,11 +148,11 @@ class ActiveTagsTab(ttk.Frame):
             cwidgets = self.active_tags.values()
             for w in cwidgets:
                 w.pack_forget()
-            tag_icon.pack(side=tk.TOP, anchor=tk.NW)
+            tag_icon.pack(side=tk.LEFT, anchor=tk.NW)
             for w in cwidgets:
-                w.pack(side=tk.TOP, anchor=tk.NW)
+                w.pack(side=tk.LEFT, anchor=tk.NW)
         else:
-            tag_icon.pack(side=tk.TOP, anchor=tk.NW)
+            tag_icon.pack(side=tk.LEFT, anchor=tk.NW)
         tag_icon.bind("<Double-Button-1>", self.on_remove_tag)
 
     def clear_active(self, event=None, update=True):
@@ -167,11 +172,9 @@ class ActiveTagsTab(ttk.Frame):
         if tags == self.last_filter:
             return
         self.last_filter = tags
-        ebinder.event_generate(BINDING.ON_FILTER_UPDATE, tags)
+        e_binder.event_generate(BINDING.ON_FILTER_UPDATE, tags)
 
     def forget_self(self):
         logger.info("Forgetting Active Tags from Grid")
         self.grid_forget()
 
-    def place_self(self):
-        self.grid(column=0, row=4, sticky=tk.NSEW)

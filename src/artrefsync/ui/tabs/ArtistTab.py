@@ -8,7 +8,9 @@ import ttkbootstrap as ttk
 from artrefsync.config import config
 from artrefsync.constants import BINDING, BOARD, DANBOORU, E621, R34, TABLE
 from artrefsync.db.post_db import PostDb
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.benchmark import Bm
+from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -51,9 +53,9 @@ class ArtistTab(ttk.Frame):
 
         self.tree.bind("<Button-1>", self.query_by_artist)
         self.tree.bind("<Button-2>", self.on_middle_tag)
-        self.board_menu_button.bind("<Return>", self.open_menu)
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
         self.tree.bind("<Key>", self.__keystroke)
+        self.board_menu_button.bind("<Return>", self.open_menu)
 
     def __keystroke(self, event: tk.Event):
         keycode = event.keycode
@@ -93,7 +95,7 @@ class ArtistTab(ttk.Frame):
     def on_middle_tag(self, e: tk.Event):
         tag = self.tree.identify_row(e.y)
         logger.info("Middle click recieved for %s", tag)
-        ebinder.event_generate(BINDING.ON_ARTIST_SELECT, tag, True)
+        e_binder.event_generate(BINDING.ON_ARTIST_SELECT, tag, True)
 
     def load_config(self):
         if self.tree.get_children():
@@ -112,8 +114,8 @@ class ArtistTab(ttk.Frame):
             str(TABLE.R34): SortedSet(config[TABLE.R34][R34.ARTISTS]),
             str(TABLE.DANBOORU): SortedSet(config[TABLE.DANBOORU][DANBOORU.ARTISTS]),
         }
-        with PostDb() as postdb:
-            for board, artists in postdb.board_artists.items():
+        with PostDb() as post_db:
+            for board, artists in post_db.board_artists.items():
                 if board not in self.board_artists_map:
                     self.board_artists_map[board] = SortedSet(artists)
                 else:
@@ -123,9 +125,8 @@ class ArtistTab(ttk.Frame):
             self.artist_set.update(artists)
 
         self.board_set = set([str(board) for board in BOARD if board != BOARD.OTHER])
-        ebinder.event_generate(BINDING.ARTIST_SET, self.artist_set)
-        ebinder.event_generate(BINDING.BOARD_SET, self.board_set)
-        self.set_artist_counts()
+        e_binder.event_generate(BINDING.ARTIST_SET, self.artist_set)
+        e_binder.event_generate(BINDING.BOARD_SET, self.board_set)
 
         for board in [
             "",
@@ -138,6 +139,14 @@ class ArtistTab(ttk.Frame):
                 compound="left",
                 command=self.on_board_menu_select,
             )
+        thread_caller.add(self.set_count_map, self.set_artist_counts)
+
+
+    def set_count_map(self):
+        with PostDb() as post_db:
+            artist_board_list = list(self.artist_set | self.board_set)
+            self.count_map = post_db.post_counts_for_tags(artist_board_list)
+
 
     def on_board_menu_select(self):
         selected_board = self.board_var.get()
@@ -157,7 +166,7 @@ class ArtistTab(ttk.Frame):
             for i, b in enumerate(self.board_artists_map.keys()):
                 self.tree.move(b, "", i)
             self.tree.selection_set((selected_board,))
-            ebinder.event_generate(BINDING.ON_ARTIST_CLEAR, "")
+            e_binder.event_generate(BINDING.ON_ARTIST_CLEAR, "")
 
     def on_key_release(self, e=None):
         text = self.entry.get()
@@ -178,7 +187,7 @@ class ArtistTab(ttk.Frame):
         if self.tree.selection():
             artist = self.tree.selection()[0]
             logger.info("Querying by artist: %s", artist)
-            ebinder.event_generate(BINDING.ON_ARTIST_SELECT, artist)
+            e_binder.event_generate(BINDING.ON_ARTIST_SELECT, artist)
 
     def change_folder_text(self, e=None):
         board = self.tree.selection()[0]
@@ -189,57 +198,36 @@ class ArtistTab(ttk.Frame):
             icon = "⯆ 🗁" if open else "⯈ 🗀"
             self.tree.set(board, "#1", f" {icon} {board}")
 
-    def set_artist_counts(self):
+    def set_artist_counts(self, _):
         logger.debug("Setting BOARD ARTISTS")
-        with PostDb() as postdb:
-            sorted_board_artists = []
-            for board, artists in postdb.board_artists.items():
-                if str(board) == "e621":
-                    sorted_board_artists.insert(0, (board, artists))
-                else:
-                    sorted_board_artists.append((board, artists))
 
-            for board, artists in self.board_artists_map.items():
-                # self.board_set.add(board)
-                board_str = str(board)
-                count = postdb.tag_posts.count(str(board_str))
-                count = count if count else 0
-                if not self.tree.exists(board_str):
+        for board, artists in self.board_artists_map.items():
+            board_str = str(board)
+            count = self.count_map.get(board, 0)
+            if not self.tree.exists(board_str):
+                self.tree.insert(
+                    "",
+                    "end",
+                    iid=board_str,
+                    text=board_str,
+                    values=(
+                        f" 🗁 {board_str}",
+                        count,
+                    ),
+                    open=True,
+                )
+            for artist in artists:
+                if not self.tree.exists(artist):
+                    count = self.count_map.get(artist, 0)
                     self.tree.insert(
-                        "",
+                        board_str,
                         "end",
-                        iid=board_str,
-                        text=board_str,
+                        iid=artist,
+                        text=artist,
                         values=(
-                            f" 🗁 {board_str}",
+                            f"       {artist}",
                             count,
                         ),
                         open=True,
                     )
-                for artist in sorted(artists):
-                    # self.board_set.add(artist)
-                    if self.tree.exists(artist):
-                        continue
-                    try:
-                        count = postdb.tag_posts.count(str(artist))
-                        count = count if count else 0
-                        self.tree.insert(
-                            board_str,
-                            "end",
-                            iid=artist,
-                            text=artist,
-                            values=(
-                                f"       {artist}",
-                                count,
-                            ),
-                            open=True,
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to set count for board %s, artist %s. Exception %s.",
-                            board_str,
-                            artist,
-                            e,
-                        )
-                        pass
-        ebinder.event_generate(BINDING.ARTIST_SET, self.artist_set)
+        e_binder.event_generate(BINDING.ARTIST_SET, self.artist_set)

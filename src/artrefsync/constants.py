@@ -45,7 +45,6 @@ class BINDING(StrEnum):
     ON_ARTIST_SELECT = auto()
     ON_ARTIST_CLEAR = auto()
     ON_TAG_SELECT = auto()
-    ON_TAG_MIDDLE = auto()
     ON_FILTER_UPDATE = auto()
     ON_SORT_BY_UPDATE = auto()
     ON_POST_COUNT = auto()

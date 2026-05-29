@@ -3,7 +3,7 @@ import tkinter as tk
 
 from artrefsync.config import config
 from artrefsync.constants import BINDING
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
 import logging
 
 logger = logging.getLogger(__name__)
@@ -84,15 +84,15 @@ class LoadingBars(ttk.Frame):
         self.mid_label.grid(column=1, row=0, sticky=tk.NSEW)
         # self.right_bar.grid(column=2,row=0, sticky=tk.W)
 
-        ebinder.bind(BINDING.ON_LOAD_LEFT_SET, self.reset_right, self)
-        ebinder.bind(BINDING.ON_LOAD_MID_SET, self.set_mid, self)
-        ebinder.bind(BINDING.ON_LOAD_RIGHT_SET, self.set_right, self)
-        ebinder.bind(BINDING.ON_LOADING_DONE, self.reset_bar, self)
+        e_binder.bind(BINDING.ON_LOAD_LEFT_SET, self.reset_right, self)
+        e_binder.bind(BINDING.ON_LOAD_MID_SET, self.set_mid, self)
+        e_binder.bind(BINDING.ON_LOAD_RIGHT_SET, self.set_right, self)
+        e_binder.bind(BINDING.ON_LOADING_DONE, self.reset_bar, self)
 
-        ebinder.bind(BINDING.ON_LOAD_LEFT_SET, self.left_bar.set, self)
-        ebinder.bind(BINDING.ON_LOAD_LEFT_INCR, self.left_bar.increment, self)
-        ebinder.bind(BINDING.ON_LOAD_RIGHT_SET, self.right_bar.set, self)
-        ebinder.bind(BINDING.ON_LOAD_RIGHT_INCR, self.right_bar.increment, self)
+        e_binder.bind(BINDING.ON_LOAD_LEFT_SET, self.left_bar.set, self)
+        e_binder.bind(BINDING.ON_LOAD_LEFT_INCR, self.left_bar.increment, self)
+        e_binder.bind(BINDING.ON_LOAD_RIGHT_SET, self.right_bar.set, self)
+        e_binder.bind(BINDING.ON_LOAD_RIGHT_INCR, self.right_bar.increment, self)
 
     def reset_bar(self):
         self.is_packed = False

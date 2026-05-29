@@ -9,6 +9,7 @@ from artrefsync.boards.board_handler import ImageBoardHandler, Post
 from artrefsync.config import config
 from artrefsync.constants import BOARD, E621, STATS
 from artrefsync.stats import stats
+import asyncio
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -21,12 +22,14 @@ def main():
 class E621Handler(ImageBoardHandler):
     """Class to handle messages from the image board E621"""
 
-    def __init__(self, only_recent=False):
+    def __init__(self, only_recent=False, stop_event:Event = None):
         logger.info("Initialize E621 Handler")
         self.only_recent = only_recent
+        self.type_tags = defaultdict(set)
+        self.stop_event = stop_event
         self.reload()
         config.subscribe_reload(self.reload)
-        self.type_tags = defaultdict(set)
+
 
     def reload(self):
         username = config[BOARD.E621][E621.USERNAME]
@@ -34,7 +37,7 @@ class E621Handler(ImageBoardHandler):
         self.black_list = config[BOARD.E621][E621.BLACK_LIST]
         self.artist_list = list(set(config[BOARD.E621][E621.ARTISTS]))
 
-        self.client = E621_Client(username, api_key, self.only_recent)
+        self.client = E621_Client(username, api_key, self.only_recent, self.stop_event)
         self.website = "https://e621.net/posts.json"
         self.hostname = "e621.net"
         self.limit = 320
@@ -51,15 +54,14 @@ class E621Handler(ImageBoardHandler):
         return BOARD.E621
 
     def get_artist_list(self):
-        # return  list(set(config[BOARD.E621][E621.ARTISTS]))
         return self.artist_list
 
     def get_posts(
-        self, tag, post_limit=10000, stop_event: Event = None
+        self, tag, post_limit=10000
     ) -> dict[str, Post]:
         post_dict = {}
         e621_posts: list[E621_Post] = self.client.get_posts(tag, post_limit)
-        if stop_event and stop_event.is_set():
+        if self.stop_event and self.stop_event.is_set():
             return None
         if " " in tag:
             tag = tag.split()[0]  # Remove query and metatags
@@ -163,15 +165,7 @@ class E621Handler(ImageBoardHandler):
                 sample_link=e_post.sample.url,
                 preview_link=e_post.preview.url,
             )
-            stats.add(STATS.TAG_SET, tags)
-            stats.add(STATS.SPECIES_SET, species)
-            stats.add(STATS.ARTIST_SET, artists)
-            stats.add(STATS.COPYRIGHT_SET, franchise)
-            stats.add(STATS.CHARACTER_SET, character)
-            stats.add(STATS.META_SET, meta)
-            stats.add(STATS.RATING_SET, rating)
             post_dict[pid] = post
-            stats.add(STATS.POST_COUNT)
         return post_dict
 
 

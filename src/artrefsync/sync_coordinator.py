@@ -26,13 +26,13 @@ from artrefsync.stores.eagle_storage import EagleHandler
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.plain_file_storage import PlainLocalStorage
 from artrefsync.stores.storage import ImageStoreHandler
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
 
 logger = logging.getLogger(__name__)
 
 
 def main():
-    coordinator = SyncCoordinator(E621Handler(), EagleHandler())
+    coordinator = SyncCoordinator(R34Handler(), EagleHandler())
     coordinator.sync()
 
 
@@ -53,20 +53,20 @@ def sync_config(event: Event):
 
         if config[TABLE.E621][E621.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.E621, store.get_store())
-            board = E621Handler(only_recent)
+            board = E621Handler(only_recent, event)
             sync(board, store, limit, event)
 
         if config[TABLE.R34][R34.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.R34, store.get_store())
-            board = R34Handler(only_recent)
+            board = R34Handler(only_recent, event)
             sync(board, store, limit, event)
 
         if config[TABLE.DANBOORU][DANBOORU.ENABLED] and not event.is_set():
             logger.info("Syncing %s with store: %s", TABLE.DANBOORU, store.get_store())
-            board = Danbooru_Handler(only_recent)
+            board = Danbooru_Handler(only_recent, event)
             sync(board, store, limit, event)
     finally:
-        ebinder.event_generate(BINDING.ON_LOADING_DONE)
+        e_binder.event_generate(BINDING.ON_LOADING_DONE)
 
 
 def sync_from_store(event: Event):
@@ -150,41 +150,50 @@ class SyncCoordinator:
     def sync(self):
         try:
             self.artist_list = self.board_handler.get_artist_list()
-            ebinder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+            self.sync_artist_metadata(self.artist_list)
+            e_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
             for artist in self.artist_list:
                 if self.stop_event.is_set():
                     return
-                ebinder.event_generate(
+                e_binder.event_generate(
                     BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
                 )
-                self.sync_artist(artist)
+                self.sync_artist_files(artist)
 
-            with PostDb() as post_db:
-                ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
-                for tag, posts in self.tag_post_dict.items():
-                    if self.stop_event.is_set():
-                        return
-                    post_db.tag_posts.union_update(tag, posts)
+            e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
             self.update_tag_types()
             self.update_board_artist_tag_counts(self.board, self.artist_list)
         except Exception:
             logger.exception("Sync Failed.")
 
-    def sync_artist(self, artist):
+    def sync_artist_metadata(self, artists: list[str]):
+        e_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+        logger.info("Syncing artists: %s", artists)
+        for artist in artists:
+            e_binder.event_generate(BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}")
+            e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
+            if self.stop_event.is_set():
+                return
+            self.update_metadata(artist)
+
+    def sync_artist_files(self, artist):
         logger.info("Starting sync artist %s", artist)
 
-        self.update_metadata(artist)
+        # self.update_metadata(artist)
+        self.update_post_file_table(artist)
+        self.download_missing_ids(artist)
+        self.update_post_file_table(artist=artist)
         logger.debug("Ending sync artist %s", artist)
 
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
-        ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
+        e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
         updated_posts = []
         board_posts: dict[str, Post] = self.board_handler.get_posts(
-            artist, self.max_per_artist, self.stop_event
+            artist, self.max_per_artist
         )
         logger.info(
-            "Recieved %d metadata posts for %s from board %s",
+            "Received %d metadata posts for %s from board %s",
             len(board_posts) if board_posts else 0,
             artist,
             self.board,
@@ -193,9 +202,12 @@ class SyncCoordinator:
             for pid, board_post in board_posts.items():
                 board_post.tags.append(board_post.ext)
                 board_post.tags.append(board_post.artist_name)
+                board_post.tags = list(dict.fromkeys(board_post.tags))
                 inserted = post_db.posts.insert(board_post)
+                post_db.update_tag_tables(pid, board_post.tags)
                 if inserted:
                     updated_posts.append(board_post)
+                
         logger.info(
             "Updated %d metadata posts for %s from board %s",
             len(updated_posts) if updated_posts else 0,
@@ -206,24 +218,24 @@ class SyncCoordinator:
 
     def get_missing_ids(self, artist: str):
         missing_ids = []
-        storeposts = self.store_handler.get_posts(self.board, artist)
-        logger.info("%d store posts for %s", len(storeposts), artist)
+        store_posts = self.store_handler.get_posts(self.board, artist)
+        logger.info("%d store posts for %s", len(store_posts), artist)
         with PostDb() as post_db:
             post_ids = post_db.posts.select_id_list(
                 [("artist_name", artist), ("board", self.board)]
             )
 
             for pid in post_ids:
-                if pid not in storeposts:
-                    # if pid not in storeposts or pid not in post_file_ids:
+                if pid not in store_posts:
+                    # if pid not in store posts or pid not in post_file_ids:
                     missing_ids.append(pid)
                 else:
-                    if not storeposts[pid].thumbnail or not storeposts[pid].sample:
+                    if not store_posts[pid].thumbnail or not store_posts[pid].sample:
                         missing_ids.append(pid)
             return missing_ids
 
     def download_missing_ids(self, artist):
-        ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Downloading missing")
+        e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Downloading missing")
 
         missing_ids = self.get_missing_ids(artist)
         failure_list = []
@@ -233,7 +245,7 @@ class SyncCoordinator:
         with PostDb() as post_db:
             missing_posts = [post_db.posts[id] for id in missing_ids]
         if not missing_posts:
-            ebinder.event_generate(
+            e_binder.event_generate(
                 BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), ""
             )
             return
@@ -249,13 +261,13 @@ class SyncCoordinator:
                     event=self.stop_event,
                 )
                 future_to_pid[future] = post.id
-            ebinder.event_generate(
+            e_binder.event_generate(
                 BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
             )
             for future in concurrent.futures.as_completed(future_to_pid.keys()):
                 try:
                     result = future.result()
-                    ebinder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
+                    e_binder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
                     if self.stop_event and self.stop_event.is_set():
                         logger.warning("Stop Event Recieved.")
                         executor.shutdown(wait=True, cancel_futures=True)
@@ -304,7 +316,7 @@ class SyncCoordinator:
         logger.info(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist
         )
-        ebinder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
+        e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(
             str(self.board), artist
         )
@@ -328,30 +340,21 @@ class SyncCoordinator:
 
     def update_board_artist_tag_counts(self, board, artist_list):
         board_map = defaultdict(int)
-        tag_posts = defaultdict(set)
-        with PostDb() as postdb:
+        with PostDb() as post_db:
             for artist in artist_list:
                 artist_map = defaultdict(int)
-                posts = postdb.posts.select([("artist_name", artist), ("board", board)])
+                posts = post_db.posts.select([("artist_name", artist), ("board", board)])
                 for post in posts:
-                    # try:
                     id = post.id
                     for tag in post.tags:
                         artist_map[tag] += 1
                         board_map[tag] += 1
-                        tag_posts[tag].add(id)
-
-                    # except Exception:
-                    #     pass
-                # postdb.artist_tags.dumps_blob(artist, dict(artist_map))
+                    
                 artist_tag_count_list = [(artist, tag, count) for tag, count in artist_map.items()]
-                postdb.artist_tag_counts.insert_many(artist_tag_count_list)
+                post_db.artist_tag_counts.insert_many(artist_tag_count_list)
 
             board_tag_count_list = [(board, tag, count) for tag, count in board_map.items()]
-            postdb.artist_tag_counts.insert_many(board_tag_count_list)
-            # postdb.artist_tags.dumps_blob(str(board), dict(board_map))
-            for tag, posts in tag_posts.items():
-                postdb.tag_posts.union_update(tag, posts)
+            post_db.artist_tag_counts.insert_many(board_tag_count_list)
     
     def update_tag_types(self):
         type_tags = self.board_handler.get_type_tags()

@@ -21,13 +21,13 @@ class Danbooru_Handler(ImageBoardHandler):
     """
     Class to handle requesting and handling messages from the image board E621
     """
-
-    def __init__(self, only_recent=False):
+    def __init__(self, only_recent=False, stop_event:Event = None):
         self.only_recent = only_recent
         logger.info("Initialize Danbooru Handler")
+        self.type_tags = defaultdict(set)
+        self.stop_event = stop_event
         self.reload()
         config.subscribe_reload(self.reload)
-        self.type_tags = defaultdict(set)
 
     def reload(self):
         self.danbooru_api_key = config[BOARD.DANBOORU][DANBOORU.API_KEY]
@@ -38,6 +38,7 @@ class Danbooru_Handler(ImageBoardHandler):
             self.danbooru_username,
             api_key=self.danbooru_api_key,
             only_recent=self.only_recent,
+            stop_event=self.stop_event
         )
         self.board = BOARD.DANBOORU
 
@@ -52,34 +53,34 @@ class Danbooru_Handler(ImageBoardHandler):
 
     # @disk_cache
     def get_posts(
-        self, tag, post_limit=None, stop_event: Event = None
+        self, tag, post_limit=None
     ) -> dict[str, Post]:
         posts = {}
 
         danbooru_posts = self.client.get_posts(tag, post_limit)
-        if stop_event and stop_event.is_set():
+        if self.stop_event and self.stop_event.is_set():
             return None
         if " " in tag:
             tag = tag.split()[0]  # Remove query and metatags
         logger.info("Recieved %s from client.", len(danbooru_posts))
 
-        for dpost in danbooru_posts:
-            website = f"https://danbooru.donmai.us/posts/{dpost.id}"
-            post_id = Post.make_storage_id(dpost.id, self.get_board())
+        for d_post in danbooru_posts:
+            website = f"https://danbooru.donmai.us/posts/{d_post.id}"
+            post_id = Post.make_storage_id(d_post.id, self.get_board())
             is_black_listed = False
-            tags = dpost.tag_string
-            rating = "rating_{dpost.rating}"
-            ext = dpost.file_ext
+            tags = d_post.tag_string
+            rating = f"rating_{d_post.rating}"
+            ext = d_post.file_ext
 
             try:
-                created_datetime = datetime.fromisoformat(dpost.created_at)
+                created_datetime = datetime.fromisoformat(d_post.created_at)
                 create_timestamp = int(created_datetime.timestamp())
                 tags.append(str(created_datetime.year))
             except Exception:
                 create_timestamp = 0
 
             try:
-                updated_datetime = datetime.fromisoformat(dpost.updated_at)
+                updated_datetime = datetime.fromisoformat(d_post.updated_at)
                 update_timestamp = int(updated_datetime.timestamp())
             except Exception:
                 update_timestamp = 0
@@ -101,10 +102,10 @@ class Danbooru_Handler(ImageBoardHandler):
                 continue
 
 
-            self.type_tags["metadata"].update(dpost.tag_string_meta)
-            self.type_tags["artist"].update(dpost.tag_string_artist)
-            self.type_tags["character"].update(dpost.tag_string_character)
-            self.type_tags["copyright"].update(dpost.tag_string_copyright)
+            self.type_tags["metadata"].update(d_post.tag_string_meta)
+            self.type_tags["artist"].update(d_post.tag_string_artist)
+            self.type_tags["character"].update(d_post.tag_string_character)
+            self.type_tags["copyright"].update(d_post.tag_string_copyright)
 
             self.type_tags["artist"].add(str(tag))
             self.type_tags["rating"].add(str(rating))
@@ -113,30 +114,30 @@ class Danbooru_Handler(ImageBoardHandler):
 
             post = Post(
                 id=post_id,
-                ext_id=dpost.id,
+                ext_id=d_post.id,
                 name=f"{post_id}-{tag}",
                 artist_name=tag,
                 tags=list(dict.fromkeys(tags)),
                 board=self.board,
-                md5=dpost.md5,
+                md5=d_post.md5,
                 update_timestamp=update_timestamp,
                 create_timestamp=create_timestamp,
-                score=dpost.score,
-                url=dpost.file_url,
+                score=d_post.score,
+                url=d_post.file_url,
                 website=website,
-                height=dpost.image_height,
-                width=dpost.image_width,
+                height=d_post.image_height,
+                width=d_post.image_width,
                 ratio=(
-                    dpost.image_width / dpost.image_height
-                    if dpost.image_width and dpost.image_height
+                    d_post.image_width / d_post.image_height
+                    if d_post.image_width and d_post.image_height
                     else None
                 ),
-                ext=dpost.file_ext,
-                preview_link=dpost.preview_file_url,
-                sample_link=dpost.large_file_url,
-                file_link=dpost.file_url,
+                ext=d_post.file_ext,
+                preview_link=d_post.preview_file_url,
+                sample_link=d_post.large_file_url,
+                file_link=d_post.file_url,
             )
-            stats.add(STATS.TAG_SET, dpost.tag_string)
+            stats.add(STATS.TAG_SET, d_post.tag_string)
             stats.add(STATS.TAG_SET, tag)
             stats.add(STATS.ARTIST_SET, tag)
             posts[post_id] = post

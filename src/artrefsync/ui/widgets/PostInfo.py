@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter.font import nametofont
 
 import ttkbootstrap as ttk
+from PIL import ImageTk
 from tkinterdnd2 import COPY, DND_FILES
 from ttkbootstrap.tooltip import ToolTip
 
@@ -13,23 +14,24 @@ from artrefsync.config import config
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.EventManager import ebinder
+from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.image_utils import ImageUtils
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 
 class PostInfo(ttk.Frame):
-    def __init__(self, root, thread_caller: TkThreadCaller, **kwargs):
+    def __init__(self, root, **kwargs):
         logger.info("Creating Post Info Tab")
         super().__init__(root, *kwargs, width=4)
         self.grid(column=0, row=0, sticky=tk.NSEW)
-        self.thread_caller = TkThreadCaller
         text_width = 25
         self.font = nametofont("TkDefaultFont")
         self.colors = ttk.Style().colors
+        self.cancel_key = "post_info"
+        self.blur_map = {}
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, minsize=200)
@@ -80,7 +82,7 @@ class PostInfo(ttk.Frame):
         self.add_bindings()
 
     def add_bindings(self):
-        ebinder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
+        e_binder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
         self.file.drag_source_register(DND_FILES)
         self.file.dnd_bind("<<DragInitCmd>>", self.drag_init)
         self.file.bind("<Double-1>", self.start_file)
@@ -101,10 +103,12 @@ class PostInfo(ttk.Frame):
                 os.startfile(dir)
 
     def on_post_select(self, post_id):
+        blur_tags = config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]
+
         logger.info("On Post Select, post id: %s", post_id)
-        with PostDb() as postdb:
-            post = postdb.posts[post_id]
-            post_file = postdb.files[post_id]
+        with PostDb() as post_db:
+            post = post_db.posts[post_id]
+            post_file = post_db.files[post_id]
 
         if post_file and post:
             post.file_link = post_file.file
@@ -119,9 +123,15 @@ class PostInfo(ttk.Frame):
             self.tags.config(state=tk.NORMAL)
             self.tags.delete("1.0", tk.END)
             for tag in post.tags:
-                self.tags.insert(tk.END, f"{tag}  ")
+                tag_text = tag
+                if blur_tags:
+                    blur_text = config.censor_text(tag)
+                    self.blur_map[blur_text] = tag
+                    tag_text = blur_text
+                self.tags.insert(tk.END, f"{tag_text}  ")
+
             self.tags.config(state=tk.DISABLED)
-            self.after(0, self.after_on_post_select, post, post_file)
+            self.after_idle(self.after_on_post_select, post, post_file)
 
     def after_on_post_select(self, post: Post, post_file: PostFile):
         if not post_file:
@@ -137,17 +147,22 @@ class PostInfo(ttk.Frame):
         if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
             blur = "rating_s" not in post.tags
 
+        thread_caller.add(
+            ImageUtils.get_cv2_pil_image,
+            self.set_image,
+            self.cancel_key,
+            file=file_name,
+            size=(190, 190),
+            blur=blur,
+        )
 
-        if file_name:
-            if not os.path.exists(file_name):
-                return
-            thumbnail = ImageUtils.get_cv2_pil_image(
-                file_name, (190, 190), as_photoimage=True, blur = blur
-            )
-            self.thumbnail.config(image=thumbnail)
-            self.thumbnail.image = thumbnail
+    def set_image(self, image):
+        photo = ImageTk.PhotoImage(image)
+        self.thumbnail.config(image=photo)
+        self.thumbnail.image = photo
 
     def tags_double(self, event: tk.Event):
+        blur_tags = config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]
         widget: tk.Text = event.widget  # pyright: ignore[reportAssignmentType]
         middle = event.num == 2
 
@@ -155,7 +170,10 @@ class PostInfo(ttk.Frame):
             index = widget.index(f"@{event.x},{event.y}")
             word = self.get_word(widget, index).strip()
             if word:
-                self.query_by_tag(word, middle)
+                tag_text = word
+                if blur_tags:
+                    tag_text = self.blur_map[word]
+                self.query_by_tag(tag_text, middle)
         except Exception:
             pass
 
@@ -168,10 +186,7 @@ class PostInfo(ttk.Frame):
             return ""
 
     def query_by_tag(self, tag, middle_click):
-        if not middle_click:
-            ebinder.event_generate(BINDING.ON_TAG_SELECT, tag)
-        else:
-            ebinder.event_generate(BINDING.ON_TAG_MIDDLE, tag)
+        e_binder.event_generate(BINDING.ON_TAG_SELECT, tag, middle_click)
 
     def drag_init(self, event):
         file = self.file.cget("text")

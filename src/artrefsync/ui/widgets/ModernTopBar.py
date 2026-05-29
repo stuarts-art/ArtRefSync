@@ -4,7 +4,7 @@ import ttkbootstrap as ttk
 
 from artrefsync.config import config
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -87,9 +87,9 @@ class ModernTopBar(ttk.Frame):
 
         # Top, Mid row and column config
         self._top.rowconfigure(0, weight=1, pad=2)
-        self._top.columnconfigure(0, weight=1)
+        self._top.columnconfigure(0, weight=0)
         self._top.columnconfigure(1, weight=1)
-        self._top.columnconfigure(2, weight=1)
+        self._top.columnconfigure(2, weight=0)
         self._mid.rowconfigure(0, weight=2)
         self._mid.columnconfigure(2, weight=1, minsize=300)
 
@@ -116,10 +116,8 @@ class ModernTopBar(ttk.Frame):
 
 
     def on_close(self, event=None):
-        thread_caller = TkThreadCaller(self)
         thread_caller.stop()
         self.root.destroy()
-        # raise Exception()
 
     def toggle_left_sidebar(self, event=None):
         left_info = self.mid_left.grid_info()

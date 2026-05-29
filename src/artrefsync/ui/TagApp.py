@@ -4,12 +4,12 @@ import tkinter as tk
 
 import ttkbootstrap as ttk
 
-# import sv_ttk
 from tkinterdnd2 import TkinterDnD
 
 from artrefsync.config import Config
 from artrefsync.constants import BINDING
-from artrefsync.stores.link_cache import LinkCache
+from artrefsync.db.post_db import PostDb
+from artrefsync.stores.link_cache import link_cache
 from artrefsync.ui.tabs.ActiveTags import ActiveTagsTab
 from artrefsync.ui.tabs.ArtistTab import ArtistTab
 from artrefsync.ui.tabs.ConfigTab import ConfigTab
@@ -20,15 +20,15 @@ from artrefsync.ui.widgets.LoadingBar import LoadingBars
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
 from artrefsync.ui.widgets.PhotoGallery import PhotoImageGallery
 from artrefsync.ui.widgets.PostInfo import PostInfo
-from artrefsync.utils.EventManager import ebinder
-from artrefsync.utils.TkThreadCaller import TkThreadCaller
+from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
 
 
 def main():
     app = App()
-    app.mainloop()
+    app.start()
 
 
 class App(ttk.Window):
@@ -45,29 +45,6 @@ class App(ttk.Window):
         """
         global config
         config = Config(config_path=config_path, config_file_name=config_file_name)
-        self.load_config()
-
-    def load_config(self):
-        logger.setLevel(config.log_level)
-        logger.info("Starting App")
-        self.init_scaffolding()
-        self.init_top_bar_vars()
-        self.init_tabs()
-        self.init_views()
-        self.after_idle(ebinder.event_generate, BINDING.ON_FILTER_UPDATE)
-        self.gallery.text.focus_set()
-        self.init_bindings()
-        logger.info("App Init Complete")
-
-    def start(self):
-        with LinkCache(), TkThreadCaller(self):
-            try:
-                self.mainloop()
-            except Exception:
-                logger.exception("Exception Raised")
-
-    def init_scaffolding(self):
-        logger.info("Init Scafolding")
         super().__init__(
             themename="darkly",
             size=(1080, 1080),
@@ -76,12 +53,46 @@ class App(ttk.Window):
             title="Art Ref Sync App",
         )
         TkinterDnD._require(self)
+        self.init_scaffolding()
+        self.temp_loading_var.set(10)
+        self.temp_loading.start()
+        self.after(100, self.load_config)
+        # self.mainloop()
+
+    def load_config(self):
+        self.focus_set()
+        logger.setLevel(config.log_level)
+        logger.info("Starting App")
+        self.init_scaffolding()
+
+        # TODO
+        with PostDb() as post_db:
+            pass
+        self.temp_loading_var.set(30)
+        self.init_tabs()
+        self.temp_loading_var.set(50)
+        self.init_views()
+        self.after_idle(e_binder.event_generate, BINDING.ON_FILTER_UPDATE)
+        self.gallery.text.focus_set()
+        self.init_bindings()
+        self.init_top_bar_vars()
+        logger.info("App Init Complete")
+
+    def start(self):
+        thread_caller.root = self
+        with thread_caller, link_cache:
+            try:
+                self.mainloop()
+            except Exception:
+                logger.exception("Exception Raised")
+
+    def init_scaffolding(self):
+        logger.info("Init Scafolding")
 
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.bar = ModernTopBar(self, False)
         self.stime = time.time()
-        self.thread_caller = TkThreadCaller(self)
 
         self.bar.mid_mid.columnconfigure(0, weight=0)
         self.bar.mid_mid.columnconfigure(1, weight=4)
@@ -106,6 +117,10 @@ class App(ttk.Window):
         self.notebook = ttk.Notebook(self.left_tabs)
         self.notebook.grid(column=0, row=3, padx=5, sticky=tk.NSEW)
 
+        self.temp_loading_var = ttk.IntVar(value=0)
+        self.temp_loading = ttk.Progressbar(self.right, variable=self.temp_loading_var, maximum=100, length = 200 )
+        self.temp_loading.grid(row=0, column=0)
+
     def swap_to_notebook_entry(self, *e):
         tab = self.notebook.nametowidget(self.notebook.select())
         tab.entry.focus_set()
@@ -123,27 +138,29 @@ class App(ttk.Window):
         self.tag_tab = TagTab(self.notebook)
         self.notebook.add(self.tag_tab, text="Tags")
         self.tag_tab.grid_forget()
-        self.active_tab = ActiveTagsTab(self.left_tabs)
+        self.active_tab = ActiveTagsTab(self.bar.top_mid)
         self.sort_by_tab = SortByTab(self.bar.top_right)
         self.sort_by_tab.pack(side="right", padx=5)
-        self.post_info = PostInfo(self.bar.mid_right, self.thread_caller)
+        self.post_info = PostInfo(self.bar.mid_right)
         self.loading_bar = LoadingBars(self.bar._bot)
+        self.notebook.select(1)
+
 
     def init_top_bar_vars(self):
         self.top_artist_text = ttk.StringVar()
         self.top_artist_count_text = ttk.StringVar()
         self.top_post_text = ttk.StringVar()
-        ebinder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist_select, self.bar)
-        ebinder.bind(
+        e_binder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist_select, self.bar)
+        e_binder.bind(
             BINDING.ON_POST_COUNT,
             lambda x: self.top_artist_count_text.set(f"({x})"),
             self.bar,
         )
-        ttk.Label(self.bar.top_mid, textvariable=self.top_artist_text).pack(
-            side=tk.LEFT
-        )
+        # ttk.Label(self.bar.top_mid, textvariable=self.top_artist_text).pack(
+        #     side=tk.LEFT
+        # )
         ttk.Label(self.bar.top_mid, textvariable=self.top_artist_count_text).pack(
-            side=tk.LEFT
+            side=tk.RIGHT
         )
 
     def on_artist_select(self, artist, *nargs):
@@ -151,11 +168,16 @@ class App(ttk.Window):
 
     def init_views(self):
         logger.info("Init Views")
+        self.temp_loading_var.set(30)
         self.config_tab = ConfigTab(self.right)
+        self.temp_loading_var.set(40)
         self.image_viewer = ViewerTab(self.right)
+        self.temp_loading_var.set(50)
         self.image_viewer.grid(column=0, row=0, sticky=tk.NSEW)
+        self.temp_loading_var.set(60)
         self.image_viewer.grid_forget()
-        self.gallery = PhotoImageGallery(self.right, self.thread_caller)
+        self.temp_loading_var.set(70)
+        self.gallery = PhotoImageGallery(self.right )
         self.gallery.grid(column=0, row=0, sticky=tk.NSEW)
 
     def init_bindings(self):
@@ -164,8 +186,10 @@ class App(ttk.Window):
         self.config_tab.clear_button.bind("<Button-1>", self.toggle_config)
         self.bind_all("<Control-Key-1>", lambda e: self.notebook.select(0))
         self.bind_all("<Control-Key-2>", lambda e: self.notebook.select(1))
-        self.bind_all("<Control-Key-3>", self.toggle_config)
+        self.bind_all("<Control-Key-3>", self.focus_galery)
+        self.bind_all("<Control-Key-4>", self.toggle_config)
         self.bind_all("<Control-comma>", self.toggle_config)
+        self.notebook.bind("<<NotebookTabChanged>>", self.swap_to_notebook_entry)
         self.gallery.scrolled_text.text.bind("<Tab>", self.swap_to_notebook_entry)
         self.gallery.scrolled_text.text.bind("<Shift-Tab>", self.swap_to_notebook_tree)
         self.artist_tab.entry.bind("<Shift-Tab>", self.focus_galery)

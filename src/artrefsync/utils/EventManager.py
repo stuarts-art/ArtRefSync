@@ -69,4 +69,4 @@ class EventManager:
             return default
 
 
-ebinder = EventManager()
+e_binder = EventManager()

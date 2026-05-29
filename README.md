@@ -1,6 +1,8 @@
 # ArtRefSync
 
-This is a tool for artists that:
+A image viewer and downloader for artists who make dubious art.
+
+Key Features:
 
 1. Syncs down image and tag information from image boards (E621, Rule34, Danbooru)
 2. Maintains a local tag-to-image index which allows for fast searching
@@ -10,13 +12,10 @@ This is a tool for artists that:
     - Post information for each image
     - Images can be dragged out of the application into viewing tools such as [Pureref](https://www.pureref.com/)
 4. Other features that I think are cool
-    - It is 100% local (besides when syncing). It will not harvest your data.
-    - It is not an electron app. It is not just a reskinned chromium browser that is probably harvesting your data.
-    - It has absoultely no AI integration.
-
-
-
-
+    - 100% local (besides when syncing). It will not harvest your data.
+    - Not an electron app. It is not just a reskinned chromium browser that is probably harvesting your data.
+    - It has absolutely no AI integration.
+    - Tag Blacklisting: Ignores all images that include tags within the blacklist, such as `ai-generated`.
 
 > [!WARNING]
 > Supported Image boards contain both SFW and **NSFW** Works.
@@ -35,41 +34,74 @@ Motivation:
 - R34 (Western Art) - [How to get an API key](https://api.rule34.xxx/#:~:text=API%20Keys,The%20API%20key)
 - Danbooru (Eastern Art) - [How to get an API key](https://danbooru.donmai.us/wiki_pages/help:api#:~:text=You%20will%20need%20an%20API%20key%20if%20you%20need%20to%20login%20using%20the%20API.%20You%20can%20generate%20an%20API%20key%20by%20visiting%20your%20user%20profile%20and%20clicking%20the%20Generate%20API%20key%20button.)
 
-
-
 ### Supported Local Storage
 
 - [Eagle](https://en.eagle.cool/)
 - Plain File System
 
-## Installation
+## Quick Start
 
+### Non-Developers - Download EXE
+Download the zip file from the last [workflow](https://github.com/stuarts-art/ArtRefSync/actions/workflows/windows_pyinstaller.yml) run. Extract the zip and run the exe.
+
+### Installing from Pip
 ```
 pip install git+https://github.com/stuartsartcode/ArtRefSync
-```
-
-Alternatively, you can download the source and run:
-
-```
 pip install -e .
+python main.py
 ```
 
-## Usage
-
-- [ ] TODO: Update this section
-
-To run the sync, use:
-
-```python
-from artrefsync.sync import sync_config
-sync_config()
+### Installing from Uv
+```bash
+uv init . # Creates the virtual env
+uv add git+https://github.com/stuartsartcode/ArtRefSync
+uv sync
+uv pip install -e .
+uv run main.py
 ```
 
-When this is first ran, if the config does not exist, it creates a `config.toml` file.
-Note that the default config has everything disabled.
-
+### Running from UVX
+``` bash
+uvx --from git+https://github.com/stuarts-art/ArtRefSync sync_cli
+```
 
 ## ROADMAP
-- [ ] Video Support?
-- [ ] Non-image board files?
-- [ ] Non image files?
+- [ ] Fix VIdeo/gif support
+- [ ] Non-Image Board Files
+
+
+## Installation
+
+### Non Coders (EXE file in zip folder)
+Download the zip file from the last [workflow](https://github.com/stuarts-art/ArtRefSync/actions/workflows/windows_pyinstaller.yml) run. Extract the zip and run the exe.
+
+### Other useful commands
+```bash
+# exporting a requirements.txt instead of a uv.lock file.
+uv export --format requirements.txt --output-file requirements.txt
+
+# Build EXE
+uv run pyinstaller --collect-all ttkbootstrap --name ArtRefSync main.py
+```
+
+## Libraries:
+| Library | License | Usage |
+| --- | --- | --- |
+[dacite](https://github.com/konradhalas/dacite) | [MIT](https://github.com/konradhalas/dacite/blob/master/LICENSE) | Codec between dictionaries and classes
+[diskcache](https://github.com/grantjenks/python-diskcache) | [Apache v2.0](https://github.com/grantjenks/python-diskcache/blob/master/LICENSE) | `sqlite3` based cache that's persistent between sessions.
+[opencv-python](https://github.com/opencv/opencv-python) | [MIT](https://github.com/opencv/opencv-python/blob/4.x/LICENSE.txt) | Image processing
+[pillow](https://github.com/python-pillow/Pillow) | [MIT-CMU](https://github.com/python-pillow/Pillow/blob/main/LICENSE) | Image processing and conversion to tkinter friendly formats
+[requests](https://github.com/psf/requests) | [Apache v2.0](https://github.com/psf/requests/blob/main/LICENSE) | Http rest request interface
+[simple-toml-configurator](https://github.com/GilbN/Simple-TOML-Configurator) | [MIT](https://github.com/GilbN/Simple-TOML-Configurator/blob/main/LICENSE) | Plain-text config file creation and management.
+[sortedcontainers](https://github.com/grantjenks/python-sortedcontainers) | [Apache v2.0](https://github.com/grantjenks/python-sortedcontainers/blob/master/LICENSE) | Efficient sorted wrapper for python types
+[tenacity](https://github.com/jd/tenacity) | [Apache V2.0](https://github.com/jd/tenacity/blob/main/LICENSE) | Retry Interface
+[tkinterdnd2](https://github.com/pmgagne/tkinterdnd2) | [MIT](https://github.com/pmgagne/tkinterdnd2/blob/master/LICENSE) | Tkinter drag and drop support.
+[ttkbootstrap](https://github.com/israel-dryer/ttkbootstrap) | [MIT](https://github.com/israel-dryer/ttkbootstrap/blob/master/LICENSE) | Modern tkinter syling.
+
+## Dev Libraries:
+| Library | License | Usage |
+| --- | --- | --- |
+[pyinstaller](https://github.com/pyinstaller/pyinstaller) | [GNU Gneral Public](https://github.com/pyinstaller/pyinstaller/blob/develop/COPYING.txt) | Build exe file
+[ruff](https://github.com/astral-sh/ruff) | [MIT](https://github.com/astral-sh/ruff/blob/main/LICENSE) | Linter and formatter
+
+
