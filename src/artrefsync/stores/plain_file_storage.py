@@ -12,12 +12,11 @@ from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import config
-from artrefsync.utils.utils import str_dict
+from artrefsync.utils.utils import resource_path, str_dict
 
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class DIRS(StrEnum):
@@ -33,7 +32,7 @@ def main():
 class PlainLocalStorage(ImageStoreHandler):
     def __init__(self):
         logger.info("Plain File Store Handler Init Start")
-        self.artist_base_folder = Path.cwd() / f"{config[TABLE.LOCAL][LOCAL.ARTIST_DIR]}"
+        self.artist_base_folder = Path(resource_path(f"{config[TABLE.LOCAL][LOCAL.ARTIST_DIR]}"))
         self.dir_base_map = {}
         self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = str_dict(str_dict)
         self.dir_board_folder_map = str_dict(str_dict)

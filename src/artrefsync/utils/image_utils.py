@@ -11,7 +11,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.config import config
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class ImageUtils:

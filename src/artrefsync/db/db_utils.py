@@ -15,7 +15,6 @@ from typing import get_args
 from artrefsync.config import config
 
 logger = logging.getLogger()
-logger.setLevel(config.log_level)
 
 
 
@@ -131,17 +130,6 @@ class DbUtils:
         logger.debug("Primary Key - %s", primary_key)
 
         return field_type, table_fields, primary_key
-
-    @staticmethod
-    def resource_path(relative_path):
-        if os.path.isabs(relative_path):
-            return relative_path
-        try:
-            base_path = sys._MEIPASS
-        except Exception:
-            base_path = os.path.abspath(".")
-
-        return os.path.join(base_path, relative_path)
 
 
 class BlobDb:

@@ -15,7 +15,6 @@ from artrefsync.stores.storage import ImageStoreHandler, Post
 from artrefsync.utils.utils import str_dict
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 def main():

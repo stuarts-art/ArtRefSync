@@ -6,7 +6,7 @@ import ttkbootstrap as ttk
 
 from tkinterdnd2 import TkinterDnD
 
-from artrefsync.config import Config
+from artrefsync.config import config
 from artrefsync.constants import BINDING
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.link_cache import link_cache
@@ -43,8 +43,6 @@ class App(ttk.Window):
                 The name of the ttkbootstrap theme to apply to the
                 application.
         """
-        global config
-        config = Config(config_path=config_path, config_file_name=config_file_name)
         super().__init__(
             themename="darkly",
             size=(1080, 1080),
@@ -52,12 +50,12 @@ class App(ttk.Window):
             scaling=2,
             title="Art Ref Sync App",
         )
+
         TkinterDnD._require(self)
         self.init_scaffolding()
         self.temp_loading_var.set(10)
         self.temp_loading.start()
         self.after(100, self.load_config)
-        # self.mainloop()
 
     def load_config(self):
         self.focus_set()
@@ -65,8 +63,9 @@ class App(ttk.Window):
         logger.info("Starting App")
         self.init_scaffolding()
 
-        # TODO
+        # Init dbs
         with PostDb() as post_db:
+            logger.info("DBs initialized")
             pass
         self.temp_loading_var.set(30)
         self.init_tabs()

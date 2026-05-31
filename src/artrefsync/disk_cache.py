@@ -5,13 +5,14 @@ import functools
 import logging
 
 from typing import Callable, ParamSpec, TypeVar
+from artrefsync.utils.utils import resource_path
 from artrefsync.config import config
 from artrefsync.constants import TABLE, APP
 from artrefsync.db.db_utils import BlobDb, DbUtils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
-cache_dir = DbUtils.resource_path(config[TABLE.APP][APP.CACHE_DIR])
+cache_dir = resource_path(config[TABLE.APP][APP.CACHE_DIR])
 cache_ttl = int(config[TABLE.APP][APP.CACHE_TTL])
 os.makedirs(cache_dir, exist_ok=True)
 

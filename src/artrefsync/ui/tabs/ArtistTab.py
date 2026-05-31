@@ -13,7 +13,6 @@ from artrefsync.utils.benchmark import Bm
 from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class ArtistTab(ttk.Frame):

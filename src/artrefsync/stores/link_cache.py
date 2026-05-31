@@ -4,25 +4,22 @@ from tempfile import (
     TemporaryDirectory,
 )
 
-import requests
-
 from artrefsync.config import config
 from artrefsync.utils.utils import singleton
+from requests_ratelimiter import LimiterSession
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
-
 
 @singleton
 class LinkCache:
     website_headers = {"User-Agent": "ArtRefSync/1.0"}
+    limiter = LimiterSession(per_second=10)
 
     def __init__(self):
         self._link_cache: dict[str, str] = {}
         self.store_count = {}
         self.store_missing = {}
         self.temp_dir = TemporaryDirectory()
-
         logger.info("Link Cache Initialized with dir: %s", self.temp_dir)
 
     def __enter__(self):
@@ -42,7 +39,7 @@ class LinkCache:
 
     @staticmethod
     def download_link_to_file(link, file):
-        site_response = requests.get(
+        site_response = LinkCache.limiter.get(
             link, stream=True, headers=LinkCache.website_headers
         )
         site_response.raise_for_status()

@@ -4,6 +4,7 @@ from threading import Event
 import re
 
 import requests
+from requests_ratelimiter import LimiterSession
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.config import config
@@ -13,7 +14,6 @@ from artrefsync.db.post_db import PostDb
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 def main():
@@ -27,9 +27,12 @@ class R34_Client:
 
     def __init__(self, api_string=None, only_recent=False, stop_event:Event = None):
         logger.info("R34 Init Start")
+
+
         self.r34_api_string = (
             api_string if api_string else config[TABLE.R34][R34.API_KEY]
         )
+        self.session = LimiterSession(per_minute=60)
         self.only_recent = only_recent
         self.base_url = "https://api.rule34.xxx/index.php?page=dapi&s=post&q=index"
         self.hostname = "rule34.xxx"
@@ -78,9 +81,9 @@ class R34_Client:
         return posts
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @config.cache("r34").memoize(expire=config.cache_ttl())
+    # @config.cache("r34").memoize(expire=config.cache_ttl())
     def get_page(self, tag, page, last_id=None):
-        response = requests.get(
+        response = self.session.get(
             self._build_url_request(tag, page, last_id), timeout=2.0
         )
         response.raise_for_status()

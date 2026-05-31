@@ -2,6 +2,7 @@ import logging
 import os
 import sqlite3
 
+from artrefsync.utils.utils import resource_path
 from artrefsync.db.TagType import ArtistTagCount, PostTagLink, Tag, TagType
 from artrefsync.config import config
 from artrefsync.db.db_utils import BlobDb, DbUtils
@@ -11,18 +12,18 @@ from artrefsync.constants import APP, BOARD, DB, TABLE
 from artrefsync.utils.benchmark import Bm
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 def main():
-    pass
+    with PostDb(), Bm():
+        pass
 
 
 class PostDb:
     tables_initialized = False
 
     def __init__(
-        self, connection: sqlite3.Connection | None = None, db_name=DB.TAGAPP_DB
+        self, connection: sqlite3.Connection | None = None, db_dir = "", db_name = ""
     ):
         """Simple sqllite context manager to dump and load serialized (pickle) blob files
         Args:
@@ -34,13 +35,13 @@ class PostDb:
         self.connection = connection
         self.connection_owner = False
         if not self.connection:
-            db_dir = config[TABLE.APP][APP.DB_DIR]
-            db_name = config[TABLE.APP][APP.DB_FILE_NAME]
+            db_dir = db_dir if db_dir else config[TABLE.APP][APP.DB_DIR]
+            db_name = db_name if db_name else config[TABLE.APP][APP.DB_FILE_NAME]
             if db_dir:
-                db_name = DbUtils.resource_path(os.path.join(db_dir, db_name))
+                db_name = resource_path(f"{db_dir}/{db_name}")
                 os.makedirs(os.path.dirname(db_name), exist_ok=True)
             else:
-                db_name = DbUtils.resource_path(db_name)
+                db_name = resource_path(db_name)
             logger.debug("Connecting to Database: %s", db_name)
             self.connection = sqlite3.connect(db_name)
             self.connection_owner = True
@@ -67,11 +68,7 @@ class PostDb:
         logger.debug("Opening PostDB")
 
     def update_tag_tables(self, pid, tags):
-        post_row_id = self.posts.get_row_ids(
-            [
-                pid,
-            ]
-        )[0]
+        post_row_id = self.posts.get_row_ids([pid,])[0]
         self.tags.insert_many([(tag,) for tag in tags])
         tag_row_ids = self.tags.get_row_ids(tags)
         query_args = tuple((post_row_id, tag_row_id) for tag_row_id in tag_row_ids)
@@ -204,6 +201,39 @@ class PostDb:
             return rows[0] if rows else 0
         return rows
 
+    def posts_by_artist(self):
+        query = [
+            "SELECT",
+            "t1.tag, count(p1.id)as count",
+            "FROM PostTagLink pt",
+            f"JOIN {Post.__name__} p1 ON pt.pid = p1.rowid",
+            f"JOIN {Tag.__name__} t1 ON  pt.tid = t1.rowid",
+            "WHERE t1.tag IN",
+            f"(SELECT t2.tag FROM {TagType.__name__} t2 WHERE t2.type = \"artist\")",
+            # f"JOIN {TagType.__name__} t2 ON  t1.tag=t2.tag",
+            "group by t1.tag",
+            "ORDER BY count DESC"
+        ]
+        query = [
+            "SELECT p1.id, count(t1.tag) as count",
+            "FROM PostTagLink pt",
+            f"JOIN {Post.__name__} p1 ON pt.pid = p1.rowid",
+            f"JOIN {Tag.__name__} t1 ON  pt.tid = t1.rowid",
+            "WHERE pt.tid IN ",
+            "(",
+            f"SELECT t1.rowid FROM {TagType.__name__} t2",
+            f"JOIN {Tag.__name__} t1 ON  t2.tag = t1.tag",
+            "WHERE t2.type = \"artist\"",
+            ")",
+            "GROUP BY p1.id",
+            "ORDER BY count desc"
+        ]
+        query_str = " ".join(query)
+        cur = self.connection.cursor()
+        cur.execute(query_str)
+        rows = cur.fetchall()
+        return rows
+
     def post_counts_for_tags(self, tags:list[str]):
         query = [
             "SELECT",
@@ -223,19 +253,22 @@ class PostDb:
         return counts
 
     def posts_in_intersection(self, tags, order_by="id", order_dir="DESC"):
+        if isinstance(tags, str):
+            tags = [tags]
         if not tags:
             query = [
                 "SELECT id",
-                f"FROM {Post.__name__}",
+                f"FROM {PostFile.__name__}",
                 f"ORDER BY {order_by} {order_dir}",
             ]
         elif len(tags) == 1:
             return self.posts_from_tag(tags[0], order_by=order_by, order_dir=order_dir)
         else:
             query = [
-                "SELECT p1.id",
+                "SELECT pf1.id",
                 "FROM PostTagLink pt",
                 f"JOIN {Post.__name__} p1 ON pt.pid = p1.rowid",
+                f"JOIN {PostFile.__name__} pf1 ON p1.id = pf1.id",
                 f"JOIN {Tag.__name__} t1 ON  pt.tid = t1.rowid",
                 f"WHERE t1.tag IN ('{"', '".join(tags)}')",
                 "GROUP BY p1.id",

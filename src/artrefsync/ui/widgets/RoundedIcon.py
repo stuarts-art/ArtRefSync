@@ -9,7 +9,6 @@ from artrefsync.config import config
 from artrefsync.utils.image_utils import ImageUtils
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class RoundedIcon(ttk.Label):

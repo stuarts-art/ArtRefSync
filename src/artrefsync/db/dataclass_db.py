@@ -3,7 +3,9 @@ import pickle
 import sqlite3
 from dataclasses import asdict, dataclass
 from enum import StrEnum
+from threading import Lock
 from typing import Generic, MutableSequence, Type, TypeVar
+from artrefsync.utils.utils import resource_path
 
 import dacite
 
@@ -16,6 +18,8 @@ T = TypeVar("T", contravariant=dataclass)
 def main():
     pass
 
+_write_lock = {}
+
 
 class Dataclass_DB(Generic[T]):
     query_map = {}
@@ -25,7 +29,7 @@ class Dataclass_DB(Generic[T]):
         cls: Type[T],
         connection: sqlite3.Connection | None = None,
         table_name=None,
-        db_name=None,
+        db_name="",
         lazy=False,
         key_list=[],
     ):
@@ -39,7 +43,7 @@ class Dataclass_DB(Generic[T]):
         self.logger = logging.getLogger(cls.__name__)
         self.logger.setLevel(config.log_level)
         self.cls = cls
-        self.connection = connection
+        self.connection:sqlite3.Connection = connection
         self.connection_owner = False
         self.table_name = table_name if table_name else cls.__name__
         self.key_list = key_list  # Overrides default singular key
@@ -48,16 +52,14 @@ class Dataclass_DB(Generic[T]):
             self.logger.warning(
                 "Key_list must have one or more values. Defaulting back to the first index."
             )
-
-        self.db_name = (
-            db_name
-            if db_name
-            else DbUtils.resource_path(cls.__name__ + "_dataclassdb.db")
-        )
+        self.db_name = db_name
         if not self.connection:
+            self.db_name = resource_path(cls.__name__ + "_dataclassdb.db")
             self.logger.info("Creating or connecting to Database: %s", self.db_name)
             self.connection = sqlite3.connect(self.db_name)
             self.connection_owner = True
+        if self.connection not in _write_lock:
+            _write_lock[self.connection] = Lock()
         self.commit = self.connection.commit
         self.field_types, self.table_fields, self.primary_key = DbUtils.get_sql_fields(
             cls, *self.key_list
@@ -68,6 +70,12 @@ class Dataclass_DB(Generic[T]):
 
         if not lazy:
             self.create_or_update_table(cls)
+
+    @property
+    def write_lock(self):
+        if self.connection not in _write_lock:
+            _write_lock[self.connection] = Lock()
+        return _write_lock[self.connection]
 
 
     def select_freeform(
@@ -152,8 +160,9 @@ class Dataclass_DB(Generic[T]):
 
             self.logger.info('Creating Table with Query "%s"', query)
 
-            cur.execute(query)
-            self.commit()
+            with self.write_lock:
+                cur.execute(query)
+                self.commit()
 
         if not self.key_list:
             auto_update_query = f"""
@@ -166,8 +175,9 @@ class Dataclass_DB(Generic[T]):
                     WHERE {self.primary_key} = OLD.{self.primary_key};
                 END;
             """
-            cur.execute(auto_update_query)
-            self.commit()
+            with self.write_lock:
+                cur.execute(auto_update_query)
+                self.commit()
 
     def insert(self, item: T):
         """
@@ -189,7 +199,8 @@ class Dataclass_DB(Generic[T]):
         query = f"INSERT OR REPLACE INTO {self.table_name} ({field_names}) VALUES({placeholders})"
 
         cur = self.connection.cursor()
-        cur.execute(query, query_values)
+        with self.write_lock:
+            cur.execute(query, query_values)
         return not exists
 
     def insert_many(self, items: list[tuple]):
@@ -220,7 +231,8 @@ class Dataclass_DB(Generic[T]):
             Dataclass_DB.query_map[query_key]  = query_str
 
         cur = self.connection.cursor()
-        cur.executemany(Dataclass_DB.query_map[query_key], tuple(items))
+        with self.write_lock:
+            cur.executemany(Dataclass_DB.query_map[query_key], tuple(items))
         return cur.rowcount
 
     def get_row_ids(self, id_list: list):
@@ -378,7 +390,8 @@ class Dataclass_DB(Generic[T]):
         )
         cur = self.connection.cursor()
         cur.row_factory = DbUtils.dict_factory
-        cur.execute(query, query_values + (item_id,))
+        with self.write_lock:
+            cur.execute(query, query_values + (item_id,))
 
     def update_fields(self, item_id: str, item_field_values: list[tuple[str, str]]):
         """Update list of fields. If no item field is given, replace the item."""
@@ -391,7 +404,8 @@ class Dataclass_DB(Generic[T]):
         query = f"UPDATE {self.table_name} SET {field_names} WHERE id = ?"
         cur = self.connection.cursor()
         cur.row_factory = DbUtils.dict_factory
-        cur.execute(query, query_values + (item_id,))
+        with self.write_lock:
+            cur.execute(query, query_values + (item_id,))
 
     def __contains__(self, key) -> bool:
         query = f"SELECT 1 FROM {self.table_name} WHERE {self.primary_key} = ? LIMIT 1"

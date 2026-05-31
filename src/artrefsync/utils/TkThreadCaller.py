@@ -9,7 +9,6 @@ from artrefsync.config import config
 from artrefsync.utils.utils import singleton
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 @singleton

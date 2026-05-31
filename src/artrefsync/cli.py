@@ -1,25 +1,20 @@
-import os
 import argparse
 import logging
-from pathlib import Path
+from artrefsync import App
 
 logger = logging.getLogger(__name__)
 
 def ui():
-    parser = argparse.ArgumentParser(description="A sample project script")
+    parser = argparse.ArgumentParser(description="Support for args planned. Currently does not do anything.")
     parser.add_argument(
-        "path", type=str, help="Path to the root of your library", default="."
+        "path", type=str, nargs="?", help="Path to the root of your library", default="."
+    )
+    parser.add_argument(
+        "--config_file_name", type=str, help="", default="config"
     )
     args = parser.parse_args()
-    print(f"ARGS: {args}")
-    path = Path(args.path)
-
-    if path.is_file():
-        print("path must be a directory, not a file")
-        return
-    if not path.exists():
-        logger.info("Creating directory")
-        os.makedirs(path, mode=0o771,exist_ok=True)
-    os.chdir(path)
-    from artrefsync import App
+    logger.info(args)
     App().start()
+
+if __name__ == "__main__":
+    ui()

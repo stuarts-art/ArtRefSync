@@ -10,7 +10,6 @@ from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import e_binder
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class ActiveTagsTab(ttk.Frame):

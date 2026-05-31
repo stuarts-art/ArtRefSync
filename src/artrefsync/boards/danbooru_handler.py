@@ -10,7 +10,6 @@ from artrefsync.constants import BOARD, DANBOORU, STATS
 from artrefsync.stats import stats
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 def main():

@@ -4,8 +4,8 @@ import re
 import time
 from threading import Event
 
-import requests
 from dacite import DaciteError
+from requests_ratelimiter import LimiterSession
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.danbooru_model import (
@@ -16,7 +16,6 @@ from artrefsync.constants import DANBOORU, TABLE
 from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 def main():
@@ -39,6 +38,7 @@ class Danbooru_Client:
         self.website_headers = {
             "User-Agent": f"ArtRefSync/1.0 ({username})",
         }
+        self.session = LimiterSession(per_second=10)
         self.only_recent = only_recent
         self.stop_event = stop_event
         self.base_url = "https://danbooru.donmai.us"
@@ -110,13 +110,23 @@ class Danbooru_Client:
         return posts
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @config.cache("danbooru").memoize(expire=config.cache_ttl())
-    def get_page(self, tag: str, page: int=1, last_id = None):
-        delta_time = time.time() - self.last_run
-        if delta_time < 0.1:
-            time.sleep(0.1 - delta_time)
-        response = requests.get(
-            self._build_post_url_request(tag, page, last_id),
+    # @config.cache("danbooru").memoize(expire=config.cache_ttl())
+    def get_page(self, tag: str, page: int=1, last_id = "", order = ""):
+        tags = [tag]
+        if last_id:
+            tags.append(f"id:>{last_id}")
+        if order:
+            tags.append(f"order:{order}")
+
+        params = {
+            "tags": "+".join(tags),
+            "limit": self.limit,
+            "page": page
+        }
+
+        response = self.session.get(
+            self.post_base_url,
+            params=params,
             headers=self.website_headers,
             timeout=5.0,
         )

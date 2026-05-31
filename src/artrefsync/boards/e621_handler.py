@@ -12,7 +12,6 @@ from artrefsync.stats import stats
 import asyncio
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 def main():

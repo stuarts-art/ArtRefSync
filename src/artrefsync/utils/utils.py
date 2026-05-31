@@ -1,5 +1,8 @@
 from collections import UserDict
 from functools import wraps
+import os
+from pathlib import Path
+import sys
 
 class str_dict(UserDict):
     # This class forces keys to be strings, useful when dealing with StrEnums.
@@ -30,3 +33,14 @@ def singleton(cls):
             instances[cls] = cls(*args, **kwargs)
         return instances[cls]
     return wrapper
+
+@staticmethod
+def resource_path(relative_path):
+    if os.path.isabs(relative_path):
+        return Path(relative_path)
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath("./_internal")
+        os.makedirs(base_path, 0o771, exist_ok=True)
+    return Path(os.path.join(base_path, relative_path))

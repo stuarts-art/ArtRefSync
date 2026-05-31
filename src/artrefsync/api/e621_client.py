@@ -7,6 +7,7 @@ import time
 
 from dacite import DaciteError
 
+from requests_ratelimiter import LimiterSession
 from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.api.e621_model import E621_Post
 import requests
@@ -15,7 +16,6 @@ from artrefsync.constants import E621, TABLE
 from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 def main():
@@ -28,9 +28,8 @@ class E621_Client:
         self.website = "https://e621.net/posts.json"
         self.hostname = "https://e621.net/"
         self.limit = 320
-        self.last_run = time.time()
         self.stop_event: Event = stop_event
-        self.client = requests.Session()
+        self.session = LimiterSession(per_second=2)
         if not username:
             username = config[TABLE.E621][E621.USERNAME]
         if not api_key:
@@ -67,7 +66,7 @@ class E621_Client:
         return posts
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @config.cache("e621").memoize(expire=config.cache_ttl())
+    # @config.cache("e621").memoize(expire=config.cache_ttl())
     def get_posts_page(self, tags: list[str] | str = "", page = 1, last_id="", order = "", limit = 320) -> list[E621_Post]:
         logger.info("For Tag %s Getting Page %d", tags, page)
         tag_param = []
@@ -82,12 +81,7 @@ class E621_Client:
             ("tags", "+".join(tag_param)),
             ("page", page)
         ]
-        now = time.time()
-        delta = now - self.last_run
-        if delta < .6:
-            time.sleep(.6 - delta)
-        self.last_run=time.time()
-        response = self.client.get(
+        response = self.session.get(
             self.website,
             params= params,
             headers=self.website_headers,

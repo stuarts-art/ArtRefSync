@@ -9,9 +9,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.api.eagle_model import EagleFolder, EagleItem, EagleLibrary
 from artrefsync.config import config
 from artrefsync.constants import EAGLE, STORE
+from requests_ratelimiter import LimiterSession
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 def main():
@@ -23,7 +23,7 @@ class EagleClient:
         eagle_url = config[STORE.EAGLE][EAGLE.ENDPOINT].strip()
         self.eagle_url = eagle_url if eagle_url else "http://localhost:41595/api"
         self.lock = threading.Lock()
-        self.connection = requests.Session()
+        self.connection = LimiterSession(per_second=100)
         with requests.Session() as session:
             self.folder = self._Folder(self.eagle_url, self.lock, session)
             self.item = self._Item(self.eagle_url, self.lock, session)

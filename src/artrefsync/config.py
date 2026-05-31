@@ -20,25 +20,29 @@ from artrefsync.constants import (
     STORE,
     TABLE,
 )
-from artrefsync.utils.utils import singleton
+from artrefsync.utils.utils import resource_path
+
 
 __all__ = ["config"]
 
 
-@singleton
 class Config:
     def __init__(self, config_path="config", config_file_name="config"):
-        self.kwargs = {
-            "config_path": config_path,
-            "defaults": self.default_config,
-            "config_file_name": config_file_name,
-        }
+        self.config_path = config_path
+        self.config_file_name = config_file_name
         self._subscribed_reload = []
-        self._reload_config()
         self.__caches = {}
+        self._reload_config(self.config_path, self.config_file_name)
 
-    def _reload_config(self):
-        self.settings = Configuration(**self.kwargs)
+    def _reload_config(self, config_path=None, config_file_name=None):
+        kwargs = {
+            "config_path": config_path if config_path else self.config_path,
+            "defaults": self.default_config,
+            "config_file_name": config_file_name
+            if config_file_name
+            else self.config_file_name,
+        }
+        self.settings = Configuration(**kwargs)
         self.path = self.settings._full_config_path
         self.log_level = self.settings.get_settings()["app_log_level"]
 
@@ -57,8 +61,9 @@ class Config:
                 log_file_handler,
             ],
         )
-    
+
     repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
+
     @functools.lru_cache
     def censor_text(self, text):
         if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
@@ -72,9 +77,8 @@ class Config:
             )
             return text[0] + repl_split[1:-1] + text[-1]
 
-
-    def cache(self, subdir : str = "") -> Cache:
-        key = f"{config[TABLE.APP][APP.CACHE_DIR]}/{subdir}"
+    def cache(self, subdir: str = "") -> Cache:
+        key = resource_path(f"{self[TABLE.APP][APP.CACHE_DIR]}/{subdir}")
         if key not in self.__caches:
             self.__caches[key] = Cache(key)
         return self.__caches[key]
@@ -87,7 +91,7 @@ class Config:
         if reset:
             self._reload_config()
         else:
-            config.settings.update()
+            self.settings.update()
 
         for reload in self._subscribed_reload:
             reload()
@@ -156,7 +160,4 @@ class Config:
     }
 
 
-config = Config()
-# config.cache(""): Cache = Cache(config[TABLE.APP][APP.CACHE_DIR])
-
-
+config: Config = Config()

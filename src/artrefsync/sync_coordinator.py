@@ -198,11 +198,15 @@ class SyncCoordinator:
             artist,
             self.board,
         )
+
+        for pid, board_post in board_posts.items():
+            board_post.tags.append(board_post.ext)
+            board_post.tags.append(board_post.ext)
+            board_post.tags.append(board_post.artist_name)
+            board_post.tags = list(dict.fromkeys(board_post.tags))
+
         with PostDb() as post_db:
             for pid, board_post in board_posts.items():
-                board_post.tags.append(board_post.ext)
-                board_post.tags.append(board_post.artist_name)
-                board_post.tags = list(dict.fromkeys(board_post.tags))
                 inserted = post_db.posts.insert(board_post)
                 post_db.update_tag_tables(pid, board_post.tags)
                 if inserted:
