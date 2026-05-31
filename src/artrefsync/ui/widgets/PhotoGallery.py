@@ -18,6 +18,7 @@ from artrefsync.db.post_db import PostDb
 from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
+from artrefsync.utils.benchmark import Bm
 
 logger = logging.getLogger()
 logger.setLevel(config.log_level)
@@ -120,13 +121,16 @@ class PhotoImageGallery(ttk.Frame):
             sort_by,
             sort_dir,
         )
+
+        count = self.get_sorted_posts(tags=self.tags, as_count=True)
+        e_binder.event_generate(BINDING.ON_POST_COUNT, count)
         # with PostDb() as post_db:
         #     sorted_posts = post_db.posts_in_intersection(self.tags, sort_by, sort_dir)
         # self.simple_frames.change_posts(sorted_posts)
 
-    def get_sorted_posts(self, tags, sort_by, sort_dir):
-        with PostDb() as post_db:
-            sorted_posts = post_db.posts_in_intersection(tags, sort_by, sort_dir)
+    def get_sorted_posts(self, tags, sort_by="", sort_dir="", limit = 100, offset = 0, as_count = False):
+        with PostDb() as post_db, Bm():
+            sorted_posts = post_db.posts_in_intersection(tags, sort_by, sort_dir, limit=limit, offset=offset, as_count=as_count)
         return sorted_posts
 
 
@@ -314,7 +318,7 @@ class SimpleFrames:
             posts = []
         if posts == SimplePhotoLabel.post_ids:
             return
-        e_binder.event_generate(BINDING.ON_POST_COUNT, len(posts) if posts else "0")
+        # e_binder.event_generate(BINDING.ON_POST_COUNT, len(posts) if posts else "0")
 
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts

@@ -18,6 +18,10 @@ def main():
     with PostDb(), Bm():
         pass
 
+    with PostDb() as post_db, Bm():
+        pass
+
+
 
 class PostDb:
     tables_initialized = False
@@ -136,16 +140,6 @@ class PostDb:
 
         return db.select_id_list(criteria)
 
-    def get_tag_intersection(self, tags):
-        posts = self.tag_posts.loads_blob(tags)
-        if not posts:
-            return set()
-        if isinstance(tags, list) or isinstance(tags, set):
-            if len(posts) == 1:
-                return posts[0]
-            else:
-                return posts[0].intersection(*posts[1:])
-        return posts
 
     def get_missing_post_file_ids(self):
         missing_ids = self.posts.select_freeform(
@@ -252,35 +246,41 @@ class PostDb:
         counts = {k:v for (k, v) in rows}
         return counts
 
-    def posts_in_intersection(self, tags, order_by="id", order_dir="DESC"):
+    def posts_in_intersection(self, tags =[], order_by="id", order_dir="DESC", limit = 100, offset = 0, as_count = False):
         if isinstance(tags, str):
             tags = [tags]
         if not tags:
             query = [
-                "SELECT id",
-                f"FROM {PostFile.__name__}",
-                f"ORDER BY {order_by} {order_dir}",
+                "SELECT",
+                "count(pf.id)" if as_count else "pf.id",
+                f"FROM {PostFile.__name__} pf",
+                f"JOIN {Post.__name__} p1 ON pf.id = p1.id",
+                f"ORDER BY p1.{order_by} {order_dir}" if order_by else "",
+                f"LIMIT {limit} OFFSET {offset}" if not as_count else ""
             ]
-        elif len(tags) == 1:
-            return self.posts_from_tag(tags[0], order_by=order_by, order_dir=order_dir)
+        # elif len(tags) == 1:
+        #     return self.posts_from_tag(tags[0], order_by=order_by, order_dir=order_dir)
         else:
             query = [
-                "SELECT pf1.id",
+                "SELECT",
+                "count(pf1.id)" if as_count else "pf1.id",
                 "FROM PostTagLink pt",
                 f"JOIN {Post.__name__} p1 ON pt.pid = p1.rowid",
                 f"JOIN {PostFile.__name__} pf1 ON p1.id = pf1.id",
                 f"JOIN {Tag.__name__} t1 ON  pt.tid = t1.rowid",
                 f"WHERE t1.tag IN ('{"', '".join(tags)}')",
-                "GROUP BY p1.id",
+                "GROUP BY pf1.id" if not as_count else "",
                 f"HAVING COUNT(DISTINCT t1.tag) = {len(tags)}",
-                f"ORDER BY p1.{order_by} {order_dir}",
+                f"ORDER BY p1.{order_by} {order_dir}" if order_by else "",
+                f"LIMIT {limit} OFFSET {offset}" if not as_count else ""
             ]
-
         query_str = " ".join(query)
         cur = self.connection.cursor()
         cur.row_factory = DbUtils.scalor_row_factory
         cur.execute(query_str)
         rows = cur.fetchall()
+        # if as_count:
+        #     return rows[0] if rows else 0
         return rows
 
     def get_tag_counts(
