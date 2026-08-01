@@ -22,8 +22,7 @@ from artrefsync.constants import (
 )
 from artrefsync.utils.utils import resource_path
 
-
-__all__ = ["config"]
+__all__ = ["Config", "get_config", "set_config"]
 
 
 class Config:
@@ -66,7 +65,7 @@ class Config:
 
     @functools.lru_cache
     def censor_text(self, text):
-        if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
+        if self[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
             repl_split = "_".join(
                 [
                     split[0]
@@ -113,6 +112,7 @@ class Config:
 
     default_config = {
         TABLE.APP: {
+            APP.THEME: "bootstrap-dark",
             APP.LIMIT: 5000,
             APP.LOG_LEVEL: "INFO",
             APP.ID_LENGTH: 8,
@@ -159,5 +159,15 @@ class Config:
         },
     }
 
+_config: Config = None
 
-config: Config = Config()
+def get_config():
+    global _config
+    if not _config:
+        _config = Config()
+    return _config
+
+def set_config(config: Config):
+    global _config
+    _config = config
+

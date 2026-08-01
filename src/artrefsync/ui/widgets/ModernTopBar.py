@@ -2,12 +2,13 @@ import logging
 
 import ttkbootstrap as ttk
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
+
 
 class ModernTopBar(ttk.Frame):
     def __init__(self, root: ttk.Window, override_default_top_bar=False):
@@ -27,47 +28,10 @@ class ModernTopBar(ttk.Frame):
 
     menu_event_name = "<<Menu_Settings>>"
 
-    def create_menu_settings_event(self, e=None):
-        self.root.event_generate("<<Menu_Settings>>")
-
-    def init_menu(self):
-        self.sidebar_right_toggle = RoundedIcon(
-            self.top_right,
-            text="◨",
-            hover_color=self.colors.dark,
-            font=("Helvetica", 12),
-            style=self.button_style,
-            size=30,
-        )
-        self.menu_button = RoundedIcon(
-            self.top_left,
-            text="≡",
-            hover_color=self.colors.dark,
-            font=("Helvetica", 12),
-            style=self.button_style,
-            size=30,
-        )
-        self.sidebar_left_toggle = RoundedIcon(
-            self.top_left,
-            text="◧",
-            hover_color=self.colors.dark,
-            font=("Helvetica", 12),
-            style=self.button_style,
-            size=30,
-        )
-
-        self.sidebar_right_toggle.pack(side="right", padx=5)
-        self.menu_button.pack(side="left", padx=5)  # ,   pady=12)
-        self.sidebar_left_toggle.pack(side="left", padx=5)  # ,   pady=12)
-
-        self.menu_button.bind("<ButtonPress-1>", self.create_menu_settings_event)
-        self.sidebar_left_toggle.bind("<ButtonPress-1>", self.toggle_left_sidebar)
-        self.sidebar_right_toggle.bind("<ButtonPress-1>", self.toggle_right_sidebar)
-
     def init_scafolding(self):
-        """ UI Structure  
-        - _top: top_bar_left, top_bar_mid, top_bar_right  
-        - _mid: left, mid, right  
+        """UI Structure
+        - _top: top_bar_left, top_bar_mid, top_bar_right
+        - _mid: left, mid, right
         - _bot:
         """
         super().__init__(self.root, padding=5, style=self.top_style)
@@ -77,6 +41,7 @@ class ModernTopBar(ttk.Frame):
 
         # Top, Mid, Bot, Init and grid placement
         self._top = ttk.Frame(self, style=self.top_style, height=34)
+        # self._top = ttk.Frame(self, style=self.top_style, height=34)
         self._top_sep = ttk.Separator(self)
         self._mid = ttk.Frame(self)
         self._bot = ttk.Frame(self)
@@ -114,10 +79,39 @@ class ModernTopBar(ttk.Frame):
         self.mid_right_sep.grid(column=3, row=0, sticky="ns")
         self.mid_right.grid(column=4, row=0, sticky="nes")
 
+    def init_menu(self):
+        self.sidebar_right_toggle = RoundedIcon(
+            self.top_right,
+            text="◨",
+            hover_color=self.colors.dark,
+            font=("Helvetica", 12),
+            style=self.button_style,
+            size=30,
+        )
+        self.menu_button = RoundedIcon(
+            self.top_left,
+            text="≡",
+            hover_color=self.colors.dark,
+            font=("Helvetica", 12),
+            style=self.button_style,
+            size=30,
+        )
+        self.sidebar_left_toggle = RoundedIcon(
+            self.top_left,
+            text="◧",
+            hover_color=self.colors.dark,
+            font=("Helvetica", 12),
+            style=self.button_style,
+            size=30,
+        )
 
-    def on_close(self, event=None):
-        thread_caller.stop()
-        self.root.destroy()
+        self.sidebar_right_toggle.pack(side="right", padx=5)
+        self.menu_button.pack(side="left", padx=5)  # ,   pady=12)
+        self.sidebar_left_toggle.pack(side="left", padx=5)  # ,   pady=12)
+
+        self.menu_button.bind("<ButtonPress-1>", self.create_menu_settings_event)
+        self.sidebar_left_toggle.bind("<ButtonPress-1>", self.toggle_left_sidebar)
+        self.sidebar_right_toggle.bind("<ButtonPress-1>", self.toggle_right_sidebar)
 
     def toggle_left_sidebar(self, event=None):
         left_info = self.mid_left.grid_info()
@@ -137,3 +131,5 @@ class ModernTopBar(ttk.Frame):
             self.mid_right_sep.grid(column=3, row=0, sticky="ns")
             self.mid_right.grid(column=4, row=0, sticky="nes")
 
+    def create_menu_settings_event(self, e=None):
+        self.root.event_generate("<<Menu_Settings>>")

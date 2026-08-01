@@ -7,10 +7,10 @@ from tkinter.font import nametofont
 import ttkbootstrap as ttk
 from PIL import ImageTk
 from tkinterdnd2 import COPY, DND_FILES
-from ttkbootstrap.tooltip import ToolTip
 
 from artrefsync.boards.board_handler import Post, PostFile
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
@@ -22,10 +22,11 @@ logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 
-class PostInfo(ttk.Frame):
+class PostInfoTab(ttk.Frame):
     def __init__(self, root, **kwargs):
         logger.info("Creating Post Info Tab")
         super().__init__(root, *kwargs, width=4)
+        self.color = ttk.Style().colors
         self.grid(column=0, row=0, sticky=tk.NSEW)
         text_width = 25
         self.font = nametofont("TkDefaultFont")
@@ -37,7 +38,7 @@ class PostInfo(ttk.Frame):
         self.grid_rowconfigure(0, minsize=200)
         self.grid_rowconfigure(5, weight=1)
 
-        self.thumbnail = tk.Label(self)
+        self.thumbnail = ttk.Label(self)
         self.thumbnail.grid(column=0, row=0, sticky=tk.NSEW)
         self.name = ttk.Label(
             self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
@@ -45,13 +46,20 @@ class PostInfo(ttk.Frame):
         self.name.grid(column=0, row=1, sticky=tk.EW)
         self.artist_frame = ttk.Labelframe(self, text="Artist")
         self.artist_frame.grid(column=0, row=2, sticky=tk.EW, ipady=0)
-        self.artist = RoundedIcon.from_text(self.artist_frame, "", self.colors.primary)
-        self.artist.pack(side=tk.LEFT)
+        self.board_button = RoundedIcon.from_text(
+            self.artist_frame, "", self.colors.primary, command=self.on_artist_click
+        )
+        self.board_button.pack(side=tk.LEFT)
+        self.artist_button = RoundedIcon.from_text(
+            self.artist_frame, "", self.colors.primary, command=self.on_artist_click
+        )
+        self.artist_button.pack(side=tk.LEFT)
 
         self.small_details_frame = ttk.Frame(self)
         self.small_details_frame.grid(column=0, row=3, sticky=tk.EW)
         score_frame = ttk.Labelframe(self.small_details_frame, text="Score")
         ext_frame = ttk.Labelframe(self.small_details_frame, text="Ext")
+
         dim_frame = ttk.Labelframe(self.small_details_frame, text="Size")
         score_frame.pack(side=tk.LEFT, expand=True, fill="x")
         ext_frame.pack(side=tk.LEFT, expand=True, fill="x")
@@ -59,27 +67,51 @@ class PostInfo(ttk.Frame):
         self.score_label = ttk.Label(
             score_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
         )
-        self.ext_label = ttk.Label(
-            ext_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
+        self.ext_button = RoundedIcon.from_text(
+            ext_frame, "", self.colors.primary, command=self.on_artist_click
         )
+        # self.ext_label = ttk.Label(
+        #     ext_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
+        # )
         self.dim_label = ttk.Label(
             dim_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
         )
         self.score_label.pack()
-        self.ext_label.pack()
+        # self.ext_label.pack()
+        self.ext_button.pack()
         self.dim_label.pack()
 
         self.file = ttk.Label(self, cursor="arrow", justify=tk.LEFT, border=1)
         self.file.grid(column=0, row=4, sticky=tk.NSEW)
-        self.file_tooltip = ToolTip(self.file)
+        self.file_tooltip = ttk.ToolTip(self.file)
         self.tags_frame = ttk.Frame(self)
         self.tags_frame.grid(column=0, row=5, sticky=tk.NSEW)
 
-        self.tags = ttk.Text(self.tags_frame, wrap=tk.WORD, width=text_width)
+        self.tags = ttk.ScrolledText(
+            self.tags_frame, wrap=tk.WORD, width=text_width, cursor="arrow"
+        )
+        self.tags.text.tag_configure(
+            "sel",
+            background=self.color.warning,
+            foreground=self.color.warning,
+            underline=1,
+        )
         self.tags.pack(fill="both", expand=True)
         self.grid_propagate(False)
 
         self.add_bindings()
+
+    def on_artist_click(self, event: tk.Event):
+        state = event.state
+        ctrl_pressed = (state & 0x4) != 0
+        widget_text = event.widget.text
+        e_binder.event_generate(BINDING.ON_ARTIST_SELECT, widget_text, ctrl_pressed)
+
+    def on_tag_click(self, event: tk.Event):
+        state = event.state
+        ctrl_pressed = (state & 0x4) != 0
+        widget_text = event.widget.text
+        e_binder.event_generate(BINDING.ON_TAG_SELECT, widget_text, ctrl_pressed)
 
     def add_bindings(self):
         e_binder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
@@ -87,8 +119,7 @@ class PostInfo(ttk.Frame):
         self.file.dnd_bind("<<DragInitCmd>>", self.drag_init)
         self.file.bind("<Double-1>", self.start_file)
         self.file.bind("<Button-2>", self.start_file_dir)
-        self.tags.bind("<Double-Button-1>", self.tags_double)
-        self.tags.bind("<Button-2>", self.tags_double)
+        self.tags.text.bind("<Button-1>", self.on_text_tag_click)
 
     def start_file(self, event):
         file = self.file.cget("text")
@@ -107,16 +138,18 @@ class PostInfo(ttk.Frame):
 
         logger.info("On Post Select, post id: %s", post_id)
         with PostDb() as post_db:
-            post = post_db.posts[post_id]
-            post_file = post_db.files[post_id]
+            post: Post = post_db.posts.get(id=post_id)
+            post_file: PostFile = post_db.files.get(id=post_id)
 
         if post_file and post:
             post.file_link = post_file.file
             post.sample_link = post_file.preview
             self.name.configure(text=post.name)
-            self.artist.update_text(post_file.artist_name)
+            self.name.configure(text=post.name)
+            self.board_button.update_text(post_file.board)
+            self.artist_button.update_text(post_file.artist_name)
             self.score_label.configure(text=post.score)
-            self.ext_label.configure(text=f"{post.ext.upper()}")
+            self.ext_button.update_text(post.ext)
             self.dim_label.configure(text=f"{post.width}x{post.height}")
             self.file.configure(text=post.file_link)
             self.file_tooltip.text = f"{post.file_link}\n-Double Click: Open\n-Middle Click: Open file location"
@@ -161,32 +194,38 @@ class PostInfo(ttk.Frame):
         self.thumbnail.config(image=photo)
         self.thumbnail.image = photo
 
-    def tags_double(self, event: tk.Event):
+    def on_text_tag_click(self, event: tk.Event):
+        state = event.state
+        ctrl_pressed = (state & 0x4) != 0
         blur_tags = config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]
-        widget: tk.Text = event.widget  # pyright: ignore[reportAssignmentType]
-        middle = event.num == 2
+        widget: tk.Text = self.tags.text
+        print(event)
 
-        try:
-            index = widget.index(f"@{event.x},{event.y}")
-            word = self.get_word(widget, index).strip()
-            if word:
-                tag_text = word
-                if blur_tags:
-                    tag_text = self.blur_map[word]
-                self.query_by_tag(tag_text, middle)
-        except Exception:
-            pass
+        index = widget.index(f"@{event.x},{event.y}")
+        start, end = self.get_word_box(widget, index)
+        if not start or not end:
+            return
+        if word := widget.get(start, end).strip():
+            self.tags.config(state=tk.NORMAL)
+            ranges = self.tags.tag_ranges("sel")
+            if ranges:
+                widget.tag_remove("sel", 1.0, tk.END)
+            widget.tag_add("sel", start, end)
+            self.tags.config(state=tk.DISABLED)
+            tag_text = word
+            if blur_tags:
+                tag_text = self.blur_map[word]
+            e_binder.event_generate(BINDING.ON_TAG_SELECT, tag_text, ctrl_pressed)
+        return "break"
 
-    def get_word(self, widget, index):
+    def get_word_box(self, widget, index):
         try:
             start = widget.search(" ", index, "1.0", backwards=True)
             end = widget.search(" ", index, tk.END)
-            return widget.get(start, end)
+            return start, end
+
         except Exception:
             return ""
-
-    def query_by_tag(self, tag, middle_click):
-        e_binder.event_generate(BINDING.ON_TAG_SELECT, tag, middle_click)
 
     def drag_init(self, event):
         file = self.file.cget("text")

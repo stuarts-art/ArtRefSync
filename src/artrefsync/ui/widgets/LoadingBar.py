@@ -1,7 +1,8 @@
 import ttkbootstrap as ttk
 import tkinter as tk
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import BINDING
 from artrefsync.utils.EventManager import e_binder
 import logging

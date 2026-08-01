@@ -1,15 +1,15 @@
 import base64
-from collections import defaultdict
 import logging
+from collections import defaultdict
 from threading import Event
 
 from artrefsync.api.e621_client import E621_Client
 from artrefsync.api.e621_model import E621_Post
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
-from artrefsync.config import config
-from artrefsync.constants import BOARD, E621, STATS
-from artrefsync.stats import stats
-import asyncio
+from artrefsync.config import get_config
+config = get_config()
+from artrefsync.constants import BOARD, E621
+from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class E621Handler(ImageBoardHandler):
             "User-Agent": f"MyProject/1.0 (by {username} on e621)",
         }
 
-    def get_type_tags(self) -> dict[str, str]:
+    def get_type_tags(self) -> dict[str, set[str]]:
         return self.type_tags
 
     def get_board(self) -> BOARD:
@@ -59,7 +59,16 @@ class E621Handler(ImageBoardHandler):
         self, tag, post_limit=10000
     ) -> dict[str, Post]:
         post_dict = {}
-        e621_posts: list[E621_Post] = self.client.get_posts(tag, post_limit)
+        last_id = None
+
+        if self.only_recent:
+            with PostDb() as post_db:
+                row = post_db.posts.get(board = self.get_board(), artist_name = tag, select_fields=["ext_id", "MAX(create_timestamp)"], as_tuple=True)
+                if row:
+                    last_id = row[0]
+        
+
+        e621_posts: list[E621_Post] = self.client.get_posts(tag, post_limit, last_id=last_id)
         if self.stop_event and self.stop_event.is_set():
             return None
         if " " in tag:
@@ -113,7 +122,6 @@ class E621Handler(ImageBoardHandler):
             is_black_listed = False
             for black_listed in self.black_list:
                 if black_listed in tags:
-                    stats.add(STATS.SKIP_COUNT, 1)
                     logger.debug(
                         "Skipping %s for blacklist item '%s'. %s",
                         post_id,

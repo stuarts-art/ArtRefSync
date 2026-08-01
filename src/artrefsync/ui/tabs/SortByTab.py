@@ -5,7 +5,8 @@ import ttkbootstrap as ttk
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.TkThreadCaller import thread_caller
 from artrefsync.utils.image_utils import ImageUtils
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 
 from artrefsync.constants import BINDING
 

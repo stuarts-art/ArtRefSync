@@ -1,14 +1,15 @@
 import logging
 import os
 import tempfile
+import time
 from asyncio import Event
 from pathlib import Path
-import time
 
 from artrefsync.api.eagle_client import EagleClient
 from artrefsync.api.eagle_model import EagleFolder, EagleItem
 from artrefsync.boards.board_handler import PostFile
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import BOARD, EAGLE, STORE, TABLE
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler, Post
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     handler = EagleHandler()
-    pass
+    info = handler.client.library.info()
 
 
 class EagleHandler(ImageStoreHandler):
@@ -44,7 +45,7 @@ class EagleHandler(ImageStoreHandler):
         self.library_path_dict = {}
         self.pid_map = {}
         self.switch_libary(self.library)
-        self.get_artists_folder()
+        self.get_artists_folder(refresh=True)
         logger.debug("%s \n%s", "Board Artist dict:", self.board_artist_id_map)
 
     def get_store(self):
@@ -207,10 +208,9 @@ class EagleHandler(ImageStoreHandler):
                 self.library_path_dict[library_string]
             )
             logger.debug("Switch Library to %s response: %s.", library_string, response)
-            # Fixes a bug where Eagle returns incorrect data if called too quickly after switching.
-            time.sleep(0.5)
         else:
             logger.info('Failed to find library "%s" in History', library_string)
+        time.sleep(3)
 
     def get_thumbnail(self, post=None, ext_id=None):
         try:

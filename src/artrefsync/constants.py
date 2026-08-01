@@ -47,7 +47,7 @@ class BINDING(StrEnum):
     ON_TAG_SELECT = auto()
     ON_FILTER_UPDATE = auto()
     ON_SORT_BY_UPDATE = auto()
-    ON_POST_COUNT = auto()
+    ON_SET_TOP_RIGHT_TEXT = auto()
     ON_ZOOM_DELTA = auto()
 
     ON_TEXT_ESCAPE = auto()
@@ -93,6 +93,7 @@ class TABLE(StrEnum):
 
 
 class APP(StrEnum):
+    THEME = auto()
     LIMIT = auto()
     LOG_LEVEL = auto()
     ID_LENGTH = auto()

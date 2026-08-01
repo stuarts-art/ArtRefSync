@@ -1,20 +1,21 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from threading import Event
+from typing import Annotated
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import APP, BOARD, STORE, TABLE
 
 
 # @dataclass_json
 @dataclass
 class Post:
-    id: str  # Centralized App ID
-    ext_id: str  # external id (When from Board->BoardID, Store -> StoreID)
+    id: str
+    ext_id: Annotated[str, "UNIQUE"]  # external id (When from Board->BoardID, Store -> StoreID)
     name: str = ""
     artist_name: str = ""
     tags: list[str] | None = None
-    board: BOARD | None = None
+    board: Annotated[BOARD | None, "UNIQUE"] = None
     score: int | None = 0
     url: str | None = ""
     website: str = ""
@@ -28,6 +29,7 @@ class Post:
     file_link: str | None = ""
     sample_link: str | None = ""
     preview_link: str | None = ""
+    sql_id: Annotated[int | None, "PRIMARY KEY"] = None
 
     def __post_init__(self):
         self.storage_id = self.name[: self.name.find("-")]
@@ -56,7 +58,7 @@ class Post:
 
 @dataclass
 class PostFile:
-    id: str  # Centralized App ID
+    id: Annotated[str, "PRIMARY KEY"]  # Centralized App ID
     ext_id: str  # external id (When from Board->BoardID, Store -> StoreID)
     store: STORE | None
     board: BOARD | None

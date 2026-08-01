@@ -1,5 +1,7 @@
 import argparse
 import logging
+from pathlib import Path
+
 from artrefsync import App
 
 logger = logging.getLogger(__name__)
@@ -14,7 +16,11 @@ def ui():
     )
     args = parser.parse_args()
     logger.info(args)
-    App().start()
+
+    config_path = Path(args.path).resolve()
+    config_file_name = args.config_file_name
+    
+    App(config_path=config_path, config_file_name=config_file_name).start()
 
 if __name__ == "__main__":
     ui()

@@ -1,18 +1,19 @@
 # Taken from https://stackoverflow.com/a/48137257 by user foobar167.
 # Only slight modification made was to change Image.ANTIALIAS to the new Image.LAZCOS
 
+import logging
 import math
-import warnings
 import tkinter as tk
+import warnings
 
-from tkinter import ttk
+import ttkbootstrap as ttk
 from PIL import Image, ImageTk
 
-import logging
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import BINDING
-from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.image_utils import ImageUtils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -55,7 +56,7 @@ class CanvasImage:
         hbar.grid(row=1, column=0, sticky="we")
         vbar.grid(row=0, column=1, sticky="ns")
         # Create canvas and bind it with scrollbars. Public for outer classes
-        self.canvas = tk.Canvas(
+        self.canvas = ttk.Canvas(
             self.__imframe,
             highlightthickness=0,
             xscrollcommand=hbar.set,
@@ -85,7 +86,9 @@ class CanvasImage:
         # Handle keystrokes in idle mode, because program slows down on a weak computers,
         # when too many key stroke events in the same time
 
-        self.canvas.bind('<Key>', lambda event: self.canvas.after_idle(self.__keystroke, event))
+        self.canvas.bind(
+            "<Key>", lambda event: self.canvas.after_idle(self.__keystroke, event)
+        )
 
         # Decide if this image huge or not
         self.__huge = False  # huge or not
@@ -101,9 +104,10 @@ class CanvasImage:
     def open_image(self, path) -> Image:
         return ImageUtils.get_cv2_pil_image(path)
 
-
     # Moved out of init to allow for hotswapping images
     def set_image(self, path):
+        self.canvas.yview_moveto(0)
+        self.canvas.xview_moveto(0)
         self.path = path  # path to the image, should be public for outer classes
         if self.__image:
             self.__image.close()
@@ -134,7 +138,9 @@ class CanvasImage:
             ]  # list of arguments to the decoder
         self.__min_side = min(self.imwidth, self.imheight)  # get the smaller image side
         # Create image pyramid
-        self.__pyramid = [self.smaller()] if self.__huge else [self.open_image(self.path)]
+        self.__pyramid = (
+            [self.smaller()] if self.__huge else [self.open_image(self.path)]
+        )
         # Set ratio coefficient for image pyramid
         self.__ratio = (
             max(self.imwidth, self.imheight) / self.__huge_size if self.__huge else 1.0
@@ -183,7 +189,7 @@ class CanvasImage:
             w = int(h2 * aspect_ratio1)  # band length
         i, j, n = 0, 1, round(0.5 + self.imheight / self.__band_width)
         while i < self.imheight:
-            logger.debug("\rOpening image: {j} from {n}".format(j=j, n=n), end="")
+            logger.debug(f"\rOpening image: {j} from {n}", end="")
             band = min(self.__band_width, self.imheight - i)  # width of the tile band
             self.__tile[1][3] = band  # set band width
             self.__tile[2] = (
@@ -204,7 +210,6 @@ class CanvasImage:
 
     def redraw_figures(self):
         """Dummy function to redraw figures in the children classes"""
-        pass
 
     def grid(self, **kw):
         """Put CanvasImage widget on the parent widget"""
@@ -301,7 +306,6 @@ class CanvasImage:
                             int(y2 / self.__scale),
                         )
                     )
-                #
                 imagetk = ImageTk.PhotoImage(
                     image.resize((int(x2 - x1), int(y2 - y1)), self.__filter)
                 )
@@ -360,7 +364,6 @@ class CanvasImage:
             (-1) * int(math.log(k, self.__reduction)), len(self.__pyramid) - 1
         )
         self.__scale = k * math.pow(self.__reduction, max(0, self.__curr_img))
-        #
         self.canvas.scale("all", x, y, scale, scale)  # rescale all objects
         # Redraw some figures before showing image on the screen
         self.redraw_figures()  # method for child classes
@@ -401,20 +404,18 @@ class CanvasImage:
             ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
                 self.__scroll_y("scroll", 1, "unit", event=event)
             elif event.keysym in [
-                "q", "minus"
+                "q",
+                "minus",
             ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
                 self.canvas.event_generate("<MouseWheel>", delta=-120)
             elif event.keysym in [
-                "e", "equal"
+                "e",
+                "equal",
             ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
                 self.canvas.event_generate("<MouseWheel>", delta=+120)
-            elif event.keysym in [
-                "z"
-            ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+            elif event.keysym in ["z"]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
                 e_binder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE)
-            elif event.keysym in [
-                "c"
-            ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+            elif event.keysym in ["c"]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
                 e_binder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE)
 
             else:

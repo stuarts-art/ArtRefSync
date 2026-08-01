@@ -10,7 +10,8 @@ import ttkbootstrap as ttk
 from PIL import ImageTk
 from tkinterdnd2 import DND_FILES, TkinterDnD
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
 from artrefsync.utils.IntegerVar import IntegerVar

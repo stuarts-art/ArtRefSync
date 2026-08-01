@@ -6,7 +6,8 @@ from tkinter.filedialog import askdirectory
 
 import ttkbootstrap as ttk
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import TABLE, get_table_mapping
 from artrefsync.sync_coordinator import sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
@@ -22,8 +23,28 @@ class ConfigTab(ttk.Frame):
         logger.info("Init Config Tab")
         super().__init__(root, *args, **kwargs)
         self.configure_style(root)
-        self.config_notebook = ttk.Notebook(self)
-        self.config_notebook.pack(expand=True, fill="both", padx=5, pady=5)
+        style = ttk.Style()
+
+        style.configure(
+            "custom.TNotebook", tabposition="nw", borderwidth=0, tabmargins=0
+        )
+        style.configure(
+            "custom.TNotebook.Tab",
+            width=8,
+            font=(None, 8),
+            borderwidth=0,
+            focuscolor=style.lookup("custom.TNotebook.Tab", "background"),
+            bordercolor="black",
+        )
+
+        style.configure(
+            "sub.TNotebook", tabposition="wn", borderwidth=0, tabmargins=0, padding=5
+        )
+        style.configure("sub.TNotebook.Tab", width=10, borderwidth=0)
+        self.config_notebook = ttk.Notebook(self, style="custom.TNotebook")
+        self.config_notebook.pack(expand=True, fill="both")
+        self.init_control_tab()
+
         self.load()
 
     def load(self):
@@ -36,20 +57,42 @@ class ConfigTab(ttk.Frame):
         self.store_sync_event = Event()
         self.frames = {}
 
-        for table in TABLE:
-            logger.info("Initializing %s tab.", table)
-            tab_frame = ttk.Frame(self.config_notebook)
-            self.init_config_tabs(table, tab_frame)
-            self.config_notebook.add(
-                tab_frame,
-                text=table.capitalize().ljust(6),
-            )
-            self.frames[table] = tab_frame
+        self.tab_groups = ["App", "Boards", "Stores"]
+        self.tab_groups = {
+            "App": [TABLE.APP],
+            "Boards": [TABLE.E621, TABLE.R34, TABLE.DANBOORU],
+            "Stores": [TABLE.EAGLE, TABLE.LOCAL],
+        }
+        self.group_widgets = {}
 
+        for tab_group, tables in self.tab_groups.items():
+            if len(tables) == 1:
+                table = tables[0]
+                group_widget = ttk.ScrolledFrame(self.config_notebook, padding=10)
+                self.group_widgets[tab_group] = group_widget
+                self.init_config_tabs(table, group_widget)
+                self.frames[table] = group_widget
+                group_widget = group_widget.container
 
-        self.clear_button = RoundedIcon(self, text="✕", size=(25, 25), command=self.toggle_console_window)
+            else:
+                group_widget = ttk.Notebook(self.config_notebook, style="sub.TNotebook")
+                self.group_widgets[tab_group] = group_widget
+                for table in tables:
+                    sub_frame = ttk.Frame(group_widget)
+                    sub_frame.grid_columnconfigure(0, minsize=15)
+                    self.init_config_tabs(table, sub_frame)
+                    group_widget.add(
+                        sub_frame,
+                        text=table.capitalize(),
+                    )
+                    self.frames[table] = sub_frame
+
+            self.config_notebook.add(group_widget, text=tab_group.capitalize())
+
+        self.clear_button = RoundedIcon(
+            self, text="✕", size=(25, 25), command=self.toggle_console_window
+        )
         self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
-
 
     def reload(self):
         config.reload_config()
@@ -59,60 +102,52 @@ class ConfigTab(ttk.Frame):
 
         self.load()
 
-    def init_config_tabs(self, table, tab_frame):
-        if table == TABLE.APP:
-            self.save_config_button = ttk.Button(
-                tab_frame, text="Save Config", command=self.save_config
-            )
-            self.save_config_button.grid(
-                row=1, column=1, sticky=("w", "e"), pady=10, padx=5
-            )
-            self.reset_config_button = ttk.Button(
-                tab_frame, text="Reset Config", command=self.reload
-            )
-            self.reset_config_button.grid(
-                row=1, column=2, sticky=("w", "e"), pady=10, padx=5
-            )
+    def init_control_tab(self):
+        tab_frame = ttk.Frame(self.config_notebook, padding=10)
+        self.config_notebook.add(tab_frame, text="Controls")
+        pack_args = {"side": tk.TOP, "pady": 10, "padx": 10, "anchor": tk.NW}
 
-            self.start_sync_button = ttk.Button(
-                tab_frame, text="Start Sync", command=self.start_sync
-            )
-            self.start_sync_button.grid(
-                row=2, column=1, sticky=("w", "e"), pady=10, padx=5
-            )
+        def create_control_button(text, command):
+            return ttk.Button(tab_frame, text=text, command=command).pack(**pack_args)
 
-            self.start_store_sync_button = ttk.Button(
-                tab_frame, text="Sync from Store", command=self.start_store_sync
-            )
-            self.start_store_sync_button.grid(
-                row=3, column=1, sticky=("w", "e"), pady=10, padx=5
-            )
-            self.console_var = ttk.BooleanVar(value=False)
-            self.console_toggle = ttk.Button(
-                tab_frame, text="Toggle Console", command=self.toggle_console_window
-            )
-            self.console_toggle.grid(
-                row=4, column=1, sticky=("w", "e"), pady=10, padx=5
-            )
+        create_control_button("Save config", self.save_config)
+        create_control_button("Reset config", self.reload)
+        self.start_sync_button = create_control_button("Start Sync", self.start_sync)
+        self.start_store_sync_button = create_control_button(
+            "Sync from store", self.start_store_sync
+        )
 
+    def init_config_tabs(self, table, tab_frame: ttk.Frame):
         self.config_table_tabs[table] = tab_frame
         self.widget_dict[table] = {}
         self.var_dict[table] = {}
 
-        for i, table_field in enumerate(
-            get_table_mapping()[table], 5 if table == TABLE.APP else 0
-        ):
-            label = ttk.Label(
-                # tab_frame, text=f"{table_field.capitalize()}:", width=2
-                tab_frame,
-                text=f"{table_field.capitalize()}:",
-            )
-            label.grid(row=i, column=0, sticky="w", pady=10, padx=5)
+        tab_frame.columnconfigure(0, weight=0, minsize=150)
+        tab_frame.columnconfigure(1, weight=1)
+
+        grid_args = {"pady": 10, "padx": 10}
+
+        for i, table_field in enumerate(get_table_mapping()[table]):
+            lines = []
+            line = ""
+            for word in table_field.capitalize().split("_"):
+                if len(word) + len(line) > 12:
+                    if line:
+                        lines.append(line)
+                    line = word
+                else:
+                    if line:
+                        line += " "
+                    line += word
+            lines.append(line)
+
+            label = ttk.Label(tab_frame, text="\n".join(lines))
+            label.grid(row=i, column=0, sticky="w", **grid_args)
 
             if "list" in table_field or "artists" == table_field:
                 list_frame = InputTreeviewFrame(tab_frame, config[table][table_field])
                 widget = list_frame
-                list_frame.grid(row=i, column=1, sticky=("w", "E"), pady=10)
+                list_frame.grid(row=i, column=1, sticky=("w", "E"), **grid_args)
             else:
                 if "enabled" in table_field:
                     check_var = tk.IntVar()
@@ -121,8 +156,8 @@ class ConfigTab(ttk.Frame):
                     entry = ttk.Checkbutton(
                         tab_frame,
                         text="",
-                        style="Roundtoggle.Toolbutton",
                         variable=check_var,
+                        bootstyle="round toggle",
                     )
 
                 elif "dir" in table_field:
@@ -141,7 +176,7 @@ class ConfigTab(ttk.Frame):
                         # width=30,
                     )
                     entry.insert(0, config[table][table_field])
-                entry.grid(row=i, column=1, sticky=("w", "e"), pady=10)
+                entry.grid(row=i, column=1, sticky=("w", "e"), **grid_args)
                 widget = entry
             self.widget_dict[table][table_field] = widget
 
@@ -174,6 +209,7 @@ class ConfigTab(ttk.Frame):
             self.start_store_sync_button.configure(
                 state="active", text="Cancel Sync", bootstyle="warning"
             )
+            self.start_sync_button.configure(state="disabled")
             if config.log_level == "DEBUG":
                 sync_from_store(self.sync_event)
                 self.finish_store_sync()
@@ -195,12 +231,14 @@ class ConfigTab(ttk.Frame):
         self.start_store_sync_button.configure(
             state="normal", text="Start Store Sync", bootstyle="default"
         )
+        self.start_sync_button.configure(state="normal")
         config.reload_config()
 
     def start_sync(self):
         if not self.sync_running:
             self.sync_running = True
             self.start_sync_button.configure(state="active", text="Cancel Sync")
+            self.start_store_sync_button.configure(state="disabled")
             if config.log_level == "DEBUG":
                 sync_config(self.sync_event)
                 self.finish_sync()
@@ -216,6 +254,7 @@ class ConfigTab(ttk.Frame):
         logger.info("Sync Finished. Reseting button.")
         self.sync_running = False
         self.start_sync_button.configure(state="normal", text="Start Sync")
+        self.start_store_sync_button.configure(state="normal")
         config.reload_config()
         self.sync_event.clear()
 

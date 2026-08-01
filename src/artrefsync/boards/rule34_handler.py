@@ -1,15 +1,15 @@
-from collections import defaultdict
 import logging
+from collections import defaultdict
 from datetime import datetime
 from threading import Event
 
 from artrefsync.api.r34_client import R34_Client
 from artrefsync.api.r34_model import R34_Post
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
-from artrefsync.config import config
-from artrefsync.constants import BOARD, R34, STATS
-from artrefsync.stats import stats
-from artrefsync.utils.benchmark import pretty_wrap
+from artrefsync.config import get_config
+config = get_config()
+from artrefsync.constants import BOARD, R34
+from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)                                                                                    
 
@@ -54,7 +54,14 @@ class R34Handler(ImageBoardHandler):
     ) -> dict[str, Post]:
         posts = {}
 
-        r34_posts: list[R34_Post] = self.client.get_posts(tag, post_limit)
+        last_id = None
+        if self.only_recent:
+            with PostDb() as post_db:
+                row = post_db.posts.get(board = self.get_board(), artist_name = tag, select_fields=["ext_id", "MAX(create_timestamp)"], as_tuple=True)
+                if row:
+                    last_id = row[0]
+
+        r34_posts: list[R34_Post] = self.client.get_posts(tag, post_limit, last_id = last_id)
         if self.stop_event and self.stop_event.is_set():
             return None
 
@@ -77,7 +84,6 @@ class R34Handler(ImageBoardHandler):
             tags.append(rating)
             for black_listed in self.black_list:
                 if black_listed in rpost.tags:
-                    stats.add(STATS.SKIP_COUNT, 1)
                     logger.debug(f"Skipping {post_id} for {black_listed}. ({website})")
                     skip_rpost = True
                     break
@@ -136,11 +142,7 @@ class R34Handler(ImageBoardHandler):
                 file_link=rpost.file_url,
                 ext=ext,
             )
-            stats.add(STATS.TAG_SET, rpost.tags)
-            stats.add(STATS.TAG_SET, tag)
-            stats.add(STATS.ARTIST_SET, tag)
             posts[post_id] = post
-            stats.add(STATS.POST_COUNT)
 
 
         logger.info("Returning %d posts for artist %s", len(posts), tag)

@@ -4,7 +4,8 @@ from tempfile import (
     TemporaryDirectory,
 )
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.utils.utils import singleton
 from requests_ratelimiter import LimiterSession
 

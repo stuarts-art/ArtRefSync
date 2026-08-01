@@ -1,6 +1,7 @@
 from typing import Iterable
 import ttkbootstrap as ttk
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import E621, R34, TABLE
 from sortedcontainers import SortedSet
 

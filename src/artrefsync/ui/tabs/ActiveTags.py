@@ -4,7 +4,6 @@ from tkinter.font import nametofont
 
 import ttkbootstrap as ttk
 
-from artrefsync.config import config
 from artrefsync.constants import BINDING
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import e_binder
@@ -56,7 +55,7 @@ class ActiveTagsTab(ttk.Frame):
             return self.on_tag_middle(artist)
 
         if artist in self.active_tags:
-            self.remove_tag(artist)
+            logger.info("Artist %s already selected.", artist)
             return
 
         if not middle_click and self.active_tags:
@@ -73,12 +72,12 @@ class ActiveTagsTab(ttk.Frame):
         self.add_tag(self.artist, self.colors.primary)
         e_binder[BINDING.SELECTED_ARTIST] = self.artist
 
-    def on_tag(self, tag, middle_clicked = False):
+    def on_tag(self, tag, middle_clicked=False):
         if middle_clicked:
             return self.on_tag_middle(tag)
         logger.info("Tag Recieved: %s", tag)
         if tag in self.active_tags:
-            self.remove_tag(tag)
+            logger.info("Tag %s already selected")
             return
         if self.is_artist(tag):
             return self.on_artist(tag)
@@ -122,6 +121,7 @@ class ActiveTagsTab(ttk.Frame):
         widget.destroy()
         if not self.active_tags:
             self.forget_self()
+        self.update_idletasks()
         return True
 
     def add_tag(self, tag="", color=None):
@@ -153,6 +153,7 @@ class ActiveTagsTab(ttk.Frame):
         else:
             tag_icon.pack(side=tk.LEFT, anchor=tk.NW)
         tag_icon.bind("<Double-Button-1>", self.on_remove_tag)
+        self.update_idletasks()
 
     def clear_active(self, event=None, update=True):
         while self.active_tags and (item := self.active_tags.popitem()):
@@ -176,4 +177,3 @@ class ActiveTagsTab(ttk.Frame):
     def forget_self(self):
         logger.info("Forgetting Active Tags from Grid")
         self.grid_forget()
-

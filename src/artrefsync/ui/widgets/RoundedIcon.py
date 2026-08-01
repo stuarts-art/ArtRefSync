@@ -5,7 +5,6 @@ from tkinter.font import nametofont
 import ttkbootstrap as ttk
 from PIL import ImageTk
 
-from artrefsync.config import config
 from artrefsync.utils.image_utils import ImageUtils
 
 logger = logging.getLogger(__name__)
@@ -13,6 +12,13 @@ logger = logging.getLogger(__name__)
 
 class RoundedIcon(ttk.Label):
     font = None
+    _colors = None
+
+    @classmethod
+    def get_color(cls):
+        if cls._colors is None:
+            cls._colors = ttk.Style().colors
+        return cls._colors
 
     @staticmethod
     def text_width(text):
@@ -21,7 +27,10 @@ class RoundedIcon(ttk.Label):
         return RoundedIcon.font.measure(text)
 
     @staticmethod
-    def from_text(root, text, normal_color="#FFFFFF00", hover_color="#595253"):
+    def from_text(
+        root, text, normal_color="#FFFFFF00", hover_color="#595253", command=None
+    ):
+
         if not RoundedIcon.font:
             RoundedIcon.font = nametofont("TkDefaultFont")
         text_width = RoundedIcon.font.measure(text)
@@ -29,13 +38,15 @@ class RoundedIcon(ttk.Label):
         return RoundedIcon(
             root,
             text,
-            size=(icon_width, 22),
-            normal_color=normal_color,
-            hover_color=hover_color,
+            size=(icon_width, 25),
+            normal_color=RoundedIcon.get_color().bg,
+            # hover_color=hover_color,
+            hover_color=RoundedIcon.get_color().selectbg,
+            command=command,
         )
 
     def update_text(self, text):
-        self.text=text
+        self.text = text
         width = RoundedIcon.font.measure(text)
         self.width = (width // 20 + 1) * 20
         self.set_image()
@@ -51,6 +62,8 @@ class RoundedIcon(ttk.Label):
         radius=5,
         style=None,
         text_variable=None,
+        pack_kwargs={},
+        grid_kwargs={},
         command=None,
         **kwargs,
     ):
@@ -100,6 +113,13 @@ class RoundedIcon(ttk.Label):
 
         if command:
             self.bind("<Button-1>", command)
+
+        if pack_kwargs and grid_kwargs:
+            raise ValueError("Cannot use pack and grid")
+        elif pack_kwargs:
+            self.pack(**pack_kwargs)
+        elif grid_kwargs:
+            self.grid(**grid_kwargs)
 
     def set_image(self):
         self.normal_icon = ImageTk.PhotoImage(

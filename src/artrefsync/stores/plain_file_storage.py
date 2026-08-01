@@ -11,7 +11,8 @@ from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
 from artrefsync.boards.board_handler import Post, PostFile
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.utils.utils import resource_path, str_dict
 
 import logging

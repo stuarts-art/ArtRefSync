@@ -13,7 +13,8 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.utils.image_utils import ImageUtils
 
 logger = logging.getLogger(__name__)

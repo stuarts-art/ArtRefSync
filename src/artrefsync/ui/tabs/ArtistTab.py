@@ -2,14 +2,14 @@ import fnmatch
 import logging
 import tkinter as tk
 
-from sortedcontainers import SortedSet
 import ttkbootstrap as ttk
+from sortedcontainers import SortedSet
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import BINDING, BOARD, DANBOORU, E621, R34, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.utils.EventManager import e_binder
-from artrefsync.utils.benchmark import Bm
 from artrefsync.utils.TkThreadCaller import thread_caller
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ class ArtistTab(ttk.Frame):
         shift_pressed = (state & 0x1) != 0
 
         if keysym in ["Return", "grave"]:
-            self.query_by_artist()
+            self.query_by_artist(event)
         elif keysym == "w":
             self.tree.event_generate("<Up>")
         elif keysym == "a":
@@ -114,7 +114,7 @@ class ArtistTab(ttk.Frame):
             str(TABLE.DANBOORU): SortedSet(config[TABLE.DANBOORU][DANBOORU.ARTISTS]),
         }
         with PostDb() as post_db:
-            for board, artists in post_db.board_artists.items():
+            for board, artists in post_db.get_board_artists().items():
                 if board not in self.board_artists_map:
                     self.board_artists_map[board] = SortedSet(artists)
                 else:
@@ -182,9 +182,24 @@ class ArtistTab(ttk.Frame):
                     self.tree.move(artist, board, artist_index)
                 artist_index += 1
 
-    def query_by_artist(self, e=None):
-        if self.tree.selection():
-            artist = self.tree.selection()[0]
+    def query_by_artist(self, event:tk.Event=None):
+        event_type = str(event.type)
+        state = event.state
+        ctrl_pressed = (state & 0x4) != 0
+        shift_pressed = (state & 0x1) != 0
+        artist = ""
+
+        if event_type == "2":
+            if self.tree.selection():
+                artist = self.tree.selection()[0]
+
+
+
+        elif event_type == "4":
+            artist = self.tree.identify_row(event.y)
+
+
+        if artist:
             logger.info("Querying by artist: %s", artist)
             e_binder.event_generate(BINDING.ON_ARTIST_SELECT, artist)
 

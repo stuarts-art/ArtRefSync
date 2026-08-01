@@ -1,17 +1,15 @@
 import json
 import logging
-from threading import Event
 import re
+from threading import Event
 
-import requests
 from requests_ratelimiter import LimiterSession
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from artrefsync.config import config
 from artrefsync.api.r34_model import R34_Post
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import R34, TABLE
-from artrefsync.db.post_db import PostDb
-
 
 logger = logging.getLogger(__name__)
 
@@ -46,20 +44,16 @@ class R34_Client:
     def _build_url_request(self, tag, page, last_id=None) -> str:
         return f"{self.base_url}{self.r34_api_string}&limit={self.limit}&tags={tag}{f'+id:>{last_id}' if last_id else ''}&fields=tag_info&pid={page}&json=1"
 
-    async def get_posts(
-        self, tag, post_limit=10000
+    def get_posts(
+        self, tag, post_limit=10000, last_id = None
     ) -> list[R34_Post]:
         posts = []
         posts_data = []
-        last_id = None
         if "+limit:" in tag:
             limit = int(re.split("\rD+", tag.split("limit:")[-1])[0])
             if limit:
                 post_limit = limit
 
-        if self.only_recent:
-            with PostDb() as post_db:
-                last_id = post_db.get_last_id(tag, "r34")
         for page in range(50):
             if self.stop_event and self.stop_event.is_set():
                 return None
@@ -72,9 +66,8 @@ class R34_Client:
             try:
                 r34_post = R34_Post.parse_r34_post(post_data)
                 posts.append(r34_post)
-            except Exception as e:
+            except Exception:
                 logger.exception("Failed to parse")
-                pass
 
             if post_limit and len(posts) >= post_limit:
                 break

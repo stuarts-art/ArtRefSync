@@ -1,13 +1,14 @@
-from collections import defaultdict
 import logging
+from collections import defaultdict
 from datetime import datetime
 from threading import Event
 
 from artrefsync.api.danbooru_client import Danbooru_Client
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
-from artrefsync.config import config
-from artrefsync.constants import BOARD, DANBOORU, STATS
-from artrefsync.stats import stats
+from artrefsync.config import get_config
+config = get_config()
+from artrefsync.constants import BOARD, DANBOORU
+from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ def main():
     pass
 
 
-class Danbooru_Handler(ImageBoardHandler):
+class DanbooruHandler(ImageBoardHandler):
     """
     Class to handle requesting and handling messages from the image board E621
     """
@@ -56,7 +57,13 @@ class Danbooru_Handler(ImageBoardHandler):
     ) -> dict[str, Post]:
         posts = {}
 
-        danbooru_posts = self.client.get_posts(tag, post_limit)
+        last_id = None
+        if self.only_recent:
+            with PostDb() as post_db:
+                row = post_db.posts.get(board = self.get_board(), artist_name = tag, select_fields=["ext_id", "MAX(create_timestamp)"], as_tuple=True)
+                if row:
+                    last_id = row[0]
+        danbooru_posts = self.client.get_posts(tag, post_limit,last_id=last_id)
         if self.stop_event and self.stop_event.is_set():
             return None
         if " " in tag:
@@ -91,7 +98,6 @@ class Danbooru_Handler(ImageBoardHandler):
 
             for black_listed in self.black_list:
                 if black_listed in tags:
-                    stats.add(STATS.SKIP_COUNT, 1)
                     logger.debug(
                         "Skipping %s for %s. (%s)", post_id, black_listed, website
                     )
@@ -136,11 +142,7 @@ class Danbooru_Handler(ImageBoardHandler):
                 sample_link=d_post.large_file_url,
                 file_link=d_post.file_url,
             )
-            stats.add(STATS.TAG_SET, d_post.tag_string)
-            stats.add(STATS.TAG_SET, tag)
-            stats.add(STATS.ARTIST_SET, tag)
             posts[post_id] = post
-            stats.add(STATS.POST_COUNT)
         return posts
 
 

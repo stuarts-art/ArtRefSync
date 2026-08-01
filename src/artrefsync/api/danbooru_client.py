@@ -11,9 +11,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.api.danbooru_model import (
     Danbooru_Post,
 )
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import DANBOORU, TABLE
-from artrefsync.db.post_db import PostDb
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class Danbooru_Client:
         return url_request
 
     def get_posts(
-        self, tag, post_limit=10000
+        self, tag, post_limit=10000, last_id = None
     ) -> list[Danbooru_Post]:
         logger.debug("Getting posts for %s", tag)
 
@@ -71,10 +71,6 @@ class Danbooru_Client:
         failed = []
         skipped = []
 
-        last_id = None
-        if self.only_recent:
-            with PostDb() as post_db:
-                last_id = post_db.get_last_id(tag, TABLE.DANBOORU)
         # Starts at index 1 (Index 0 returns page 1)
         posts_data = []
         for page in range(1, 20):

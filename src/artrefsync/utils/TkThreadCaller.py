@@ -5,7 +5,8 @@ from threading import Event
 
 import ttkbootstrap as ttk
 
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.utils.utils import singleton
 
 logger = logging.getLogger(__name__)

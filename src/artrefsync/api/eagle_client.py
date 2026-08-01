@@ -7,7 +7,8 @@ import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.eagle_model import EagleFolder, EagleItem, EagleLibrary
-from artrefsync.config import config
+from artrefsync.config import get_config
+config = get_config()
 from artrefsync.constants import EAGLE, STORE
 from requests_ratelimiter import LimiterSession
 
@@ -23,7 +24,7 @@ class EagleClient:
         eagle_url = config[STORE.EAGLE][EAGLE.ENDPOINT].strip()
         self.eagle_url = eagle_url if eagle_url else "http://localhost:41595/api"
         self.lock = threading.Lock()
-        self.connection = LimiterSession(per_second=100)
+        # self.connection = LimiterSession(per_second=100)
         with requests.Session() as session:
             self.folder = self._Folder(self.eagle_url, self.lock, session)
             self.item = self._Item(self.eagle_url, self.lock, session)
@@ -124,9 +125,13 @@ class EagleClient:
         def history(self) -> list[str]:
             logger.info("Getting Library History...")
             with self.lock:
-                response = self.session.get(
-                    self.library_url("history"), timeout=self.library_timeout
-                )
+                try:
+                    response = self.session.get(
+                        self.library_url("history"), timeout=self.library_timeout
+                    )
+                except requests.exceptions.ConnectionError:
+                    raise ConnectionError("Eagle is likely closed.")
+
             response.raise_for_status()
             data = json.loads(response.content)["data"]
             data = [x.replace("\\", "/").removesuffix("/") for x in data]
