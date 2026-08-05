@@ -2,7 +2,9 @@ import logging
 import os
 import platform
 import tkinter as tk
+import webbrowser
 from tkinter.font import nametofont
+from urllib.parse import urlparse
 
 import ttkbootstrap as ttk
 from PIL import ImageTk
@@ -10,6 +12,7 @@ from tkinterdnd2 import COPY, DND_FILES
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import get_config
+
 config = get_config()
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
@@ -70,22 +73,28 @@ class PostInfoTab(ttk.Frame):
         self.ext_button = RoundedIcon.from_text(
             ext_frame, "", self.colors.primary, command=self.on_artist_click
         )
-        # self.ext_label = ttk.Label(
-        #     ext_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
-        # )
         self.dim_label = ttk.Label(
             dim_frame, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
         )
         self.score_label.pack()
-        # self.ext_label.pack()
         self.ext_button.pack()
         self.dim_label.pack()
 
-        self.file = ttk.Label(self, cursor="arrow", justify=tk.LEFT, border=1)
+        self.file = RoundedIcon.from_text(
+            self,
+            "File",
+            self.colors.primary,
+        )
         self.file.grid(column=0, row=4, sticky=tk.NSEW)
         self.file_tooltip = ttk.ToolTip(self.file)
+
+        self.link_button = RoundedIcon.from_text(
+            self, "Link", self.colors.primary, command=self.on_link_click
+        ).grid(column=0, row=5, sticky=tk.NSEW)
+        self.link_tooltip = ttk.ToolTip(self.link_button)
+
         self.tags_frame = ttk.Frame(self)
-        self.tags_frame.grid(column=0, row=5, sticky=tk.NSEW)
+        self.tags_frame.grid(column=0, row=6, sticky=tk.NSEW)
 
         self.tags = ttk.ScrolledText(
             self.tags_frame, wrap=tk.WORD, width=text_width, cursor="arrow"
@@ -100,6 +109,10 @@ class PostInfoTab(ttk.Frame):
         self.grid_propagate(False)
 
         self.add_bindings()
+
+    def on_link_click(self, event: tk.Event):
+        if data := event.widget.data:
+            webbrowser.open(data)
 
     def on_artist_click(self, event: tk.Event):
         state = event.state
@@ -117,21 +130,28 @@ class PostInfoTab(ttk.Frame):
         e_binder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
         self.file.drag_source_register(DND_FILES)
         self.file.dnd_bind("<<DragInitCmd>>", self.drag_init)
-        self.file.bind("<Double-1>", self.start_file)
-        self.file.bind("<Button-2>", self.start_file_dir)
+        self.file.bind("<Button-1>", self.start_file)
+        self.file.bind("<Button-3>", self.start_file_dir)
+        self.link_button.bind("<Button-3>", self.copy_to_clipboard)
+
         self.tags.text.bind("<Button-1>", self.on_text_tag_click)
 
     def start_file(self, event):
-        file = self.file.cget("text")
+        file = self.file.data
         if file and platform.system() == "Windows":
             os.startfile(file)
 
     def start_file_dir(self, event):
-        file = self.file.cget("text")
+        file = self.file.data
         if file and platform.system() == "Windows":
             dir = os.path.dirname(file)
             if dir and os.path.isdir(dir):
                 os.startfile(dir)
+
+    def copy_to_clipboard(self, event):
+        self.clipboard_clear()
+        self.clipboard_append(self.link_button.data)
+        self.update()
 
     def on_post_select(self, post_id):
         blur_tags = config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]
@@ -140,6 +160,9 @@ class PostInfoTab(ttk.Frame):
         with PostDb() as post_db:
             post: Post = post_db.posts.get(id=post_id)
             post_file: PostFile = post_db.files.get(id=post_id)
+        website = post.website
+        domain = urlparse(website).netloc
+        domain = domain.removeprefix("www.")
 
         if post_file and post:
             post.file_link = post_file.file
@@ -151,8 +174,14 @@ class PostInfoTab(ttk.Frame):
             self.score_label.configure(text=post.score)
             self.ext_button.update_text(post.ext)
             self.dim_label.configure(text=f"{post.width}x{post.height}")
-            self.file.configure(text=post.file_link)
-            self.file_tooltip.text = f"{post.file_link}\n-Double Click: Open\n-Middle Click: Open file location"
+
+            self.file.update_text(text=f"{post.file_link[:30]}...", data=post.file_link)
+            self.file_tooltip.text = (
+                f"{post.file_link}\n<L-Click> Open\n<R-Click>: Open In Explorer"
+            )
+            self.link_button.update_text(domain, post.website)
+            self.link_tooltip.text = f"{post.website}\n<L-Click>: Open in browser\n<R-Click>: Copy to clipboard"
+
             self.tags.config(state=tk.NORMAL)
             self.tags.delete("1.0", tk.END)
             for tag in post.tags:
@@ -199,7 +228,6 @@ class PostInfoTab(ttk.Frame):
         ctrl_pressed = (state & 0x4) != 0
         blur_tags = config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]
         widget: tk.Text = self.tags.text
-        print(event)
 
         index = widget.index(f"@{event.x},{event.y}")
         start, end = self.get_word_box(widget, index)

@@ -24,7 +24,6 @@ class BINDING(StrEnum):
     GALLERY_WIDGET = auto()
     VIEWER_WIDGET = auto()
     # Mapped vars
-    SELECTED_ARTIST = auto()
     ARTIST_SET = auto()
     BOARD_SET = auto()
     SORT_BY = auto()

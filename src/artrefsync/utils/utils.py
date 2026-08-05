@@ -1,14 +1,15 @@
+import os
+import sys
 from collections import UserDict
 from functools import wraps
-import os
 from pathlib import Path
-import sys
+
 
 class str_dict(UserDict):
     # This class forces keys to be strings, useful when dealing with StrEnums.
     # Why? Because if a StrEnum is a key, the string equivalent does not match that key.
     # Note that if the string is a key, the StrEnum will match.
-    def __init__(self, default = None):
+    def __init__(self, default=None):
         self.default = default
         super().__init__()
 
@@ -19,20 +20,24 @@ class str_dict(UserDict):
         if self.default is None:
             raise KeyError
         else:
-            self[str(key)] = self.default()            
+            self[str(key)] = self.default()
             return self[str(key)]
 
     def __getitem__(self, key):
         return super().__getitem__(str(key))
 
+
 def singleton(cls):
     instances = {}
+
     @wraps(cls)
     def wrapper(*args, **kwargs):
         if cls not in instances:
             instances[cls] = cls(*args, **kwargs)
         return instances[cls]
+
     return wrapper
+
 
 @staticmethod
 def resource_path(relative_path):
@@ -43,4 +48,4 @@ def resource_path(relative_path):
     except Exception:
         base_path = os.path.abspath("./_internal")
         os.makedirs(base_path, 0o771, exist_ok=True)
-    return Path(os.path.join(base_path, relative_path))
+    return Path(os.path.join(base_path, relative_path)).resolve()

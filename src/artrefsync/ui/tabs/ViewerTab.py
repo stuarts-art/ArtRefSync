@@ -1,18 +1,21 @@
 import logging
-from threading import Lock
 import time
 import tkinter as tk
+from threading import Lock
+
 import ttkbootstrap as ttk
 
 from artrefsync.boards.board_handler import PostFile
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import BINDING, NAMES
 from artrefsync.db.post_db import PostDb
-from artrefsync.ui.widgets.AdvancedScrolling import CanvasImage
+from artrefsync.ui.widgets.GifAdvancedScrolling import CanvasImage
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.IntegerVar import IntegerVar
 from artrefsync.utils.TkThreadCaller import thread_caller
+
+config = get_config()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -27,12 +30,13 @@ class ViewerTab(ttk.Frame):
         self.pid = None
         self.cancle_key = "ViewerTab"
         self.closing = Lock()
+        self.last_scale = time.time()
 
         self.file = ""
         self.height = self.winfo_height()
         self.width = self.winfo_width()
-        self.index_var = ttk.IntVar(value=0)
-        self.canvas_image = CanvasImage(self)
+        self.index_var = IntegerVar(value=0)
+        self.canvas_image = CanvasImage(self, self.index_var)
         self.init_widgets()
         self.init_bindings()
         self.gif_top = False
@@ -44,9 +48,28 @@ class ViewerTab(ttk.Frame):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.canvas_image.grid(row=0, column=0)
-        # self.init_gif_control()
+        self.init_gif_control()
         self.clear_button = RoundedIcon(self, text="✕", size=(25, 25))
         self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
+
+    def on_scale(self, e=None):
+        if time.time() - self.last_scale < 0.2:
+            return
+        else:
+            self.last_scale = time.time()
+        self.scaling = True
+        if self.index_var.get() == self.canvas_image.frames.curr:
+            return
+        if self.grid_info() and self.canvas_image:
+            self.canvas_image.toggle_pause(toggle_on=False)
+            # self.canvas_image.__show_image()
+
+    def on_scale_release(self, e=None):
+        logger.info("On Scale Release")
+        self.scaling = False
+        if self.playing:
+            self.canvas_image.toggle_play(toggle_play=False)
+            # self.canvas_image.__show_image()
 
     # TODO: Fix gif/video support.
     def init_gif_control(self):
@@ -55,6 +78,15 @@ class ViewerTab(ttk.Frame):
         self.count_button = RoundedIcon(
             self.gif_controls, text_variable=self.index_var, command=self.toggle_play
         )
+        self.scale = ttk.Scale(
+            self.gif_controls,
+            from_=0,
+            to=100,
+            variable=self.index_var.dummyvar,
+            length=400,
+            command=lambda e: self.after_idle(self.on_scale),
+        )
+
         self.left_button = RoundedIcon(self.gif_controls, "˂", command=self.prev_frame)
         self.leftleft_button = RoundedIcon(
             self.gif_controls,
@@ -67,11 +99,13 @@ class ViewerTab(ttk.Frame):
             "˃˃",
             command=lambda x: e_binder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE),
         )
-        self.leftleft_button.pack(side=tk.LEFT)
-        self.left_button.pack(side=tk.LEFT)
-        self.count_button.pack(side=tk.LEFT)
-        self.right_button.pack(side=tk.LEFT)
-        self.rightright_button.pack(side=tk.RIGHT)
+
+        self.leftleft_button.grid(row=0, column=1)
+        self.left_button.grid(row=0, column=2)
+        self.count_button.grid(row=0, column=3)
+        self.scale.grid(row=0, column=4)
+        self.right_button.grid(row=0, column=5)
+        self.rightright_button.grid(row=0, column=6)
 
         e_binder.bind(BINDING.ON_TEXT_Z, self.prev_frame, self)
         e_binder.bind(BINDING.ON_TEXT_X, self.toggle_play, self)
@@ -103,6 +137,7 @@ class ViewerTab(ttk.Frame):
     def close_image_viewer(self, _=None):
         if self.after_add_binding_id:
             self.after_cancel(self.after_add_binding_id)
+        self.canvas_image.cancel_next_frame()
         e_binder[BINDING.GALLERY_WIDGET].text.focus_set()
         if self.grid_info():
             logger.info("Closing Image Viewer")
@@ -123,6 +158,7 @@ class ViewerTab(ttk.Frame):
     def update_viewer_image(self, pid):
         self.last_open_time = time.time()
         thread_caller.cancel(__name__)
+        self.canvas_image.cancel_next_frame()
 
         if not pid:
             logger.error("Missing PID in viewer")
@@ -140,7 +176,7 @@ class ViewerTab(ttk.Frame):
             self.curr_focus = self.canvas_image.canvas.focus_get()
             self.canvas_image.canvas.focus_set()
             self.cancle_key = thread_caller.add(
-                self.canvas_image.set_image,
+                self.canvas_image.load_media,
                 self.on_canvas_set_image,
                 self.cancle_key,
                 filename,
@@ -149,6 +185,9 @@ class ViewerTab(ttk.Frame):
 
     def on_canvas_set_image(self, *args):
         self.clear_button.lift()
+        frame_count = len(self.canvas_image.frames)
+        state = "normal" if frame_count > 1 else "disabled"
+        self.scale.configure(to=frame_count, state=state)
 
     def prev_frame(self, e=None):
         if self.grid_info() and self.canvas_image:

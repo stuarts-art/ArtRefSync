@@ -6,17 +6,18 @@
 
 import logging
 import math
+import time
 import tkinter as tk
-import warnings
-from tkinter import ttk
 
+import ttkbootstrap as ttk
 from PIL import Image, ImageTk
 
-
 from artrefsync.config import get_config
-config = get_config()
-from artrefsync.utils.image_utils import ImageUtils
+from artrefsync.constants import BINDING
+from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.frame_buffer import FrameBuffer
 
+config = get_config()
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
@@ -38,52 +39,26 @@ class AutoScrollbar(ttk.Scrollbar):
         raise tk.TclError("Cannot use place with the widget " + self.__class__.__name__)
 
 
+class CopyDict(dict):
+    def __init__(self, copy_from):
+        self.copy_from = copy_from
+        super().__init__()
+
+    def __missing__(self, key):
+        copied = self.copy_from[key].copy()
+        self[key] = copied
+        return copied
+
+
 class CanvasImage:
     """Display and zoom image"""
 
-    def toggle_pause(self, toggle_on=None):
-        if not self.duration:
-            return
-        if toggle_on is None:
-            if self.next_job:
-                self.__imframe.after_cancel(self.next_job)
-                self.next_job = None
-            else:
-                self.next(self.path)
-        elif toggle_on:
-            if not self.next_job:
-                self.next(self.path)
-        else:
-            if self.next_job:
-                self.__imframe.after_cancel(self.next_job)
-                self.next_job = None
-
-    def move_left(self):
-        if self.duration is not None and len(self.__images) > 1:
-            self.toggle_pause(toggle_on=False)
-            self.index -= 1
-            self.index %= len(self.__images)
-            self.__show_image()
-
-    def move_right(self):
-        if self.duration is not None and len(self.__images) > 1:
-            self.toggle_pause(toggle_on=False)
-            self.index += 1
-            self.index %= len(self.__images)
-            self.__show_image()
-
-    @property
-    def index(self):
-        return self.index_var.get()
-
-    @index.setter
-    def index(self, value):
-        self.index_var.set(value)
-
     def __init__(self, placeholder, index_var):
+        self.last_run = time.time()
         """Initialize the ImageFrame"""
+        self.cancel_key = "GifViewerCancelKey"
         self.index_var: tk.IntVar = index_var
-        self.next_job = None
+        self.after_next_frame_id = None
         self.path = None
         self.__pyramid = None
 
@@ -101,7 +76,7 @@ class CanvasImage:
         hbar.grid(row=1, column=0, sticky="we")
         vbar.grid(row=0, column=1, sticky="ns")
         # Create canvas and bind it with scrollbars. Public for outer classes
-        self.canvas = tk.Canvas(
+        self.canvas = ttk.Canvas(
             self.__imframe,
             highlightthickness=0,
             xscrollcommand=hbar.set,
@@ -142,12 +117,57 @@ class CanvasImage:
         Image.MAX_IMAGE_PIXELS = (
             1000000000  # suppress DecompressionBombError for the big image
         )
-        self.__image = None
-        self.__images = {}
+        self.frames = FrameBuffer()
+        self.__images = CopyDict(self.frames)
         self.container = None
-        # self.set_image(path)
 
-    def next(self, path):
+    @property
+    def index(self):
+        return self.index_var.get()
+
+    @index.setter
+    def index(self, value):
+        self.index_var.set(int(value))
+
+    def load_media(self, path: str | None):
+        self.canvas.yview_moveto(0)
+        self.canvas.xview_moveto(0)
+        if path is None:
+            return
+        if self.path == path:
+            self.__show_image()
+            self.toggle_pause(toggle_on=True)
+            return
+        if self.after_next_frame_id:
+            self.__imframe.after_cancel(self.after_next_frame_id)
+            self.after_next_frame_id = None
+        self.frames.load_file(path)
+        if len(self.frames) > 1:
+            self.duration = self.frames.duration
+        else:
+            self.duration = None
+        self.__images.clear()
+
+        self.index = 0
+        self.path = path  # path to the image, should be public for outer classes
+        self.update_frame_size()
+        self.__scale = self.imscale * self.__ratio  # image pyramide scale
+        self.__reduction = 2  # reduction degree of image pyramid
+        self.__pyramid = {}
+        self.__curr_img = 0  # current image from the pyramid
+
+        if len(self.frames) > 1:
+            self.show_next_frame(self.path)
+        else:
+            self.__show_image()
+
+    def cancel_next_frame(self):
+        if self.after_next_frame_id is not None:
+            self.__imframe.after_cancel(self.after_next_frame_id)
+            self.after_next_frame_id = None
+
+    def show_next_frame(self, path):
+        self.cancel_next_frame()
         if path != self.path:
             return
         if self.duration is None:
@@ -160,19 +180,57 @@ class CanvasImage:
             self.index %= len(self.frames)
 
         if self.index in self.__pyramid:
-            self.next_job = self.__imframe.after(self.duration, self.next, path)
+            self.after_next_frame_id = self.__imframe.after(
+                self.duration, self.show_next_frame, path
+            )
             self.__show_image()
         else:
             try:
                 self.__show_image()
             finally:
-                self.next_job = self.__imframe.after(self.duration, self.next, path)
+                self.after_next_frame_id = self.__imframe.after(
+                    self.duration, self.show_next_frame, path
+                )
+        for i in [1, 2]:
+            next_index = (self.index + i) % len(self.frames)
+            if next_index not in self.frames:
+                self.__imframe.after_idle(self.frames.__getitem__, next_index)
+
+    def toggle_pause(self, toggle_on=None):
+        if not self.duration:
+            return
+        if toggle_on is None:
+            if self.after_next_frame_id:
+                self.__imframe.after_cancel(self.after_next_frame_id)
+                self.after_next_frame_id = None
+            else:
+                self.show_next_frame(self.path)
+        elif toggle_on:
+            if not self.after_next_frame_id:
+                self.show_next_frame(self.path)
+        else:
+            if self.after_next_frame_id:
+                self.__imframe.after_cancel(self.after_next_frame_id)
+                self.after_next_frame_id = None
+        self.__show_image()
+
+    def move_left(self):
+        if self.duration is not None and len(self.frames) > 1:
+            self.toggle_pause(toggle_on=False)
+            self.index -= 1
+            self.index %= len(self.frames)
+            self.__show_image()
+
+    def move_right(self):
+        if self.duration is not None and len(self.frames) > 1:
+            self.toggle_pause(toggle_on=False)
+            self.index += 1
+            self.index %= len(self.frames)
+            self.__show_image()
 
     def update_frame_size(self):
         index = 0
-        self.imwidth, self.imheight = self.__images[
-            index
-        ].size  # public for outer classes
+        self.imwidth, self.imheight = self.frames[0].size  # public for outer classes
         frame_width = self.__imframe.master.winfo_width()
         frame_height = self.__imframe.master.winfo_height()
         self.imscale = min(frame_width / self.imwidth, frame_height / self.imheight)
@@ -192,40 +250,6 @@ class CanvasImage:
         self.__ratio = (
             max(self.imwidth, self.imheight) / self.__huge_size if self.__huge else 1.0
         )
-
-    # Moved out of init to allow for hotswapping images
-    def set_image(self, path: str | None):
-        if path is None:
-            return
-        if self.path == path:
-            self.__show_image()
-            self.toggle_pause(toggle_on=True)
-            return
-        if self.next_job:
-            self.__imframe.after_cancel(self.next_job)
-            self.next_job = None
-        if path.endswith(".gif"):
-            self.frames, self.duration = ImageUtils.getPilFrames(path)
-        else:
-            # self.frames = [ImageUtils.getPilImage(path),]
-            self.frames = [ImageUtils.get_cv2_pil_image(path)]
-            self.duration = None
-        self.index = 0
-        self.path = path  # path to the image, should be public for outer classes
-        with warnings.catch_warnings():  # suppress DecompressionBombWarning
-            warnings.simplefilter("ignore")
-            self.__images = {i: image.copy() for i, image in enumerate(self.frames)}
-
-        self.update_frame_size()
-        self.__scale = self.imscale * self.__ratio  # image pyramide scale
-        self.__reduction = 2  # reduction degree of image pyramid
-        self.__pyramid = {}
-        self.__curr_img = 0  # current image from the pyramid
-        if self.duration:
-            self.index = -1
-            self.next(path)
-        else:
-            self.__imframe.after_idle(self.__show_image)
 
     def smaller(self, index):
         """Resize image proportionally and return smaller image"""
@@ -247,7 +271,7 @@ class CanvasImage:
             w = int(h2 * aspect_ratio1)  # band length
         i, j, n = 0, 1, round(0.5 + self.imheight / self.__band_width)
         while i < self.imheight:
-            logger.debug("\rOpening image: {j} from {n}".format(j=j, n=n), end="")
+            logger.debug(f"\rOpening image: {j} from {n}", end="")
             band = min(self.__band_width, self.imheight - i)  # width of the tile band
             self.__tile[1][3] = band  # set band width
             self.__tile[2] = (
@@ -255,7 +279,6 @@ class CanvasImage:
             )  # tile offset (3 bytes per pixel)
             if self.__images[i]:
                 self.__images[i].close()
-            # self.__images[i] = Image.open(self.path)  # reopen / reset image
             self.__images[i] = self.frames[i].copy()
             self.__images[i].size = (self.imwidth, band)  # set size of the tile band
             self.__images[i].tile = [self.__tile]  # set tile
@@ -272,7 +295,6 @@ class CanvasImage:
 
     def redraw_figures(self):
         """Dummy function to redraw figures in the children classes"""
-        pass
 
     def grid(self, **kw):
         """Put CanvasImage widget on the parent widget"""
@@ -307,9 +329,16 @@ class CanvasImage:
         if index >= len(self.frames):
             return
         if index not in self.__pyramid:
-            self.__pyramid[index] = (
-                [self.smaller(index)] if self.__huge else [self.frames[index].copy()]
-            )
+            if self.__huge:
+                self.__pyramid[index] = [self.smaller(index)]
+            else:
+                if frame := self.frames[index]:
+                    self.__pyramid[index] = [frame.copy()]
+                else:
+                    return
+            # self.__pyramid[index] = (
+            #     [self.smaller(index)] if self.__huge else [self.frames[index].copy()]
+            # )
             w, h = self.__pyramid[index][-1].size
             while w > 512 and h > 512:  # top pyramid image is around 512 pixels in size
                 w /= self.__reduction  # divide on reduction degree
@@ -339,7 +368,7 @@ class CanvasImage:
                 )
 
     def __show_image(self):
-        index = self.index
+        index = self.index % len(self.frames)
         self.__update_pyramid(index)
         if self.__pyramid is None:
             return
@@ -413,7 +442,6 @@ class CanvasImage:
                         # ), index
                     )
                 )
-            #
             imagetk = ImageTk.PhotoImage(
                 image.resize((int(x2 - x1), int(y2 - y1)), self.__filter)
             )
@@ -470,7 +498,6 @@ class CanvasImage:
             len(self.__pyramid[self.index]) - 1,
         )
         self.__scale = k * math.pow(self.__reduction, max(0, self.__curr_img))
-        #
         self.canvas.scale("all", x, y, scale, scale)  # rescale all objects
         # Redraw some figures before showing image on the screen
         self.redraw_figures()  # method for child classes
@@ -479,37 +506,63 @@ class CanvasImage:
     def __keystroke(self, event):
         """Scrolling with the keyboard.
         Independent from the language of the keyboard, CapsLock, <Ctrl>+<key>, etc."""
-        if (
-            event.state - self.__previous_state == 4
-        ):  # means that the Control key is pressed
-            pass  # do nothing if Control key is pressed
-        else:
-            self.__previous_state = event.state  # remember the last keystroke state
-            # Up, Down, Left, Right keystrokes
-            if event.keycode in [
-                68,
-                39,
-                102,
-            ]:  # scroll right: keys 'D', 'Right' or 'Numpad-6'
+        ctrl_pressed = (event.state & 0x4) != 0
+        if event.keycode in [  # D
+            68,
+            39,
+            102,
+        ]:  # scroll right: keys 'D', 'Right' or 'Numpad-6'
+            if ctrl_pressed:
+                self.move_right()
+            else:
                 self.__scroll_x("scroll", 1, "unit", event=event)
-            elif event.keycode in [
-                65,
-                37,
-                100,
-            ]:  # scroll left: keys 'A', 'Left' or 'Numpad-4'
+        elif event.keycode in [  # A
+            65,
+            37,
+            100,
+        ]:  # scroll left: keys 'A', 'Left' or 'Numpad-4'
+            if ctrl_pressed:
+                self.move_left()
+            else:
                 self.__scroll_x("scroll", -1, "unit", event=event)
-            elif event.keycode in [
-                87,
-                38,
-                104,
-            ]:  # scroll up: keys 'W', 'Up' or 'Numpad-8'
-                self.__scroll_y("scroll", -1, "unit", event=event)
-            elif event.keycode in [
-                83,
-                40,
-                98,
-            ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+        elif event.keycode in [
+            87,
+            38,
+            104,
+        ]:  # scroll up: keys 'W', 'Up' or 'Numpad-8'
+            self.__scroll_y("scroll", -1, "unit", event=event)
+        elif event.keycode in [
+            83,
+            40,
+            98,
+        ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+            if ctrl_pressed:
+                self.toggle_pause()
+            else:
                 self.__scroll_y("scroll", 1, "unit", event=event)
+        elif event.keysym in [
+            "q",
+            "minus",
+        ]:  # scroll down: keys 'Q' or '-'
+            self.canvas.event_generate("<MouseWheel>", delta=-120)
+        elif event.keysym in [
+            "e",
+            "equal",
+        ]:  # scroll down: keys 'e' or '+'
+            self.canvas.event_generate("<MouseWheel>", delta=+120)
+        elif event.keysym in ["z"]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+            e_binder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE)
+        elif event.keysym in ["c"]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
+            e_binder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE)
+        else:
+            logger.info(
+                "KeyCode: %s, KeySym: %s, State: %s",
+                event.keycode,
+                event.keysym,
+                event.state,
+            )
+            return ""
+        return "break"
 
     def crop(self, bbox, index):
         """Crop rectangle from the image and return it"""
@@ -534,11 +587,9 @@ class CanvasImage:
         """ImageFrame destructor"""
         for image in self.__images:
             image.close()
-            # image[self.index].close()
         map(lambda i: i.close, self.__pyramid)  # close all pyramid images
         for pyramid in self.__pyramid.values():
             map(lambda i: i.close, pyramid)  # close all pyramid images
-        # del self.__pyramid[:]  # delete pyramid list
         del self.__pyramid  # delete pyramid variable
         self.canvas.destroy()
         self.__imframe.destroy()

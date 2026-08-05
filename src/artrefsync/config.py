@@ -3,7 +3,10 @@ import functools
 import logging
 import logging.handlers
 import os
+import shutil
 import sys
+from datetime import datetime
+from pathlib import Path
 
 from diskcache import Cache
 from simple_toml_configurator import Configuration
@@ -90,6 +93,14 @@ class Config:
         if reset:
             self._reload_config()
         else:
+            backup = Path(self.config_path) / "backups"
+            os.makedirs(backup, exist_ok=True)
+            backup_file = (
+                backup
+                / f"{datetime.today().strftime('%Y.%m.%d_%H.%M.%S')}.{self.config_file_name}.toml"
+            )
+            shutil.copy(self.settings._full_config_path, backup_file)
+
             self.settings.update()
 
         for reload in self._subscribed_reload:
@@ -110,7 +121,7 @@ class Config:
     def cache_ttl(self):
         return int(self.get(TABLE.APP, APP.CACHE_TTL, 300))
 
-    default_config = {
+    default_config = {  # noqa: RUF012
         TABLE.APP: {
             APP.THEME: "bootstrap-dark",
             APP.LIMIT: 5000,
@@ -159,7 +170,9 @@ class Config:
         },
     }
 
+
 _config: Config = None
+
 
 def get_config():
     global _config
@@ -167,7 +180,7 @@ def get_config():
         _config = Config()
     return _config
 
+
 def set_config(config: Config):
     global _config
     _config = config
-

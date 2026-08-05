@@ -1,4 +1,6 @@
 import logging
+import os
+from pathlib import Path
 import time
 import tkinter as tk
 
@@ -11,6 +13,7 @@ from artrefsync.ui.widgets.LoadingBar import LoadingBars
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.utils import resource_path
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +24,7 @@ def main():
 
 
 class App(ttk.Window):
-    def __init__(self, config_path="config", config_file_name="config"):
+    def __init__(self, project_path="."):
         """
         Parameters:
 
@@ -32,11 +35,13 @@ class App(ttk.Window):
                 The name of the ttkbootstrap theme to apply to the
                 application.
         """
+        self.project_path = Path(project_path).resolve()
+        os.chdir(project_path)
 
         from artrefsync.config import Config, set_config
-        config = Config(config_path=config_path, config_file_name=config_file_name)
-        set_config(config)
 
+        config = Config(config_path=resource_path("config"), config_file_name="config")
+        set_config(config)
         theme = config[TABLE.APP][APP.THEME]
         theme = "bootstrap-dark" if not theme else theme
         logger.setLevel(config.log_level)
@@ -63,7 +68,6 @@ class App(ttk.Window):
         self.temp_loading_var.set(20)
         with PostDb() as post_db:
             logger.info("DBs initialized")
-            pass
         self.update_idletasks()
 
         self.init_tabs()
@@ -166,9 +170,6 @@ class App(ttk.Window):
 
     def tab_toggle_closure(self, widget: ttk.Frame):
         def raise_toggle_widget(event: tk.Event):
-            print(widget.grid_info())
-            print(widget.winfo_name())
-            print(event)
             widget_name = widget.winfo_name()
 
             if not self.left_tabs.grid_info():

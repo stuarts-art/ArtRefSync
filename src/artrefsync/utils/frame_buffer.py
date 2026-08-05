@@ -1,0 +1,89 @@
+from pathlib import Path
+from threading import Lock
+
+import cv2
+from PIL import Image
+
+from artrefsync.utils.image_utils import ImageUtils
+from artrefsync.utils.managed_cache import ManagedCache
+
+
+class FrameBuffer(list):
+    cache = ManagedCache()
+
+    def __init__(self, size=(720, 720)):
+        self.cap: cv2.VideoCapture = None
+        self.lock = Lock()
+        self.len = 1
+        self.prev = None
+        self.thumb_size = size
+        self.path = Path()
+        self.fps = None
+        self.duration = None
+
+        super().__init__()
+
+    def load_file(self, path: Path):
+        with self.lock:
+            if self.cap and self.cap.isOpened():
+                self.cap.release()
+        self.path: Path = Path(path)
+        self.video_format = self.path.suffix in [".gif", ".mp4", ".webm", ".mov"]
+
+        with self.lock:
+            if self.video_format:
+                self.cap = cv2.VideoCapture(path)
+                self.len = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+                self.duration = int(1000 / self.fps)
+            else:
+                self.cap = None
+                self.len = 1
+                self.fps = None
+                self.duration = None
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, s) -> Image:
+        i = int(s) % len(self)
+        key = (self.path, i)
+        if key not in self.cache:
+            self.update_at_index(i, key)
+        return self.cache[key]
+
+    def __contains__(self, key):
+        frame_key = (self.path, key)
+        return frame_key in self.cache
+
+    def update_at_index(self, i, key):
+        if key not in self.cache:
+            if self.video_format:
+                if i != self.curr:
+                    self.set_frame(i)
+                with self.lock:
+                    ret, frame = self.cap.read()
+                if ret:
+                    if self.thumb_size:
+                        h, w = frame.shape[:2]
+                        thumb_size = ImageUtils.get_cv_thumb_size(
+                            (w, h), self.thumb_size
+                        )
+                        frame = cv2.resize(
+                            frame, thumb_size, interpolation=cv2.INTER_AREA
+                        )
+                    frame = ImageUtils.cv_array_to_image(frame)
+                    self.cache[key] = frame
+            else:
+                self.cache[key] = ImageUtils.get_cv2_pil_image(str(self.path))
+
+    def set_frame(self, i):
+        with self.lock:
+            if self.cap and self.cap.isOpened():
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+
+    @property
+    def curr(self):
+        with self.lock:
+            if self.cap and self.cap.isOpened():
+                return int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))

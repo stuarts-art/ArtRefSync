@@ -28,7 +28,7 @@ class RoundedIcon(ttk.Label):
 
     @staticmethod
     def from_text(
-        root, text, normal_color="#FFFFFF00", hover_color="#595253", command=None
+        root, text, normal_color="#FFFFFF00", hover_color="#595253", command=None, data = None
     ):
 
         if not RoundedIcon.font:
@@ -43,14 +43,16 @@ class RoundedIcon(ttk.Label):
             # hover_color=hover_color,
             hover_color=RoundedIcon.get_color().selectbg,
             command=command,
+            data = data
         )
 
-    def update_text(self, text):
+    def update_text(self, text, data = None):
         self.text = text
         width = RoundedIcon.font.measure(text)
         self.width = (width // 20 + 1) * 20
         self.set_image()
         self.config(image=self.image, text=text)
+        self.data = data
 
     def __init__(
         self,
@@ -65,6 +67,7 @@ class RoundedIcon(ttk.Label):
         pack_kwargs={},
         grid_kwargs={},
         command=None,
+        data = None,
         **kwargs,
     ):
         logger.info('Round Icon init for text "%s"', text)
@@ -80,6 +83,7 @@ class RoundedIcon(ttk.Label):
         self.size = size
 
         self.text = text
+        self.data = data
         self.normal_icon = ImageTk.PhotoImage(
             ImageUtils.get_round_colored_rect(
                 self.width, self.height, radius, normal_color
@@ -120,6 +124,20 @@ class RoundedIcon(ttk.Label):
             self.pack(**pack_kwargs)
         elif grid_kwargs:
             self.grid(**grid_kwargs)
+
+    def is_grid(self):
+        try:
+            self.grid_info()
+            return True
+        except tk.TclError:
+            return False
+
+    def is_packed(self):
+        try:
+            self.pack_info()
+            return True
+        except tk.TclError:
+            return False
 
     def set_image(self):
         self.normal_icon = ImageTk.PhotoImage(

@@ -41,7 +41,6 @@ class ModernTopBar(ttk.Frame):
 
         # Top, Mid, Bot, Init and grid placement
         self._top = ttk.Frame(self, style=self.top_style, height=34)
-        # self._top = ttk.Frame(self, style=self.top_style, height=34)
         self._top_sep = ttk.Separator(self)
         self._mid = ttk.Frame(self)
         self._bot = ttk.Frame(self)
@@ -80,22 +79,22 @@ class ModernTopBar(ttk.Frame):
         self.mid_right.grid(column=4, row=0, sticky="nes")
 
     def init_menu(self):
-        self.sidebar_right_toggle = RoundedIcon(
-            self.top_right,
-            text="◨",
-            hover_color=self.colors.dark,
-            font=("Helvetica", 12),
-            style=self.button_style,
-            size=30,
-        )
-        self.menu_button = RoundedIcon(
-            self.top_left,
-            text="≡",
-            hover_color=self.colors.dark,
-            font=("Helvetica", 12),
-            style=self.button_style,
-            size=30,
-        )
+        # self.sidebar_right_toggle = RoundedIcon(
+        #     self.top_right,
+        #     text="◨",
+        #     hover_color=self.colors.dark,
+        #     font=("Helvetica", 12),
+        #     style=self.button_style,
+        #     size=30,
+        # )
+        # self.menu_button = RoundedIcon(
+        #     self.top_left,
+        #     text="≡",
+        #     hover_color=self.colors.dark,
+        #     font=("Helvetica", 12),
+        #     style=self.button_style,
+        #     size=30,
+        # )
         self.sidebar_left_toggle = RoundedIcon(
             self.top_left,
             text="◧",
@@ -105,22 +104,22 @@ class ModernTopBar(ttk.Frame):
             size=30,
         )
 
-        self.sidebar_right_toggle.pack(side="right", padx=5)
-        self.menu_button.pack(side="left", padx=5)  # ,   pady=12)
+        # self.menu_button.pack(side="left", padx=5)  # ,   pady=12)
         self.sidebar_left_toggle.pack(side="left", padx=5)  # ,   pady=12)
-
-        self.menu_button.bind("<ButtonPress-1>", self.create_menu_settings_event)
         self.sidebar_left_toggle.bind("<ButtonPress-1>", self.toggle_left_sidebar)
-        self.sidebar_right_toggle.bind("<ButtonPress-1>", self.toggle_right_sidebar)
 
     def toggle_left_sidebar(self, event=None):
         left_info = self.mid_left.grid_info()
         if left_info:
+            self.sidebar_left_toggle.update_text("◨")
             self.mid_left.grid_forget()
             self.mid_left_sep.grid_forget()
+            self.update_idletasks()
         else:
+            self.sidebar_left_toggle.update_text("◧")
             self.mid_left.grid(column=0, row=0, sticky="nws")
             self.mid_left_sep.grid(column=1, row=0, sticky="ns")
+            self.update_idletasks()
 
     def toggle_right_sidebar(self, event=None):
         right_info = self.mid_right.grid_info()

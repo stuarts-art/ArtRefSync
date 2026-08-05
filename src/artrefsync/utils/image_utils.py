@@ -2,13 +2,15 @@ import functools
 import logging
 import os
 import threading
+from pathlib import Path
 
 import cv2
 import ttkbootstrap as ttk
-from PIL import Image, ImageDraw, ImageSequence, ImageTk
+from PIL import Image, ImageDraw, ImageTk
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.config import get_config
+
 config = get_config()
 
 logger = logging.getLogger(__name__)
@@ -60,40 +62,6 @@ class ImageUtils:
             logger.warning(e)
 
     @staticmethod
-    @functools.lru_cache(maxsize=3)
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def getPilFrames(file, size=(1440, 1440)):
-        image = ImageUtils.getPilImage(file)
-        frames = []
-        try:
-            duration = image.info["duration"]
-        except Exception:
-            duration = 100
-        try:
-            for frame in ImageSequence.Iterator(image):
-                compressed_frame = frame.copy()
-                if size:
-                    compressed_frame.thumbnail(size=size)
-                frames.append(compressed_frame)
-        except EOFError:
-            return (None, None)
-        return (frames, duration)
-
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def getTkFrames(file, size=(1440, 1440)):
-        frames, duration = ImageUtils.getPilFrames(file)
-        if not frames:
-            return (None, None)
-        tkFrames = []
-        for frame in frames:
-            frame_copy = frame.copy()
-            frame_copy.thumbnail(size=size)
-            photoFrame = ImageTk.PhotoImage(image=frame_copy)
-            tkFrames.append(photoFrame)
-
-        return (tkFrames, duration)
-
-    @staticmethod
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     @functools.lru_cache(maxsize=50)
     def get_tk_thumb(file: str, size=(1080, 720), radius=0):
@@ -109,7 +77,7 @@ class ImageUtils:
     @functools.lru_cache
     def getrounded_rect(size, radius) -> Image.Image:
         """
-        Produces a rounded grey-scale rectagle, useful for layer masking with putalpha.
+        Produces a rounded grey-scale rectangle, useful for layer masking with putalpha.
         """
         width, height = size
         scale = 4
@@ -167,7 +135,7 @@ class ImageUtils:
         cv_image = cv2.imread(file)
         return cv_image
 
-    k_size = 20 
+    k_size = 20
 
     @staticmethod
     @functools.lru_cache(maxsize=50)
@@ -186,30 +154,40 @@ class ImageUtils:
             ImageUtils.cv2_image_blur(cv_image)
         cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         return cv_image_rgb
-    
-    def cv2_image_blur(cv_image, offset = 0, blur_intensity = 55):
+
+    def cv2_image_blur(cv_image, offset=0, blur_intensity=55):
         h, w = cv_image.shape[:2]
-        h_start = int (h * offset)
-        w_start = int(w*offset)
-        h_end = int(h*(1.0-offset))
-        w_end = int(w*(1.0-offset))
-        blur_region = cv_image[h_start: h_end, w_start: w_end]
-        blur_region = cv2.GaussianBlur(blur_region,(blur_intensity,blur_intensity), ImageUtils.k_size)
-        cv_image[h_start: h_end, w_start: w_end] = blur_region
+        h_start = int(h * offset)
+        w_start = int(w * offset)
+        h_end = int(h * (1.0 - offset))
+        w_end = int(w * (1.0 - offset))
+        blur_region = cv_image[h_start:h_end, w_start:w_end]
+        blur_region = cv2.GaussianBlur(
+            blur_region, (blur_intensity, blur_intensity), ImageUtils.k_size
+        )
+        cv_image[h_start:h_end, w_start:w_end] = blur_region
 
         text = "Censored"
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = .75
-        thickness = 2                
+        font_scale = 0.75
+        thickness = 2
         text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
 
         text_x = (w - text_size[0]) // 2
         text_y = (h + text_size[1]) // 2
-        cv2.putText(cv_image, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
+        cv2.putText(
+            cv_image,
+            text,
+            (text_x, text_y),
+            font,
+            font_scale,
+            (255, 255, 255),
+            thickness,
+        )
 
     @staticmethod
     def get_cv2_pil_image(
-        file: str, size=(1440, 1440), as_photoimage=False, blur = False
+        file: str, size=(1440, 1440), as_photoimage=False, blur=False
     ) -> Image.Image | ImageTk.PhotoImage:
         if not file or not os.path.exists(file):
             raise FileNotFoundError()
@@ -225,7 +203,7 @@ class ImageUtils:
                 return img
 
     @staticmethod
-    def get_cv2_frame(file, size=(1080, 1080), blur = False):
+    def get_cv2_frame(file, size=(1080, 1080), blur=False):
         gif = cv2.VideoCapture(file)
         ret, frame = gif.read()
         if not ret:
@@ -282,11 +260,11 @@ class ImageUtils:
     def is_multiple_frames(file):
         if not os.path.exists(file):
             raise FileNotFoundError
-        ext = file.rsplit(".", 1)[-1]
-        if ext in ["mp4", "mov", "webm", "gif"]:
-            return True
+        if isinstance(file, Path):
+            return file.suffix in [".mp4", ".mov", ".webm", ".gif"]
         else:
-            return False
+            ext = file.rsplit(".", 1)[-1]
+            return ext in ["mp4", "mov", "webm", "gif"]
 
     @staticmethod
     def get_frame_duration(file):
@@ -298,6 +276,5 @@ class ImageUtils:
             duration = img.info["duration"]
             duration = int(duration)
         except Exception:
-            pass
             return 100
         return duration

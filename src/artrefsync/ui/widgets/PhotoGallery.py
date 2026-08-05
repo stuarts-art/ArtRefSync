@@ -9,10 +9,10 @@ from threading import Event, Lock
 import ttkbootstrap as ttk
 from PIL import ImageTk
 from tkinterdnd2 import COPY, DND_FILES
-from ttkbootstrap.widgets.scrolled import ScrolledText
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import get_config
+
 config = get_config()
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
@@ -48,7 +48,7 @@ class PhotoImageGallery(ttk.Frame):
 
     def init_widgets(self):
         logger.info("Init widgets")
-        self.scrolled_text = ScrolledText(self, autohide=False)
+        self.scrolled_text = ttk.ScrolledText(self, autohide=False)
         self.text = self.scrolled_text.text
         self.simple_frames = SimpleFrames(
             self.scrolled_text, self.frame_width, self.frame_height
@@ -177,9 +177,18 @@ class SimpleFrames:
             return SimpleFrames.frames[index]
 
     def init_bindings(self):
+        self.scroll_start = 0
+        self.w_held = False
+        self.w_start = time.time()
+        self.s_held = False
+        self.w_count = 0
         e_binder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         e_binder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
         e_binder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
+        self.text.bind("<KeyPress-w>", lambda e: self.set_w_held(True))
+        self.text.bind("<KeyRelease-w>", lambda e: self.set_w_held(False))
+        self.text.bind("<KeyPress-s>", lambda e: self.set_s_held(True))
+        self.text.bind("<KeyRelease-s>", lambda e: self.set_s_held(False))
         self.text.bind("<Key>", lambda e: self.text.after_idle(self.__keystroke, e))
         self.text.bind("<KeyRelease-space>", self.on_space)
         self.text.bind(
@@ -187,7 +196,21 @@ class SimpleFrames:
         )
         self.text.bind("<FocusOut>", self.unbind_canvas_escape)
 
-    # def __keystroke(self, event)
+    def set_w_held(self, val):
+        if self.w_held != val:
+            if val:
+                self.w_start = time.time()
+                self.scroll_start = self.text.yview()
+            else:
+                self.w_start = 0
+            self.w_held = val
+        print(
+            f"w {time.time() - self.w_start, self.scroll_start[0] * self.text.winfo_height()}"
+        )
+
+    def set_s_held(self, val):
+        self.s_held = val
+
     def __keystroke(self, event: tk.Event):
         keycode = event.keycode
         keysym = event.keysym
@@ -201,11 +224,11 @@ class SimpleFrames:
         elif keysym == "e":
             e_binder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
         elif keysym in ["w", "Up"]:
-            self.text.event_generate("<MouseWheel>", delta=30)
+            self.text.event_generate("<MouseWheel>", delta=60)
         elif keysym in ["a", "Left"]:
             self.throttled_focus_prev()
         elif keysym in ["s", "Down"]:
-            self.text.event_generate("<MouseWheel>", delta=-30)
+            self.text.event_generate("<MouseWheel>", delta=-60)
         elif keysym in ["d", "Right"]:
             self.throttled_focus_next()
         elif keysym == "z":
@@ -503,7 +526,6 @@ class SimpleFrames:
                 self.updated_selected_post(widget.pid)
                 if not self.selected.same_row(widget) and widget.bbox:
                     self.text.event_generate("<MouseWheel>", delta=-120)
-                # self.text.after_idle(self.text.see, widget)
                 self.text.see(widget)
             return
         else:
@@ -536,7 +558,6 @@ class SimpleFrames:
                     self.text.tag_remove("sel", 1.0, self.text.index(widget))
                     self.text.tag_remove("sel", f"{self.text.index(widget)}+1c", tk.END)
                     self.updated_selected_post(widget.pid)
-                    # self.text.after_idle(self.text.see, widget)
                     self.text.see(widget)
                 return
             else:

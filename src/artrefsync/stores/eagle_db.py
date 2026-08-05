@@ -11,6 +11,7 @@ from dataclassdb import DataclassDb, QueryBuilder
 
 from artrefsync.api.eagle_client import EagleClient
 from artrefsync.config import get_config
+
 config = get_config()
 from artrefsync.constants import APP, EAGLE, TABLE
 from artrefsync.utils.utils import resource_path
