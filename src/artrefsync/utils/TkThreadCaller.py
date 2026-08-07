@@ -6,9 +6,9 @@ from threading import Event
 import ttkbootstrap as ttk
 
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.utils.utils import singleton
 
+config = get_config()
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +62,6 @@ class TkThreadCaller:
                         self.cancel_key_map.pop(future)
         except Exception:
             logger.exception("failed to cancel %s", cancel_key)
-        return
 
     def call_on_finish(self, future: Future):
         try:
@@ -90,5 +89,6 @@ class TkThreadCaller:
         logger.info("Stopping active threads...")
         self.executor.shutdown(cancel_futures=True, wait=True)
         logger.info("Active Threads Stopped.")
+
 
 thread_caller = TkThreadCaller()

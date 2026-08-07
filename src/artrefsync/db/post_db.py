@@ -4,19 +4,16 @@ import os
 import sqlite3
 
 from dataclassdb import DataclassDb, QueryBuilder
+from tenacity import retry, stop_after_attempt
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import APP, TABLE
 from artrefsync.db.TagType import ArtistTagCount, PostTagLink, Tag, TagType
 from artrefsync.utils.utils import resource_path
 
+config = get_config()
 logger = logging.getLogger(__name__)
-
-
-def main():
-    pass
 
 
 class PostDb:
@@ -86,28 +83,29 @@ class PostDb:
             "artist_name"
         ).execute()
 
+    @retry(stop=stop_after_attempt(3))
     def update_tag_link_table(self, post_sql_id, tags):
-        # qb.INSERT.INTO()
-
         tag_ids = [self.tags.insert(Tag(tag)) for tag in tags]
         if tag_ids:
             self.post_tag_link.insert_many(
                 [PostTagLink(post_id=post_sql_id, tag_id=tag_id) for tag_id in tag_ids]
             )
 
+    @retry(stop=stop_after_attempt(3))
     def update_tag_types(self, tags, type_):
         tag_ids = [self.get_tag_id(tag) for tag in tags]
         tag_types = [TagType(tag_id=tag_id, type=type_) for tag_id in tag_ids]
         for tag_type in tag_types:
             self.tag_types.insert(tag_type)
 
-    @functools.lru_cache
+    @functools.lru_cache  # noqa: B019
+    @retry(stop=stop_after_attempt(3))
     def get_tag_id(self, tag: str):
         return self.tags.insert(Tag(tag))
 
+    @retry(stop=stop_after_attempt(3))
     def get_board_artists(self) -> dict[str : list[str]]:
         board_artists_dict = {}
-        # select_result = self.posts.select([], ["DISTINCT artist_name", "board"])
         select_result = self.posts.select_query(
             "DISTINCT artist_name as artist_name",
             "board",
@@ -116,7 +114,6 @@ class PostDb:
         )
 
         for row in select_result:
-            # pid = row["id"]
             board = str(row["board"])
             artist = row["artist_name"]
             if board not in board_artists_dict:
@@ -124,6 +121,7 @@ class PostDb:
             board_artists_dict[board].append(artist)
         return board_artists_dict
 
+    @retry(stop=stop_after_attempt(3))
     def post_counts_for_tags(self, tags: list[str]):
         query = QueryBuilder().select("t1.tag", "COUNT(*)").from_(PostTagLink, "pt")
         query.join(Post, "p1", "pt.post_id = p1.sql_id")
@@ -136,6 +134,7 @@ class PostDb:
         counts = {k: v for (k, v) in rows}
         return counts
 
+    @retry(stop=stop_after_attempt(3))
     def get_tag_counts(
         self, artist="", search="", type_="", as_tuple=True, limit=0, offset=0
     ):
@@ -183,15 +182,18 @@ class PostDb:
 
         return tag_counts
 
+    @retry(stop=stop_after_attempt(3))
     def posts_in_intersection(
         self,
-        tags=[],
+        tags: list[str] | None = None,
         order_by="id",
         order_dir="DESC",
         limit=100000,
         offset=0,
         as_count=False,
     ):
+        if tags is None:
+            tags = []
         if isinstance(tags, str):
             tags = [tags]
 
@@ -237,7 +239,3 @@ class PostDb:
             return rows[0][0]
         else:
             return [row[0] for row in rows]
-
-
-if __name__ == "__main__":
-    main()

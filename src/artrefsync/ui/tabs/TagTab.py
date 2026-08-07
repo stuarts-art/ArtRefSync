@@ -5,16 +5,14 @@ import ttkbootstrap as ttk
 from dataclassdb import QueryBuilder
 
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
-from artrefsync.db.TagType import Tag, TagType
+from artrefsync.db.TagType import TagType
 from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.TkThreadCaller import thread_caller
 
+config = get_config()
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
-
 
 class TagTab(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
@@ -46,7 +44,6 @@ class TagTab(ttk.Frame):
         self.tree.pack(side=tk.TOP, fill="both", expand=True)
         self.tree.column("#0", width=0, anchor="w", stretch=True)
         self.tree.column("#1", width=80, stretch=0, anchor="e")
-        # self.tree.config(selectmode=tk.BROWSE)
         self.type_tags = set()
 
         with PostDb() as post_db:

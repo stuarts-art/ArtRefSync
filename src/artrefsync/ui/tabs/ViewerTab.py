@@ -16,9 +16,7 @@ from artrefsync.utils.IntegerVar import IntegerVar
 from artrefsync.utils.TkThreadCaller import thread_caller
 
 config = get_config()
-
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class ViewerTab(ttk.Frame):
@@ -62,16 +60,13 @@ class ViewerTab(ttk.Frame):
             return
         if self.grid_info() and self.canvas_image:
             self.canvas_image.toggle_pause(toggle_on=False)
-            # self.canvas_image.__show_image()
 
     def on_scale_release(self, e=None):
         logger.info("On Scale Release")
         self.scaling = False
         if self.playing:
             self.canvas_image.toggle_play(toggle_play=False)
-            # self.canvas_image.__show_image()
 
-    # TODO: Fix gif/video support.
     def init_gif_control(self):
         self.gif_controls = ttk.Frame(self)
         self.gif_controls.grid(row=1, column=0)

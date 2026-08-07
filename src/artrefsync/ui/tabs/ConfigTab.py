@@ -7,15 +7,14 @@ from tkinter.filedialog import askdirectory
 import ttkbootstrap as ttk
 
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import TABLE, get_table_mapping
 from artrefsync.sync_coordinator import sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.TkThreadCaller import thread_caller
 
+config = get_config()
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class ConfigTab(ttk.Frame):
@@ -161,13 +160,11 @@ class ConfigTab(ttk.Frame):
                     )
 
                 elif "dir" in table_field:
-                    # entry = ttk.Entry(tab_frame, width=30, show="*")
                     entry = ttk.Entry(tab_frame)
                     entry.insert(0, config[table][table_field])
                     entry.bind("<Double-Button-1>", self.select_dir)
 
                 elif "key" in table_field or "username" in table_field:
-                    # entry = ttk.Entry(tab_frame, width=30, show="*")
                     entry = ttk.Entry(tab_frame, show="*")
                     entry.insert(0, config[table][table_field])
                 else:
@@ -184,7 +181,6 @@ class ConfigTab(ttk.Frame):
         self.console_var.set(not self.console_var.get())
         toggle = self.console_var.get()
         logger.info("Toggling to %s", toggle)
-        # toggle_console(toggle)
 
     def select_dir(self, e):
         dir = askdirectory()
@@ -265,9 +261,3 @@ class ConfigTab(ttk.Frame):
         self.root.filemenu.add_command(
             label="Edit Config", command=lambda: os.startfile(config.path)
         )
-
-
-if __name__ == "__main__":
-    import artrefsync.ui.TagApp as TagApp
-
-    TagApp.main()

@@ -5,16 +5,16 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, ClassVar
 
 from dataclassdb import DataclassDb, QueryBuilder
 
 from artrefsync.api.eagle_client import EagleClient
 from artrefsync.config import get_config
-
-config = get_config()
 from artrefsync.constants import APP, EAGLE, TABLE
 from artrefsync.utils.utils import resource_path
+
+config = get_config()
 
 
 def encode_dt_ms(dt: datetime) -> float:
@@ -40,7 +40,7 @@ class Children:
 
 class EagleDb:
     initialized = False
-    metadata_file_map = {}
+    metadata_file_map :ClassVar[dict[str, Path]]= {}
 
     def __enter__(self):
         return self
@@ -49,11 +49,11 @@ class EagleDb:
         self.connection.commit()
         self.connection.close()
 
-    def __contains__(self, name):
+    def __contains__(self, name) -> bool:
         folder = self.folder.get(name=name)
         return folder is not None
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Folder:
         return self.folder.get(name=key)
 
     def __init__(self, connection=None, client=None, refresh=True):
@@ -145,7 +145,9 @@ class EagleDb:
             "Could not find metadata file for library %s", self.library
         )
 
-    def parse_folder_dict(self, data: dict, parent_id: str):
+    def parse_folder_dict(
+        self, data: dict, parent_id: str
+    ) -> tuple[str, list[Folder], list[Children]]:
         fid = ""
         name = ""
         folders = []

@@ -6,12 +6,12 @@ import ttkbootstrap as ttk
 from sortedcontainers import SortedSet
 
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import BINDING, BOARD, DANBOORU, E621, R34, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.TkThreadCaller import thread_caller
 
+config = get_config()
 logger = logging.getLogger(__name__)
 
 
@@ -140,12 +140,10 @@ class ArtistTab(ttk.Frame):
             )
         thread_caller.add(self.set_count_map, self.set_artist_counts)
 
-
     def set_count_map(self):
         with PostDb() as post_db:
             artist_board_list = list(self.artist_set | self.board_set)
             self.count_map = post_db.post_counts_for_tags(artist_board_list)
-
 
     def on_board_menu_select(self):
         selected_board = self.board_var.get()
@@ -182,22 +180,14 @@ class ArtistTab(ttk.Frame):
                     self.tree.move(artist, board, artist_index)
                 artist_index += 1
 
-    def query_by_artist(self, event:tk.Event=None):
+    def query_by_artist(self, event: tk.Event):
         event_type = str(event.type)
-        state = event.state
-        ctrl_pressed = (state & 0x4) != 0
-        shift_pressed = (state & 0x1) != 0
         artist = ""
 
-        if event_type == "2":
-            if self.tree.selection():
-                artist = self.tree.selection()[0]
-
-
-
+        if event_type == "2" and self.tree.selection():
+            artist = self.tree.selection()[0]
         elif event_type == "4":
             artist = self.tree.identify_row(event.y)
-
 
         if artist:
             logger.info("Querying by artist: %s", artist)

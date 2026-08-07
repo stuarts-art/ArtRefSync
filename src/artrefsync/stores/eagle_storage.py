@@ -9,18 +9,13 @@ from artrefsync.api.eagle_client import EagleClient
 from artrefsync.api.eagle_model import EagleFolder, EagleItem
 from artrefsync.boards.board_handler import PostFile
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import BOARD, EAGLE, STORE, TABLE
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler, Post
 from artrefsync.utils.utils import str_dict
 
+config = get_config()
 logger = logging.getLogger(__name__)
-
-
-def main():
-    handler = EagleHandler()
-    info = handler.client.library.info()
 
 
 class EagleHandler(ImageStoreHandler):
@@ -143,7 +138,7 @@ class EagleHandler(ImageStoreHandler):
         return post_files
 
     def save_post(
-        self, post: Post, link_cache: LinkCache, event: Event = None
+        self, post: Post, link_cache: LinkCache, event: Event | None = None
     ) -> str | None:
         if event and event.is_set():
             return
@@ -152,7 +147,6 @@ class EagleHandler(ImageStoreHandler):
             return None
 
         if link_cache:
-            # loading(link_cache.increment_store_count(self.get_store())/link_cache.get_store_missing(self.get_store()))
             eagle_id = self.post_add_from_path(
                 post, link_cache.get_file_from_link(post.url)
             )
@@ -225,7 +219,3 @@ class EagleHandler(ImageStoreHandler):
 
     def update_thumbnails(self, board: BOARD, artist: str):
         pass
-
-
-if __name__ == "__main__":
-    main()

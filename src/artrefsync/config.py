@@ -1,11 +1,12 @@
+__all__ = ["Config", "get_config", "set_config"]
 # Config Related setup
-import functools
 import logging
 import logging.handlers
 import os
 import shutil
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from diskcache import Cache
@@ -25,7 +26,17 @@ from artrefsync.constants import (
 )
 from artrefsync.utils.utils import resource_path
 
-__all__ = ["Config", "get_config", "set_config"]
+
+@lru_cache
+def censor_text(text: str):
+    repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
+    repl_split = "_".join(
+        [
+            split[0] + repl_text[len(split) : 2 * len(split) - 2] + split[-1]
+            for split in text.split("_")
+        ]
+    )
+    return text[0] + repl_split[1:-1] + text[-1]
 
 
 class Config:
@@ -64,20 +75,9 @@ class Config:
             ],
         )
 
-    repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
-
-    @functools.lru_cache
     def censor_text(self, text):
         if self[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
-            repl_split = "_".join(
-                [
-                    split[0]
-                    + Config.repl_text[len(split) : 2 * len(split) - 2]
-                    + split[-1]
-                    for split in text.split("_")
-                ]
-            )
-            return text[0] + repl_split[1:-1] + text[-1]
+            return censor_text(text)
 
     def cache(self, subdir: str = "") -> Cache:
         key = resource_path(f"{self[TABLE.APP][APP.CACHE_DIR]}/{subdir}")
@@ -88,7 +88,6 @@ class Config:
     def subscribe_reload(self, func: callable):
         self._subscribed_reload.append(func)
 
-    # Reloads config alongside all subscribed in _subscribed_reload
     def reload_config(self, reset=False):
         if reset:
             self._reload_config()
@@ -97,7 +96,7 @@ class Config:
             os.makedirs(backup, exist_ok=True)
             backup_file = (
                 backup
-                / f"{datetime.today().strftime('%Y.%m.%d_%H.%M.%S')}.{self.config_file_name}.toml"
+                / f"{datetime.now(UTC).strftime('%Y.%m.%d_%H.%M.%S')}.{self.config_file_name}.toml"
             )
             shutil.copy(self.settings._full_config_path, backup_file)
 
@@ -174,13 +173,15 @@ class Config:
 _config: Config = None
 
 
-def get_config():
-    global _config
-    if not _config:
-        _config = Config()
-    return _config
-
-
 def set_config(config: Config):
+    print("SETTING CONFIG")
     global _config
     _config = config
+
+
+def get_config():
+    print("GET CONFIG")
+    if _config is None:
+        print("SETTING CONFIG")
+        set_config(Config())
+    return _config

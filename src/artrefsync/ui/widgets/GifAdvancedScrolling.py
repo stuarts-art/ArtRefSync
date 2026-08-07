@@ -19,7 +19,6 @@ from artrefsync.utils.frame_buffer import FrameBuffer
 
 config = get_config()
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class AutoScrollbar(ttk.Scrollbar):
@@ -587,9 +586,8 @@ class CanvasImage:
         """ImageFrame destructor"""
         for image in self.__images:
             image.close()
-        map(lambda i: i.close, self.__pyramid)  # close all pyramid images
         for pyramid in self.__pyramid.values():
-            map(lambda i: i.close, pyramid)  # close all pyramid images
+            (i.close for i in pyramid)  # close all pyramid images
         del self.__pyramid  # delete pyramid variable
         self.canvas.destroy()
         self.__imframe.destroy()

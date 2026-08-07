@@ -1,7 +1,8 @@
+import inspect
 import shutil
 import sys
 import time
-import inspect
+
 
 def obj_size(obj) -> str:
     return obj
@@ -33,7 +34,7 @@ def pretty_wrap(header, body, line_size = 80):
     ]
     return "".join(lines)
 
-class Bm(object):
+class Bm:
     def __init__(self, name="Benchmark", pretty=True, logger=None):
         self.name = name
         self.pretty = pretty

@@ -1,8 +1,6 @@
-from dataclasses import dataclass
-import tkinter
 import logging
-
-from artrefsync.utils.utils import singleton
+import tkinter
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -13,20 +11,17 @@ class _EventBinding:
     root: tkinter.Widget
 
 
-@singleton
 class EventManager:
     """
     Standard tkinter bindings can't easily pass data in events.
     This class provides a simplified solution leveraging the builtin "after" method.
-    [2016 Python PR for virtual event data](https://github.com/python/cpython/pull/7142)
+    [2016 Python PR for virtual event data](https://github.com/python/cpython/pull/7142).
+    It looks like this will be part of Python 3.15.
     """
 
     def __init__(self):
         self.sequence_bindings: dict[str, list[_EventBinding]] = {}
         self.map = {}
-        # self.__setitem__ = self.map.__setitem__
-        # self.__contains__ = self.map.__contains__
-        # self.__getitem__ = self.map.__getitem__
 
     def bind(self, sequence: str, func: callable, root: tkinter.Widget):
         sequence = str(sequence)
@@ -35,7 +30,7 @@ class EventManager:
             self.sequence_bindings[sequence] = []
         self.sequence_bindings[sequence].append(_EventBinding(func, root))
 
-    def event_generate(self, sequence: str, *args):
+    def event_generate(self, sequence: str, *args, **kwargs):
         sequence = str(sequence)
         logger.debug("Generating event for sequence: %s", sequence)
         if args:

@@ -1,6 +1,7 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
 import json
-from typing import List, Optional
+from dataclasses import dataclass
 
 
 # API found: https://api.eagle.cool/
@@ -11,7 +12,7 @@ class EagleFolder:
         name: str
         description: str | None
         modificationTime: int
-        children: List["EagleFolder.UpdatedFolder"]
+        children: list[EagleFolder.UpdatedFolder]
         size: int
         descendantImageCount: int
 
@@ -24,7 +25,7 @@ class EagleFolder:
         modificationTime: int
         imagesMappings: dict | None
         tags: list[str]
-        children: list["EagleFolder.CreatedFolder"]
+        children: list[EagleFolder.CreatedFolder]
         isExpand: bool | None
 
     @dataclass
@@ -32,13 +33,13 @@ class EagleFolder:
         id: str
         name: str
         description: str | None
-        children: List["EagleFolder.ListFolder"]
+        children: list[EagleFolder.ListFolder]
         modificationTime: int
-        tags: List[str]
+        tags: list[str]
         imageCount: int | None
         descendantImageCount: int | None
         pinyin: str | None
-        extendTags: List[str] | None
+        extendTags: list[str] | None
         orderBy: str | None
         sortIncrease: bool | None
 
@@ -46,7 +47,7 @@ class EagleFolder:
 class EagleItem:
 
     @dataclass
-    class Pallete:
+    class Palette:
         color: list[int]
         ratio: float
 
@@ -66,7 +67,7 @@ class EagleItem:
         width: int | None
         noThumbnail: bool | None
         lastModified: int | None
-        palettes: list["EagleItem.Pallete"] | None
+        palettes: list[EagleItem.Palette] | None
         star: int | None
 
     @dataclass
@@ -77,13 +78,11 @@ class EagleItem:
         ext: str
         tags: list[str]
         folders: list[str] | None
-        # isDeleted: bool | None
         url: str | None
         annotation: str | None
         modificationTime: int | None
         height: int | None
         width: int | None
-        # lastModified: int | None
 
     @dataclass
     class Metadata:
@@ -99,10 +98,10 @@ class EagleItem:
         url: str
         annotation: str
         modificationTime: int
-        height: Optional[int]
-        width: Optional[int]
-        palettes: Optional[list]
-        lastModified: Optional[int]
+        height: int | None
+        width: int | None
+        palettes: list | None
+        lastModified: int | None
 
         def to_file_str(self):
             return json.dumps(self.__dict__, separators=(",", ":"))
@@ -111,10 +110,10 @@ class EagleItem:
 class EagleLibrary:
     @dataclass
     class Info:
-        folders: List["EagleLibrary.Info.EagleFolder"] | None
-        smartFolders: List["EagleLibrary.Info.SmartFolder"] | None
-        quickAccess: List[dict] | None
-        tagsGroups: List["EagleLibrary.Info.TagGroups"] | None
+        folders: list[EagleLibrary.Info.EagleFolder] | None
+        smartFolders: list[EagleLibrary.Info.SmartFolder] | None
+        quickAccess: list[dict] | None
+        tagsGroups: list[EagleLibrary.Info.TagGroups] | None
         modificationTime: int
         applicationVersion: str
 
@@ -123,9 +122,9 @@ class EagleLibrary:
             id: str
             name: str
             description: str
-            children: List["EagleLibrary.Info.EagleFolder"]
+            children: list[EagleLibrary.Info.EagleFolder]
             modificationTime: int
-            tags: List[str]
+            tags: list[str]
             iconColor: str | None
             password: str | None
             passwordTips: str | None
@@ -144,7 +143,7 @@ class EagleLibrary:
         class Condition:
             hashKey: str | None
             match: str
-            rules: list["EagleLibrary.Info.Rule"]
+            rules: list[EagleLibrary.Info.Rule]
 
         @dataclass
         class SmartFolder:
@@ -153,7 +152,7 @@ class EagleLibrary:
             name: str
             description: str
             modificationTime: int
-            conditions: list["EagleLibrary.Info.Condition"]
+            conditions: list[EagleLibrary.Info.Condition]
             orderBy: str | None
             sortIncrease: bool | None
 
@@ -161,5 +160,5 @@ class EagleLibrary:
         class TagGroups:
             id: str
             name: str
-            tags: List[str]
+            tags: list[str]
             color: str | None

@@ -1,22 +1,20 @@
-import ttkbootstrap as ttk
+import logging
 import tkinter as tk
 
+import ttkbootstrap as ttk
+
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import BINDING
 from artrefsync.utils.EventManager import e_binder
-import logging
 
+config = get_config()
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class LoadingBar(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
         logger.info("Creating Loading Bar")
         super().__init__(root, *args, **kwargs)
-        # self.columnconfigure(1, weight=1)
-
         self.bar_val = ttk.IntVar(self, value=0)
         self.bar_max_val = ttk.IntVar(self, value=100)
         self.bar = ttk.Progressbar(
@@ -83,7 +81,6 @@ class LoadingBars(ttk.Frame):
 
         self.left_bar.grid(column=0, row=0, sticky=tk.W)
         self.mid_label.grid(column=1, row=0, sticky=tk.NSEW)
-        # self.right_bar.grid(column=2,row=0, sticky=tk.W)
 
         e_binder.bind(BINDING.ON_LOAD_LEFT_SET, self.reset_right, self)
         e_binder.bind(BINDING.ON_LOAD_MID_SET, self.set_mid, self)

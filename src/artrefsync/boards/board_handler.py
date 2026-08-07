@@ -3,15 +3,18 @@ from dataclasses import dataclass, field
 from typing import Annotated
 
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import APP, BOARD, STORE, TABLE
+
+config = get_config()
 
 
 # @dataclass_json
 @dataclass
 class Post:
     id: str
-    ext_id: Annotated[str, "UNIQUE"]  # external id (When from Board->BoardID, Store -> StoreID)
+    ext_id: Annotated[
+        str, "UNIQUE"
+    ]  # external id (When from Board->BoardID, Store -> StoreID)
     name: str = ""
     artist_name: str = ""
     tags: list[str] | None = None
@@ -19,7 +22,7 @@ class Post:
     score: int | None = 0
     url: str | None = ""
     website: str = ""
-    md5:str = ""   
+    md5: str = ""
     update_timestamp: int | None = 0
     create_timestamp: int | None = 0
     height: int | None = 0
@@ -44,9 +47,7 @@ class Post:
     @staticmethod
     def check_id(id_str: str) -> bool:
         id_split = id_str.split(".", maxsplit=1)
-        if len(id_split) != 2 or not id_split[0].isdigit() or id_split[1] not in BOARD:
-            return False
-        return True
+        return len(id_split) == 2 and id_split[0].isdigit() and id_split[1] in BOARD
 
     @staticmethod
     def parse_id(id_str: str) -> bool:
@@ -75,9 +76,7 @@ class PostFile:
 
 class ImageBoardHandler(ABC):
     @abstractmethod
-    def get_posts(
-        self, tag, post_limit=None
-    ) -> dict[str, Post]:
+    def get_posts(self, tag, post_limit=None) -> dict[str, Post]:
         pass
 
     @abstractmethod
@@ -89,5 +88,5 @@ class ImageBoardHandler(ABC):
         pass
 
     @abstractmethod
-    def get_type_tags(self) -> dict[str,str]:
+    def get_type_tags(self) -> dict[str, str]:
         pass

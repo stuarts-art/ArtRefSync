@@ -8,14 +8,10 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.r34_model import R34_Post
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import R34, TABLE
 
+config = get_config()
 logger = logging.getLogger(__name__)
-
-
-def main():
-    pass
 
 
 class R34_Client:
@@ -23,9 +19,10 @@ class R34_Client:
     Class to handle requesting and handling messages from the image board E621
     """
 
-    def __init__(self, api_string=None, only_recent=False, stop_event:Event = None):
+    def __init__(
+        self, api_string=None, only_recent=False, stop_event: Event | None = None
+    ):
         logger.info("R34 Init Start")
-
 
         self.r34_api_string = (
             api_string if api_string else config[TABLE.R34][R34.API_KEY]
@@ -44,9 +41,7 @@ class R34_Client:
     def _build_url_request(self, tag, page, last_id=None) -> str:
         return f"{self.base_url}{self.r34_api_string}&limit={self.limit}&tags={tag}{f'+id:>{last_id}' if last_id else ''}&fields=tag_info&pid={page}&json=1"
 
-    def get_posts(
-        self, tag, post_limit=10000, last_id = None
-    ) -> list[R34_Post]:
+    def get_posts(self, tag, post_limit=10000, last_id=None) -> list[R34_Post]:
         posts = []
         posts_data = []
         if "+limit:" in tag:
@@ -74,7 +69,6 @@ class R34_Client:
         return posts
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    # @config.cache("r34").memoize(expire=config.cache_ttl())
     def get_page(self, tag, page, last_id=None):
         response = self.session.get(
             self._build_url_request(tag, page, last_id), timeout=2.0
@@ -82,7 +76,3 @@ class R34_Client:
         response.raise_for_status()
         page_data = json.loads(response.content)
         return page_data
-
-
-if __name__ == "__main__":
-    main()

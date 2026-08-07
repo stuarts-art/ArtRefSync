@@ -20,5 +20,7 @@ def test_get_artist_folder():
     with EagleDb() as eagle_db:
         assert artists_folder_name in eagle_db
         folder = eagle_db[artists_folder_name]
+        assert folder
+        
         sub_folders = eagle_db.get_sub_folders(artists_folder_name)
         assert sub_folders

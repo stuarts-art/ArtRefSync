@@ -5,6 +5,7 @@ import time
 import tkinter as tk
 from collections import deque
 from threading import Event, Lock
+from typing import ClassVar
 
 import ttkbootstrap as ttk
 from PIL import ImageTk
@@ -12,16 +13,14 @@ from tkinterdnd2 import COPY, DND_FILES
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import get_config
-
-config = get_config()
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
 
+config = get_config()
 logger = logging.getLogger()
-logger.setLevel(config.log_level)
 
 
 class PhotoImageGallery(ttk.Frame):
@@ -125,7 +124,6 @@ class PhotoImageGallery(ttk.Frame):
 
     def update_count(self, row):
         if row:
-            # count = row[0][0]
             e_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, row)
         else:
             e_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, 0)
@@ -141,10 +139,9 @@ class PhotoImageGallery(ttk.Frame):
 
 
 class SimpleFrames:
-    frames: list[SimplePhotoLabel] = []
-    frame_map: dict = {}
+    frames: ClassVar[list[SimplePhotoLabel]] = []
+    frame_map: ClassVar[dict] = {}
 
-    # @staticmethod
 
     def __init__(self, scrolled_text: ttk.ScrolledText, width_var, height_var):
         self.scrolled_text = scrolled_text
@@ -345,7 +342,6 @@ class SimpleFrames:
             posts = []
         if posts == SimplePhotoLabel.post_ids:
             return
-        # e_binder.event_generate(BINDING.ON_POST_COUNT, len(posts) if posts else "0")
 
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts
@@ -414,9 +410,8 @@ class SimpleFrames:
         for text_char in self.text.dump(first, last, window=True):
             name = text_char[1]
             photo: SimplePhotoLabel = self.text.nametowidget(name)
-            if "sel" in self.text.tag_names(photo):
-                if photo.file:
-                    files.append(photo.file.file)
+            if "sel" in self.text.tag_names(photo) and photo.file:
+                files.append(photo.file.file)
         return files
 
     def copy_files_to_clipboard(self, file_paths):

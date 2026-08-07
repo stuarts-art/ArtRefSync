@@ -9,18 +9,20 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.e621_model import E621_Post
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import E621, TABLE
 
+config = get_config()
 logger = logging.getLogger(__name__)
 
 
-def main():
-    pass
-
-
 class E621_Client:
-    def __init__(self, username: str = None, api_key: str = None, only_recent=False, stop_event:Event = None):
+    def __init__(
+        self,
+        username: str | None = None,
+        api_key: str | None = None,
+        only_recent=False,
+        stop_event: Event | None = None,
+    ):
         logger.info("E621 Client Init")
         self.website = "https://e621.net/posts.json"
         self.hostname = "https://e621.net/"
@@ -40,9 +42,8 @@ class E621_Client:
 
         logger.info("E621 Client Complete")
 
-
     def get_posts(
-        self, tags: str = "", post_limit=10000, last_id = None
+        self, tags: str = "", post_limit=10000, last_id=None
     ) -> list[E621_Post]:
 
         posts = []
@@ -59,7 +60,9 @@ class E621_Client:
 
     @config.cache("e621").memoize(expire=config.cache_ttl())
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def get_posts_page(self, tags: list[str] | str = "", page = 1, last_id="", order = "", limit = 320) -> list[E621_Post]:
+    def get_posts_page(
+        self, tags: list[str] | str = "", page=1, last_id="", order="", limit=320
+    ) -> list[E621_Post]:
         logger.info("For Tag %s Getting Page %d", tags, page)
         tag_param = []
         if tags:
@@ -68,14 +71,10 @@ class E621_Client:
             tag_param.append(f"id:>{last_id}")
         if order:
             tag_param.append(f"order:{order}")
-        params = [
-            ("limit", limit),
-            ("tags", "+".join(tag_param)),
-            ("page", page)
-        ]
+        params = [("limit", limit), ("tags", "+".join(tag_param)), ("page", page)]
         response = self.session.get(
             self.website,
-            params= params,
+            params=params,
             headers=self.website_headers,
             timeout=10,
         )
@@ -89,7 +88,3 @@ class E621_Client:
             except DaciteError as e:
                 logger.error(e)
         return posts
-
-
-if __name__ == "__main__":
-    main()

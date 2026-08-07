@@ -12,22 +12,20 @@ from artrefsync.api.danbooru_model import (
     Danbooru_Post,
 )
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import DANBOORU, TABLE
 
+config = get_config()
 logger = logging.getLogger(__name__)
 
-
-def main():
-    client = Danbooru_Client()
-    pass
 
 class Danbooru_Client:
     """
     Class to handle requesting and handling messages from the image board E621
     """
 
-    def __init__(self, username=None, api_key=None, only_recent=False, stop_event:Event = None):
+    def __init__(
+        self, username=None, api_key=None, only_recent=False, stop_event: Event | None = None
+    ):
         logger.info("Creating Danbooru Client")
         self.username = (
             username if username else config[TABLE.DANBOORU][DANBOORU.USERNAME]
@@ -49,7 +47,7 @@ class Danbooru_Client:
         self.retries = 3
         self.last_run = time.time()
 
-    def _build_post_url_request(self, tag, page = 1, last_id = None) -> str:
+    def _build_post_url_request(self, tag, page=1, last_id=None) -> str:
         url_request = f"{self.post_base_url}?tags={tag}{f'+id:>{last_id}' if last_id else ''}&limit={self.limit}&page={page}"
         return url_request
 
@@ -57,9 +55,7 @@ class Danbooru_Client:
         url_request = f"{self.tags_base_url}?search[name_matches]={tag}&search[order]=count&limit={limit}"
         return url_request
 
-    def get_posts(
-        self, tag, post_limit=10000, last_id = None
-    ) -> list[Danbooru_Post]:
+    def get_posts(self, tag, post_limit=10000, last_id=None) -> list[Danbooru_Post]:
         logger.debug("Getting posts for %s", tag)
 
         if "+limit:" in tag:
@@ -106,19 +102,14 @@ class Danbooru_Client:
         return posts
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    # @config.cache("danbooru").memoize(expire=config.cache_ttl())
-    def get_page(self, tag: str, page: int=1, last_id = "", order = ""):
+    def get_page(self, tag: str, page: int = 1, last_id="", order=""):
         tags = [tag]
         if last_id:
             tags.append(f"id:>{last_id}")
         if order:
             tags.append(f"order:{order}")
 
-        params = {
-            "tags": "+".join(tags),
-            "limit": self.limit,
-            "page": page
-        }
+        params = {"tags": "+".join(tags), "limit": self.limit, "page": page}
 
         response = self.session.get(
             self.post_base_url,
@@ -130,7 +121,3 @@ class Danbooru_Client:
         post_data = json.loads(response.content)
         self.last_run = time.time()
         return post_data
-
-
-if __name__ == "__main__":
-    main()

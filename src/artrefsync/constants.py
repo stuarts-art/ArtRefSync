@@ -1,18 +1,18 @@
 from enum import StrEnum, auto
 
 __all__ = [
-    "get_table_mapping",
-    "TABLE",
     "APP",
     "BOARD",
-    "STORE",
-    "R34",
-    "E621",
     "DANBOORU",
+    "E621",
     "EAGLE",
     "LOCAL",
-    "TAGS",
+    "R34",
     "STATS",
+    "STORE",
+    "TABLE",
+    "TAGS",
+    "get_table_mapping",
 ]
 
 

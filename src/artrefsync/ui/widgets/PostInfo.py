@@ -12,8 +12,6 @@ from tkinterdnd2 import COPY, DND_FILES
 
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import get_config
-
-config = get_config()
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
@@ -21,8 +19,8 @@ from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
 
+config = get_config()
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class PostInfoTab(ttk.Frame):

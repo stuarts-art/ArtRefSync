@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import List
 
 import dacite
 
-config = dacite.Config(cast=[int], type_hooks={List[str]: (lambda x: x.split())})
+config = dacite.Config(cast=[int], type_hooks={list[str]: (lambda x: x.split())})
 
 @dataclass
 class TagInfo:
@@ -22,7 +21,7 @@ class R34_Post:
     sample_height: int | None
     preview_url: str
     rating: str
-    tags: List[str]
+    tags: list[str]
     id: int
     width: int | None
     change: int | None
@@ -35,10 +34,10 @@ class R34_Post:
     has_comments: str | None
     preview_width: int | None
     preview_height: int | None
-    tag_info: List[TagInfo] | None
+    tag_info: list[TagInfo] | None
 
 
     @staticmethod
-    def parse_r34_post(post_dict) -> "R34_Post":
+    def parse_r34_post(post_dict) -> R34_Post:
         post = dacite.from_dict(R34_Post, post_dict, config=config)
         return post

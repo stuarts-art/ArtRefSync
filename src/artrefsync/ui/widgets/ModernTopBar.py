@@ -2,12 +2,9 @@ import logging
 
 import ttkbootstrap as ttk
 
-from artrefsync.config import get_config
-config = get_config()
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class ModernTopBar(ttk.Frame):
@@ -79,22 +76,7 @@ class ModernTopBar(ttk.Frame):
         self.mid_right.grid(column=4, row=0, sticky="nes")
 
     def init_menu(self):
-        # self.sidebar_right_toggle = RoundedIcon(
-        #     self.top_right,
-        #     text="◨",
-        #     hover_color=self.colors.dark,
-        #     font=("Helvetica", 12),
-        #     style=self.button_style,
-        #     size=30,
-        # )
-        # self.menu_button = RoundedIcon(
-        #     self.top_left,
-        #     text="≡",
-        #     hover_color=self.colors.dark,
-        #     font=("Helvetica", 12),
-        #     style=self.button_style,
-        #     size=30,
-        # )
+
         self.sidebar_left_toggle = RoundedIcon(
             self.top_left,
             text="◧",
@@ -104,8 +86,7 @@ class ModernTopBar(ttk.Frame):
             size=30,
         )
 
-        # self.menu_button.pack(side="left", padx=5)  # ,   pady=12)
-        self.sidebar_left_toggle.pack(side="left", padx=5)  # ,   pady=12)
+        self.sidebar_left_toggle.pack(side="left", padx=5)
         self.sidebar_left_toggle.bind("<ButtonPress-1>", self.toggle_left_sidebar)
 
     def toggle_left_sidebar(self, event=None):

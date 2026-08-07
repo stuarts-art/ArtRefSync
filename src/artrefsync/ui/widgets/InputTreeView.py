@@ -1,28 +1,13 @@
-from typing import Iterable
+import logging
+from collections.abc import Iterable
+
 import ttkbootstrap as ttk
-from artrefsync.config import get_config
-config = get_config()
-from artrefsync.constants import E621, R34, TABLE
 from sortedcontainers import SortedSet
 
-import logging
+from artrefsync.config import get_config
 
+config = get_config()
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
-
-def main():
-    root = ttk.Window(themename="darkly", size=(1080, 1080))
-    frame_left = ttk.Frame(root)
-    frame_left.pack(side="left", padx=10, pady=10, anchor="n")
-    artists = config[TABLE.E621][E621.ARTISTS]
-    artists2 = config[TABLE.R34][R34.ARTISTS]
-
-    artist_tree = InputTreeviewFrame(frame_left, artists)
-    name_tree = InputTreeviewFrame(frame_left, artists2)
-
-    artist_tree.pack(fill="y", expand=False, anchor="w", side="bottom", padx=5, pady=10)
-    name_tree.pack(fill="y", expand=False, anchor="w", side="bottom")
-    root.mainloop()
 
 
 class InputTreeviewFrame(ttk.Frame):
@@ -78,10 +63,9 @@ class InputTreeviewFrame(ttk.Frame):
         logger.info(event)
 
     def on_tree_lclick(self, event):
-        # rid = self.tree.selection()[0]
         column_id = self.tree.identify_column(event.x)
         row_id = self.tree.identify_row(event.y)
-        logger.debug((f"{column_id} {row_id}"))
+        logger.debug(f"{column_id} {row_id}")
 
         if column_id == "#1":
             self.tree.delete(row_id)
@@ -100,7 +84,6 @@ class InputTreeview(ttk.Treeview):
         self.deleted = []  # Deleted Stack
 
         # Enforce alphabetical order for ease.
-        # self.column("Input", anchor="w")
         self.column("Delete", anchor="e", width=30)
         for val in self.sorted:
             self.insert("", "end", iid=val, text=val, values=("❌"))
@@ -133,15 +116,14 @@ class InputTreeview(ttk.Treeview):
     def focus_on_text(self, text):
         for item in self.selection():
             self.selection_remove(item)
-        # self.selection_clear()
         if not text:
             self.focus(self.sorted[0])
 
         else:
             idx = min(len(self.sorted) - 1, self.sorted.bisect_left(text))
-            focusidx = min(len(self.sorted) - 1, idx + 5)
+            focus_idx = min(len(self.sorted) - 1, idx + 5)
             match = self.sorted[idx]
-            focus_match = self.sorted[focusidx]
+            focus_match = self.sorted[focus_idx]
 
             logger.debug(match)
             self.focus(match)
@@ -150,19 +132,9 @@ class InputTreeview(ttk.Treeview):
             self.see(focus_match)
 
     def focus_on_next(self):
-        # for item in self.selection():
-        #     self.selection_remove(item)
         next = self.next(self.selection()[0])
         logger.debug(next)
-        # self.focus(next)
-        # self.see(next)
 
     def focus_on_prev(self):
         prev = self.prev(self.selection()[0])
         logger.debug(prev)
-        # self.focus(prev)
-        # self.see(prev)
-
-
-if __name__ == "__main__":
-    main()

@@ -1,22 +1,18 @@
 import logging
 import os
-from pathlib import Path
 import time
 import tkinter as tk
+from pathlib import Path
 
 import ttkbootstrap as ttk
 from tkinterdnd2 import TkinterDnD
 
 from artrefsync.constants import APP, BINDING, TABLE
-from artrefsync.db.post_db import PostDb
-from artrefsync.ui.widgets.LoadingBar import LoadingBars
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import e_binder
-from artrefsync.utils.utils import resource_path
 
 logger = logging.getLogger(__name__)
-
 
 def main():
     app = App()
@@ -36,15 +32,15 @@ class App(ttk.Window):
                 application.
         """
         self.project_path = Path(project_path).resolve()
+        self.config_path = self.project_path / "config"
         os.chdir(project_path)
 
         from artrefsync.config import Config, set_config
 
-        config = Config(config_path=resource_path("config"), config_file_name="config")
+        config = Config(config_path=self.config_path, config_file_name="config")
         set_config(config)
         theme = config[TABLE.APP][APP.THEME]
         theme = "bootstrap-dark" if not theme else theme
-        logger.setLevel(config.log_level)
         super().__init__(
             themename=theme,
             size=(1080, 1080),
@@ -58,7 +54,14 @@ class App(ttk.Window):
         self.temp_loading_var.set(10)
         self.update_idletasks()
         self.temp_loading.start()
+        self.after_idle(self.initialize_db)
         self.after(100, self.load_config)
+
+    def initialize_db(self):
+        from artrefsync.db.post_db import PostDb
+
+        with PostDb():
+            logger.info("DBs initialized")
 
     def load_config(self):
         self.focus_set()
@@ -66,8 +69,6 @@ class App(ttk.Window):
         self.last_widget = ""
 
         self.temp_loading_var.set(20)
-        with PostDb() as post_db:
-            logger.info("DBs initialized")
         self.update_idletasks()
 
         self.init_tabs()
@@ -97,6 +98,7 @@ class App(ttk.Window):
                 logger.exception("Exception Raised")
 
     def init_scaffolding(self):
+
         logger.info("Init Scaffolding")
 
         self.rowconfigure(0, weight=1)
@@ -153,6 +155,7 @@ class App(ttk.Window):
         from artrefsync.ui.tabs.ArtistTab import ArtistTab
         from artrefsync.ui.tabs.SortByTab import SortByTab
         from artrefsync.ui.tabs.TagTab import TagTab
+        from artrefsync.ui.widgets.LoadingBar import LoadingBars
         from artrefsync.ui.widgets.PostInfo import PostInfoTab
 
         logger.info("Init tabs")
@@ -173,7 +176,6 @@ class App(ttk.Window):
             widget_name = widget.winfo_name()
 
             if not self.left_tabs.grid_info():
-                # if not self.left_tabs.winfo_viewable():
                 self.left_tabs.grid(row=0, column=1, sticky=tk.NSEW)
                 widget.lift()
                 self.last_widget = widget_name
@@ -244,7 +246,6 @@ class App(ttk.Window):
         else:
             self.config_tab.grid(column=0, row=0, sticky=tk.NSEW)
             self.gallery.grid_forget()
-            # if self.left_bar.grid_info():
             if self.left_tabs.grid_info():
                 self.left_tabs.grid_forget()
 

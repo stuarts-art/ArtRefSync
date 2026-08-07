@@ -1,20 +1,22 @@
-from asyncio import Event
-from collections import defaultdict
-from enum import StrEnum, auto
 import os
 import shutil
-from typing import Iterable
+from asyncio import Event
+from collections import defaultdict
+from collections.abc import Iterable
+from enum import StrEnum, auto
 from pathlib import Path
+from typing import ClassVar
 
 from PIL import Image
-from artrefsync.stores.link_cache import LinkCache
-from artrefsync.stores.storage import ImageStoreHandler
-from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
+
 from artrefsync.boards.board_handler import Post, PostFile
 from artrefsync.config import get_config
-config = get_config()
+from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
+from artrefsync.stores.link_cache import LinkCache
+from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.utils.utils import resource_path, str_dict
 
+config = get_config()
 import logging
 
 logger = logging.getLogger(__name__)
@@ -26,14 +28,13 @@ class DIRS(StrEnum):
     SAMPLE = ".sample"
     THUMBNAIL = ".thumbnail"
 
-def main():
-    pass
-
 
 class PlainLocalStorage(ImageStoreHandler):
     def __init__(self):
         logger.info("Plain File Store Handler Init Start")
-        self.artist_base_folder = Path(resource_path(f"{config[TABLE.LOCAL][LOCAL.ARTIST_DIR]}"))
+        self.artist_base_folder = Path(
+            resource_path(f"{config[TABLE.LOCAL][LOCAL.ARTIST_DIR]}")
+        )
         self.dir_base_map = {}
         self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = str_dict(str_dict)
         self.dir_board_folder_map = str_dict(str_dict)
@@ -49,19 +50,18 @@ class PlainLocalStorage(ImageStoreHandler):
             dir_path = self.dir_base_map[dir]
             os.makedirs(dir_path, exist_ok=True)
             for board in BOARD:
-                board_path =  dir_path / board.value
+                board_path = dir_path / board.value
                 os.makedirs(board_path, exist_ok=True)
                 self._dir_map[dir][board] = {}
-                # self._dir_map[dir][board][board] = board_path
                 self.dir_board_folder_map[dir][board] = board_path
 
                 for artist_path in board_path.iterdir():
                     if artist_path.is_file():
                         continue
                     update_time = os.path.getmtime(artist_path)
-                    artisttxt = artist_path /  "artist.txt"
-                    if os.path.exists(artisttxt):
-                        with open(artisttxt, 'rt') as f:
+                    artist_txt = artist_path / "artist.txt"
+                    if os.path.exists(artist_txt):
+                        with open(artist_txt, "rt") as f:
                             artist = f.readline()
                     else:
                         artist = artist_path.name
@@ -76,20 +76,15 @@ class PlainLocalStorage(ImageStoreHandler):
                         self.folder_id_file_map[artist_path][pid] = file
         logger.info("Plain File Store Handler Init Complete")
 
-
     def get_artist_posts(self, dir, board, artist) -> dict[str, str]:
-        artist_dir:Path = self.get_dir_board_artist_folder(dir, board, artist)
+        artist_dir: Path = self.get_dir_board_artist_folder(dir, board, artist)
         update_time = os.path.getmtime(artist_dir)
-        last_updated = (
-            self.update_map[artist_dir] if artist_dir in self.update_map else None
-        )
+        last_updated = self.update_map.get(artist_dir, None)
 
-        if artist_dir in self.update_map:
-            if update_time == last_updated:
-                return self.folder_id_file_map[artist_dir]
+        if artist_dir in self.update_map and update_time == last_updated:
+            return self.folder_id_file_map[artist_dir]
 
         for file in artist_dir.resolve().iterdir():
-        # for file in artist_dir.iterdir():
             pid = file.name.rsplit(".", maxsplit=1)[0].split("-")[0]
             if not pid or pid == "artist":
                 continue
@@ -97,7 +92,7 @@ class PlainLocalStorage(ImageStoreHandler):
         self.update_map[artist_dir] = update_time
         return self.folder_id_file_map[artist_dir]
 
-    def get_dir_board_folder(self, dir:DIRS, board:BOARD):
+    def get_dir_board_folder(self, dir: DIRS, board: BOARD):
 
         if dir not in self.dir_base_map:
             if dir is DIRS.FILE:
@@ -112,7 +107,6 @@ class PlainLocalStorage(ImageStoreHandler):
             self.dir_board_folder_map[dir][board] = board_folder
 
         return self.dir_board_folder_map[dir][board]
-    
 
     def get_dir_board_artist_folder(self, dir: DIRS, board: BOARD, artist):
         if artist not in self._dir_map[dir][board]:
@@ -122,12 +116,11 @@ class PlainLocalStorage(ImageStoreHandler):
             os.makedirs(artist_dir, exist_ok=True)
             if mapped_name != artist:
                 artist_txt = artist_dir / "artist.txt"
-                # artist_txt = os.path.join(artist_dir, "artist.txt")
-                with open(artist_txt, 'w+t') as f:
+                with open(artist_txt, "w+t") as f:
                     f.write(artist)
             self._dir_map[dir][board][artist] = artist_dir
         return self._dir_map[dir][board][artist]
-    
+
     def get_mapped_artist_name(self, artist_name: str):
         if artist_name not in self._artist_name_map:
             mapped_name = artist_name
@@ -139,7 +132,6 @@ class PlainLocalStorage(ImageStoreHandler):
 
     def get_store(self) -> STORE:
         return STORE.LOCAL
-
 
     def create_board_and_artist_folders(self, board: BOARD, artists: Iterable[str]):
         logger.debug("Creating Board for %s, and artists: %s", board, artists)
@@ -179,8 +171,7 @@ class PlainLocalStorage(ImageStoreHandler):
         logger.info("Returning %d posts for %s, %s", len(post_files), board, artist)
         return post_files
 
-
-    def update_thumbnails(self, board: BOARD, artist:str):
+    def update_thumbnails(self, board: BOARD, artist: str):
         logger.debug("Updating thumbnails for %s", artist)
         thumb_width = float(config[TABLE.APP][APP.THUMBNAIL_WIDTH])
         thumb_height = float(config[TABLE.APP][APP.THUMBNAIL_HEIGHT])
@@ -201,7 +192,7 @@ class PlainLocalStorage(ImageStoreHandler):
                 continue
 
             file_name = f"{post.id}-thumbnail.{post.ext}"
-            file_path = thumb_dir /  file_name
+            file_path = thumb_dir / file_name
             logger.debug("Creating thumbnail for %s. path name: %s", pid, file_path)
 
             if post.ext == "mp4" or post.ext == "webm":
@@ -211,9 +202,9 @@ class PlainLocalStorage(ImageStoreHandler):
                 img.thumbnail(size=(thumb_width, thumb_height))
                 img.save(file_path)
         logger.debug("Updating thumbnails FINISHED for %s", artist)
-    
+
     def save_post(
-        self, post: Post, link_cache: LinkCache, event: Event = None
+        self, post: Post, link_cache: LinkCache, event: Event | None = None
     ) -> Post | None:
         if event and event.is_set():
             return
@@ -234,16 +225,15 @@ class PlainLocalStorage(ImageStoreHandler):
             preview=saved_posts.get(DIRS.PREVIEW, ""),
             thumbnail=saved_posts.get(DIRS.THUMBNAIL, ""),
             sample=saved_posts.get(DIRS.SAMPLE, ""),
-            file=saved_posts.get(DIRS.FILE, "")
+            file=saved_posts.get(DIRS.FILE, ""),
         )
         return post_file
-
 
     def save_link(self, post: Post, link_cache, dir=DIRS) -> bool:
         pid = post.id
         link = ""
         suffix = ""
-        match (dir):
+        match dir:
             case DIRS.FILE:
                 link = post.file_link
             case DIRS.SAMPLE:
@@ -261,7 +251,7 @@ class PlainLocalStorage(ImageStoreHandler):
         )
         link_ext = link.split(".")[-1]
         file_name = f"{pid}{suffix}.{link_ext}"
-        file_path = file_dir /  file_name
+        file_path = file_dir / file_name
 
         if os.path.exists(file_path):
             logger.debug(
@@ -273,7 +263,12 @@ class PlainLocalStorage(ImageStoreHandler):
         self.folder_id_file_map[file_dir][post.id] = file_path
         return file_path
 
-    get_thumbnail_order = [DIRS.THUMBNAIL, DIRS.PREVIEW, DIRS.SAMPLE, DIRS.FILE]
+    get_thumbnail_order: ClassVar[list[DIRS]] = [
+        DIRS.THUMBNAIL,
+        DIRS.PREVIEW,
+        DIRS.SAMPLE,
+        DIRS.FILE,
+    ]
 
     def get_thumbnail(self, post):
         for dir in self.get_thumbnail_order:
@@ -287,9 +282,3 @@ class PlainLocalStorage(ImageStoreHandler):
             "Update post called for  %s but this method is not implemented yet.",
             post.id,
         )
-        # No Metadata is saved...right?
-        pass
-
-
-if __name__ == "__main__":
-    main()

@@ -28,7 +28,12 @@ class RoundedIcon(ttk.Label):
 
     @staticmethod
     def from_text(
-        root, text, normal_color="#FFFFFF00", hover_color="#595253", command=None, data = None
+        root,
+        text,
+        normal_color="#FFFFFF00",
+        hover_color="#595253",
+        command=None,
+        data=None,
     ):
 
         if not RoundedIcon.font:
@@ -40,13 +45,12 @@ class RoundedIcon(ttk.Label):
             text,
             size=(icon_width, 25),
             normal_color=RoundedIcon.get_color().bg,
-            # hover_color=hover_color,
             hover_color=RoundedIcon.get_color().selectbg,
             command=command,
-            data = data
+            data=data,
         )
 
-    def update_text(self, text, data = None):
+    def update_text(self, text, data=None):
         self.text = text
         width = RoundedIcon.font.measure(text)
         self.width = (width // 20 + 1) * 20
@@ -67,7 +71,7 @@ class RoundedIcon(ttk.Label):
         pack_kwargs={},
         grid_kwargs={},
         command=None,
-        data = None,
+        data=None,
         **kwargs,
     ):
         logger.info('Round Icon init for text "%s"', text)

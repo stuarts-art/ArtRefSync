@@ -6,22 +6,19 @@ from threading import Event
 from artrefsync.api.danbooru_client import Danbooru_Client
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import BOARD, DANBOORU
 from artrefsync.db.post_db import PostDb
 
+config = get_config()
 logger = logging.getLogger(__name__)
-
-
-def main():
-    pass
 
 
 class DanbooruHandler(ImageBoardHandler):
     """
     Class to handle requesting and handling messages from the image board E621
     """
-    def __init__(self, only_recent=False, stop_event:Event = None):
+
+    def __init__(self, only_recent=False, stop_event: Event | None = None):
         self.only_recent = only_recent
         logger.info("Initialize Danbooru Handler")
         self.type_tags = defaultdict(set)
@@ -38,7 +35,7 @@ class DanbooruHandler(ImageBoardHandler):
             self.danbooru_username,
             api_key=self.danbooru_api_key,
             only_recent=self.only_recent,
-            stop_event=self.stop_event
+            stop_event=self.stop_event,
         )
         self.board = BOARD.DANBOORU
 
@@ -51,19 +48,21 @@ class DanbooruHandler(ImageBoardHandler):
     def get_board(self) -> BOARD:
         return BOARD.DANBOORU
 
-    # @disk_cache
-    def get_posts(
-        self, tag, post_limit=None
-    ) -> dict[str, Post]:
+    def get_posts(self, tag, post_limit=None) -> dict[str, Post]:
         posts = {}
 
         last_id = None
         if self.only_recent:
             with PostDb() as post_db:
-                row = post_db.posts.get(board = self.get_board(), artist_name = tag, select_fields=["ext_id", "MAX(create_timestamp)"], as_tuple=True)
+                row = post_db.posts.get(
+                    board=self.get_board(),
+                    artist_name=tag,
+                    select_fields=["ext_id", "MAX(create_timestamp)"],
+                    as_tuple=True,
+                )
                 if row:
                     last_id = row[0]
-        danbooru_posts = self.client.get_posts(tag, post_limit,last_id=last_id)
+        danbooru_posts = self.client.get_posts(tag, post_limit, last_id=last_id)
         if self.stop_event and self.stop_event.is_set():
             return None
         if " " in tag:
@@ -106,7 +105,6 @@ class DanbooruHandler(ImageBoardHandler):
             if is_black_listed:
                 continue
 
-
             self.type_tags["metadata"].update(d_post.tag_string_meta)
             self.type_tags["artist"].update(d_post.tag_string_artist)
             self.type_tags["character"].update(d_post.tag_string_character)
@@ -144,7 +142,3 @@ class DanbooruHandler(ImageBoardHandler):
             )
             posts[post_id] = post
         return posts
-
-
-if __name__ == "__main__":
-    main()

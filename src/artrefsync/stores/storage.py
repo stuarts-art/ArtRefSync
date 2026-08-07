@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from asyncio import Event
+
 from artrefsync.boards.board_handler import Post, PostFile
-from artrefsync.stores.link_cache import LinkCache
 from artrefsync.constants import BOARD, STORE
+from artrefsync.stores.link_cache import LinkCache
 
 
 class ImageStoreHandler(ABC):
@@ -23,7 +24,7 @@ class ImageStoreHandler(ABC):
         pass
 
     @abstractmethod
-    def save_post(self, post: Post, link_cache: LinkCache, event: Event = None):
+    def save_post(self, post: Post, link_cache: LinkCache, event: Event | None = None):
         pass
 
     @abstractmethod

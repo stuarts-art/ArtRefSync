@@ -8,15 +8,11 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from artrefsync.api.eagle_model import EagleFolder, EagleItem, EagleLibrary
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import EAGLE, STORE
-from requests_ratelimiter import LimiterSession
 
+config = get_config()
 logger = logging.getLogger(__name__)
 
-
-def main():
-    pass
 
 
 class EagleClient:
@@ -24,7 +20,6 @@ class EagleClient:
         eagle_url = config[STORE.EAGLE][EAGLE.ENDPOINT].strip()
         self.eagle_url = eagle_url if eagle_url else "http://localhost:41595/api"
         self.lock = threading.Lock()
-        # self.connection = LimiterSession(per_second=100)
         with requests.Session() as session:
             self.folder = self._Folder(self.eagle_url, self.lock, session)
             self.item = self._Item(self.eagle_url, self.lock, session)
@@ -40,9 +35,8 @@ class EagleClient:
         def folder_url(self, folder_path) -> str:
             return f"{self.eagle_url}/folder/{folder_path}"
 
-        # @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def create(
-            self, folderName: str, parent: str = None
+            self, folderName: str, parent: str | None = None
         ) -> EagleFolder.CreatedFolder:
             data = {
                 k: v
@@ -60,13 +54,12 @@ class EagleClient:
             )
             return created_file
 
-        # @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def update(
             self,
             folderId: str,
-            newName: str = None,
-            newDescription: str = None,
-            newColor: str = None,
+            newName: str | None = None,
+            newDescription: str | None = None,
+            newColor: str | None = None,
         ) -> EagleFolder.UpdatedFolder:
             data = {
                 k: v
@@ -90,7 +83,6 @@ class EagleClient:
             updated_item = dacite.from_dict(EagleFolder.UpdatedFolder, data)
             return updated_item
 
-        # @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def list(self) -> list[EagleFolder.ListFolder]:
             with self.lock:
                 response = self.session.get(
@@ -160,7 +152,6 @@ class EagleClient:
         def item_url(self, item_path) -> str:
             return f"{self._item_url}/{item_path}"
 
-        # @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def thumbnail(self, pid) -> EagleItem.UpdatedItem:
             with self.lock:
                 response = self.session.get(
@@ -180,14 +171,13 @@ class EagleClient:
             info = dacite.from_dict(EagleItem.UpdatedItem, data)
             return info
 
-        # @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
         def update(
             self,
             pid: str,
-            tags: list[str] = None,
-            annotation: str = None,
-            url: str = None,
-            star: int = None,
+            tags: list[str] | None = None,
+            annotation: str | None= None,
+            url: str | None = None,
+            star: int | None = None,
         ) -> EagleItem.UpdatedItem:
             data = {
                 k: v
@@ -216,10 +206,10 @@ class EagleClient:
             self,
             path: str,
             name: str,
-            website: str = None,
-            annotation: str = None,
-            tags: list[str] = None,
-            folder_id: str = None,
+            website: str | None = None,
+            annotation: str | None = None,
+            tags: list[str] | None = None,
+            folder_id: str | None = None,
         ) -> requests.Response:
             data = {
                 k: v
@@ -227,7 +217,7 @@ class EagleClient:
                     "path": path,
                     "name": name,
                     "website": website,
-                    "annottion": annotation,
+                    "annotation": annotation,
                     "tags": tags,
                     "folderId": folder_id,
                 }.items()
@@ -287,6 +277,3 @@ class EagleClient:
             list_items = [dacite.from_dict(EagleItem.Item, item) for item in data]
             return list_items
 
-
-if __name__ == "__main__":
-    main()

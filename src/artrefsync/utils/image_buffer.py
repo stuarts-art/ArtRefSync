@@ -2,7 +2,6 @@ import logging
 import time
 import tkinter as tk
 from collections import OrderedDict, deque
-from queue import Empty
 from threading import Lock
 
 import cv2
@@ -11,13 +10,12 @@ from PIL import ImageTk
 from tkinterdnd2 import DND_FILES, TkinterDnD
 
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.utils.image_utils import ImageUtils
-from artrefsync.utils.TkThreadCaller import thread_caller
 from artrefsync.utils.IntegerVar import IntegerVar
+from artrefsync.utils.TkThreadCaller import thread_caller
 
+config = get_config()
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 class ImageCache: # WIP Video/Gif Viewer
     def __init__(self, max_size=50):
@@ -54,10 +52,7 @@ class ImageCache: # WIP Video/Gif Viewer
     def clear(self):
         self.deque.clear()
         while self.cache:
-            k, v = self.cache.popitem()
-
-    #         v.close()
-
+            self.cache.popitem()
 
 class ImageBuffer:
     def __init__(
@@ -186,7 +181,7 @@ class ImageBuffer:
 
     def get(self, index):
         if index < 0:
-            return None
+            return
         if index < len(self.frames):
             return
 
@@ -280,7 +275,7 @@ class ImagePlayer:
     def handle_drop(self, e: tk.Event):
         file = e.data
         if file == self.path:
-            return None
+            return
         self.playing = False
         self.index.set(0)
         self.label.focus()

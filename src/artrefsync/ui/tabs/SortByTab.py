@@ -1,22 +1,17 @@
+import logging
 import tkinter as tk
-import ttkbootstrap as ttk
-
-
-from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.TkThreadCaller import thread_caller
-from artrefsync.utils.image_utils import ImageUtils
-from artrefsync.config import get_config
-config = get_config()
-
-from artrefsync.constants import BINDING
-
-from artrefsync.utils.EventManager import e_binder
 from itertools import cycle
 
-import logging
+import ttkbootstrap as ttk
 
+from artrefsync.config import get_config
+from artrefsync.constants import BINDING
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
+from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.image_utils import ImageUtils
+
+config = get_config()
 logger = logging.getLogger()
-logger.setLevel(config.log_level)
 
 
 

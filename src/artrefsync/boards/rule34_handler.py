@@ -7,15 +7,12 @@ from artrefsync.api.r34_client import R34_Client
 from artrefsync.api.r34_model import R34_Post
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
 from artrefsync.config import get_config
+
 config = get_config()
 from artrefsync.constants import BOARD, R34
 from artrefsync.db.post_db import PostDb
 
-logger = logging.getLogger(__name__)                                                                                    
-
-
-def main():
-    handler = R34Handler()
+logger = logging.getLogger(__name__)
 
 
 class R34Handler(ImageBoardHandler):
@@ -23,7 +20,7 @@ class R34Handler(ImageBoardHandler):
     Class to handle requesting and handling messages from the image board R34
     """
 
-    def __init__(self, only_recent=False, stop_event:Event=None):
+    def __init__(self, only_recent=False, stop_event: Event = None):
         self.only_recent = only_recent
         self.stop_event = stop_event
         logger.info("Initialize R34 Handler")
@@ -35,7 +32,9 @@ class R34Handler(ImageBoardHandler):
         self.black_list = config[BOARD.R34][R34.BLACK_LIST]
         self.artist_list = list(set(config[BOARD.R34][R34.ARTISTS]))
         self.client = R34_Client(
-            api_string=self.r34_api_string, only_recent=self.only_recent, stop_event=self.stop_event
+            api_string=self.r34_api_string,
+            only_recent=self.only_recent,
+            stop_event=self.stop_event,
         )
         self.board = BOARD.R34
         self.type_tags = defaultdict(set)
@@ -49,19 +48,24 @@ class R34Handler(ImageBoardHandler):
     def get_board(self) -> BOARD:
         return BOARD.R34
 
-    def get_posts(
-        self, tag, post_limit=None
-    ) -> dict[str, Post]:
+    def get_posts(self, tag, post_limit=None) -> dict[str, Post]:
         posts = {}
 
         last_id = None
         if self.only_recent:
             with PostDb() as post_db:
-                row = post_db.posts.get(board = self.get_board(), artist_name = tag, select_fields=["ext_id", "MAX(create_timestamp)"], as_tuple=True)
+                row = post_db.posts.get(
+                    board=self.get_board(),
+                    artist_name=tag,
+                    select_fields=["ext_id", "MAX(create_timestamp)"],
+                    as_tuple=True,
+                )
                 if row:
                     last_id = row[0]
 
-        r34_posts: list[R34_Post] = self.client.get_posts(tag, post_limit, last_id = last_id)
+        r34_posts: list[R34_Post] = self.client.get_posts(
+            tag, post_limit, last_id=last_id
+        )
         if self.stop_event and self.stop_event.is_set():
             return None
 
@@ -75,11 +79,7 @@ class R34Handler(ImageBoardHandler):
             post_id = Post.make_storage_id(rpost.id, self.get_board())
             ext = rpost.file_url.split(".")[-1]
 
-            tags = rpost.tags + [
-                tag,
-                BOARD.R34.value,
-                ext
-            ]
+            tags = rpost.tags + [tag, BOARD.R34.value, ext]
             rating = f"rating_{rpost.rating}"
             tags.append(rating)
             for black_listed in self.black_list:
@@ -98,9 +98,6 @@ class R34Handler(ImageBoardHandler):
             self.type_tags["rating"].add(str(rating))
             self.type_tags["format"].add(str(ext))
             self.type_tags["board"].add(str(self.get_board()))
-            # self.type_tags["format"].add(ext)
-
-            
 
             try:
                 created_datetime = datetime.strptime(
@@ -144,10 +141,5 @@ class R34Handler(ImageBoardHandler):
             )
             posts[post_id] = post
 
-
         logger.info("Returning %d posts for artist %s", len(posts), tag)
         return posts
-
-
-if __name__ == "__main__":
-    main()

@@ -7,28 +7,23 @@ from artrefsync.api.e621_client import E621_Client
 from artrefsync.api.e621_model import E621_Post
 from artrefsync.boards.board_handler import ImageBoardHandler, Post
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import BOARD, E621
 from artrefsync.db.post_db import PostDb
 
+config = get_config()
 logger = logging.getLogger(__name__)
-
-
-def main():
-    pass
 
 
 class E621Handler(ImageBoardHandler):
     """Class to handle messages from the image board E621"""
 
-    def __init__(self, only_recent=False, stop_event:Event = None):
+    def __init__(self, only_recent=False, stop_event: Event | None = None):
         logger.info("Initialize E621 Handler")
         self.only_recent = only_recent
         self.type_tags = defaultdict(set)
-        self.stop_event = stop_event
+        self.stop_event: Event | None = stop_event
         self.reload()
         config.subscribe_reload(self.reload)
-
 
     def reload(self):
         username = config[BOARD.E621][E621.USERNAME]
@@ -55,20 +50,24 @@ class E621Handler(ImageBoardHandler):
     def get_artist_list(self):
         return self.artist_list
 
-    def get_posts(
-        self, tag, post_limit=10000
-    ) -> dict[str, Post]:
+    def get_posts(self, tag, post_limit=10000) -> dict[str, Post]:
         post_dict = {}
         last_id = None
 
         if self.only_recent:
             with PostDb() as post_db:
-                row = post_db.posts.get(board = self.get_board(), artist_name = tag, select_fields=["ext_id", "MAX(create_timestamp)"], as_tuple=True)
+                row = post_db.posts.get(
+                    board=self.get_board(),
+                    artist_name=tag,
+                    select_fields=["ext_id", "MAX(create_timestamp)"],
+                    as_tuple=True,
+                )
                 if row:
                     last_id = row[0]
-        
 
-        e621_posts: list[E621_Post] = self.client.get_posts(tag, post_limit, last_id=last_id)
+        e621_posts: list[E621_Post] = self.client.get_posts(
+            tag, post_limit, last_id=last_id
+        )
         if self.stop_event and self.stop_event.is_set():
             return None
         if " " in tag:
@@ -85,7 +84,8 @@ class E621Handler(ImageBoardHandler):
             rating = f"rating_{e_post.rating.value}"
             pools = [f"pool_e621_{pool_id}" for pool_id in e_post.pools]
             ext = e_post.file.ext
-            tags = ( []
+            tags = (
+                []
                 + general
                 + species
                 + artists
@@ -174,7 +174,3 @@ class E621Handler(ImageBoardHandler):
             )
             post_dict[pid] = post
         return post_dict
-
-
-if __name__ == "__main__":
-    main()

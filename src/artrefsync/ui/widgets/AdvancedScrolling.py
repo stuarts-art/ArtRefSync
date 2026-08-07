@@ -10,13 +10,12 @@ import ttkbootstrap as ttk
 from PIL import Image, ImageTk
 
 from artrefsync.config import get_config
-config = get_config()
 from artrefsync.constants import BINDING
 from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.image_utils import ImageUtils
 
+config = get_config()
 logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level)
 
 
 class AutoScrollbar(ttk.Scrollbar):
@@ -111,7 +110,7 @@ class CanvasImage:
         self.path = path  # path to the image, should be public for outer classes
         if self.__image:
             self.__image.close()
-            map(lambda i: i.close, self.__pyramid)  # close all pyramid images
+            (i.close for i in self.__pyramid)  # close all pyramid images
             # self.canvas.delete("all")
             # self.canvas.update()
 
@@ -447,7 +446,7 @@ class CanvasImage:
     def destroy(self):
         """ImageFrame destructor"""
         self.__image.close()
-        map(lambda i: i.close, self.__pyramid)  # close all pyramid images
+        (i.close for i in self.__pyramid)  # close all pyramid images
         del self.__pyramid[:]  # delete pyramid list
         del self.__pyramid  # delete pyramid variable
         self.canvas.destroy()

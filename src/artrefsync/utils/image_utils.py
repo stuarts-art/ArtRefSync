@@ -1,8 +1,9 @@
 import functools
 import logging
 import os
-import threading
 from pathlib import Path
+from threading import Lock
+from typing import ClassVar
 
 import cv2
 import ttkbootstrap as ttk
@@ -12,17 +13,13 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from artrefsync.config import get_config
 
 config = get_config()
-
 logger = logging.getLogger(__name__)
 
 
 class ImageUtils:
-    cache = {}
-
-    _lock = threading.Lock()
-    _photolock = threading.Lock()
-    _thumblock = threading.Lock()
-    photo_failed_set = set()
+    _lock: ClassVar[Lock] = Lock()
+    _photo_lock: ClassVar[Lock] = Lock()
+    _thumb_lock: ClassVar[Lock] = Lock()
 
     def blank():
         return ttk.PhotoImage()
@@ -33,7 +30,6 @@ class ImageUtils:
     def getPilImage(cls, file: str, height=None, width=None) -> Image.Image:
         logger.debug("Cache-Miss, Getting Image")
         if not os.path.exists(file):
-            # logger.error("Cannot open path: %s", file)
             raise FileNotFoundError
         with cls._lock:
             image = Image.open(file)
@@ -48,7 +44,7 @@ class ImageUtils:
 
         try:
             image = ImageUtils.getPilImage(file)
-            with ImageUtils._thumblock:
+            with ImageUtils._thumb_lock:
                 if not upscale or image.height > size[1]:
                     thumbnail = image.copy()
                     thumbnail.thumbnail(size=size)
@@ -69,7 +65,7 @@ class ImageUtils:
         if radius:
             size = (image.width, image.height)
             image.putalpha(ImageUtils.getrounded_rect(size=size, radius=radius))
-        with ImageUtils._photolock:
+        with ImageUtils._photo_lock:
             return ImageTk.PhotoImage(image=image)
 
     @staticmethod

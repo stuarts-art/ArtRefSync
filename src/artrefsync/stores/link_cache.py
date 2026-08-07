@@ -3,17 +3,20 @@ from tempfile import (
     NamedTemporaryFile,
     TemporaryDirectory,
 )
+from typing import ClassVar
 
-from artrefsync.config import get_config
-config = get_config()
-from artrefsync.utils.utils import singleton
 from requests_ratelimiter import LimiterSession
 
+from artrefsync.config import get_config
+from artrefsync.utils.utils import singleton
+
+config = get_config()
 logger = logging.getLogger(__name__)
+
 
 @singleton
 class LinkCache:
-    website_headers = {"User-Agent": "ArtRefSync/1.0"}
+    website_headers: ClassVar[dict[str, str]] = {"User-Agent": "ArtRefSync/1.0"}
     limiter = LimiterSession(per_second=10)
 
     def __init__(self):
@@ -72,5 +75,6 @@ class LinkCache:
         logger.info("Cleaning up Link Cache. Removing temp dir: %s.", self.temp_dir)
         self.temp_dir.cleanup()
         logger.info("Link Cache Closed.")
+
 
 link_cache = LinkCache()
