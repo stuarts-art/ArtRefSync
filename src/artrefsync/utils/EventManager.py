@@ -23,6 +23,15 @@ class EventManager:
         self.sequence_bindings: dict[str, list[_EventBinding]] = {}
         self.map = {}
 
+    def __setitem__(self, key, value):
+        self.map[str(key)] = value
+
+    def __contains__(self, key):
+        return str(key) in self.map
+
+    def __getitem__(self, key):
+        return self.map[str(key)]
+
     def bind(self, sequence: str, func: callable, root: tkinter.Widget):
         sequence = str(sequence)
         logger.info("Adding Binding %s for func %s", sequence, callable.__name__)
@@ -48,14 +57,6 @@ class EventManager:
                 self.sequence_bindings.keys(),
             )
 
-    def __setitem__(self, key, value):
-        self.map[str(key)] = value
-
-    def __contains__(self, key):
-        return str(key) in self.map
-
-    def __getitem__(self, key):
-        return self.map[str(key)]
 
     def get_or_default(self, key, default):
         if str(key) in self.map:

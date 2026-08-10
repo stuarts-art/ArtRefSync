@@ -28,6 +28,7 @@ class BINDING(StrEnum):
     BOARD_SET = auto()
     SORT_BY = auto()
     SORT_DIR = auto()
+    SYNC_LOCK = auto()
 
     ON_LOAD_LEFT_SET = auto()
     ON_LOAD_MID_SET = auto()
@@ -42,6 +43,8 @@ class BINDING(StrEnum):
     ON_IMAGE_VISIBILITY = auto()
     ON_IMAGE_DOUBLE_CLICK = auto()
     ON_ARTIST_SELECT = auto()
+    ON_ARTIST_SYNC = auto()
+    ON_ARTIST_SYNC_DONE = auto()
     ON_ARTIST_CLEAR = auto()
     ON_TAG_SELECT = auto()
     ON_FILTER_UPDATE = auto()

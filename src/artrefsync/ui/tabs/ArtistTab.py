@@ -28,6 +28,8 @@ class ArtistTab(ttk.Frame):
             self.ui_frame, image=None, compound="left"
         )
         self.tree = ttk.Treeview(self, columns=("Name", "Count"), show="tree", *kwargs)
+        self.last_artist_right_clicked = ""
+        self.artist_right_menu = ttk.Menu(self, tearoff=False)
         self.reload_count = 0
         self.init_structure()
         self.init_bindings()
@@ -50,8 +52,10 @@ class ArtistTab(ttk.Frame):
     def init_bindings(self):
         self.entry.bind("<KeyRelease>", self.on_key_release)
 
-        self.tree.bind("<Button-1>", self.query_by_artist)
-        self.tree.bind("<Button-2>", self.on_middle_tag)
+        self.tree.bind("<Button-1>", self.on_artist_left)
+        self.tree.bind("<Button-2>", self.on_artist_middle)
+        self.tree.bind("<Button-3>", self.on_artist_right)
+
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
         self.tree.bind("<Key>", self.__keystroke)
         self.board_menu_button.bind("<Return>", self.open_menu)
@@ -64,7 +68,7 @@ class ArtistTab(ttk.Frame):
         shift_pressed = (state & 0x1) != 0
 
         if keysym in ["Return", "grave"]:
-            self.query_by_artist(event)
+            self.on_artist_left(event)
         elif keysym == "w":
             self.tree.event_generate("<Up>")
         elif keysym == "a":
@@ -91,10 +95,63 @@ class ArtistTab(ttk.Frame):
         y = self.board_menu_button.winfo_rooty() + self.board_menu_button.winfo_height()
         self.board_menu.post(x, y)
 
-    def on_middle_tag(self, e: tk.Event):
+    def on_artist_middle(self, e: tk.Event):
         tag = self.tree.identify_row(e.y)
         logger.info("Middle click recieved for %s", tag)
         e_binder.event_generate(BINDING.ON_ARTIST_SELECT, tag, True)
+
+    def on_artist_right(self, e: tk.Event):
+        if self.tree.identify_column(e.x) != "#0":
+            return
+        if self.tree.identify_element(e.x, e.y) == "Treeitem.indicator":
+            return
+
+        self.tree.event_generate("<Button-1>", x=e.x, y=e.y)
+        tag = self.tree.identify_row(e.y)
+        e.num = 1
+        self.on_artist_left(e)
+        e.num = 3
+        if parent := self.tree.parent(tag):
+            menu = self.get_artist_menu(tag, parent)
+        else:
+            menu = self.get_board_menu(tag)
+        try:
+            x, y, width, height = self.tree.bbox(tag)
+            menu_x = e.widget.winfo_rootx() + x
+            menu_y = e.widget.winfo_rooty() + y + height
+            menu.tk_popup(menu_x, menu_y)
+        finally:
+            menu.grab_release()
+
+    def get_board_menu(self, board: BOARD):
+        logger.info("Updating artist right click menu for board %s", board)
+        menu = self.artist_right_menu
+        menu.delete(0, tk.END)
+        menu.add_command(label="Open config.", compound="left", state="disabled")
+        menu.add_command(label="Add artist", compound="left", state="disabled")
+        menu.add_separator()
+
+        menu.add_command(label="Sync all posts", compound="left", state="disabled")
+        menu.add_command(label="Sync all recent posts", compound="left", state="disabled")
+        return menu
+
+    def get_artist_menu(self, artist, board):
+        menu = self.artist_right_menu
+        menu.delete(0, tk.END)
+        prefix = "    "
+        menu.add_command(
+            label=prefix + "Sync all posts",
+            command=lambda: e_binder.event_generate(BINDING.ON_ARTIST_SYNC, artist, board, False),
+        )
+        menu.add_command(
+            label=prefix + "Sync recent posts",
+            command=lambda: e_binder.event_generate(BINDING.ON_ARTIST_SYNC, artist, board, True)
+        )
+        menu.add_command(
+            label=prefix + "Delete artist",
+            state="disabled"
+        )
+        return menu
 
     def load_config(self):
         if self.tree.get_children():
@@ -180,7 +237,7 @@ class ArtistTab(ttk.Frame):
                     self.tree.move(artist, board, artist_index)
                 artist_index += 1
 
-    def query_by_artist(self, event: tk.Event):
+    def on_artist_left(self, event: tk.Event):
         event_type = str(event.type)
         artist = ""
 

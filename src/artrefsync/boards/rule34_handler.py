@@ -5,7 +5,8 @@ from threading import Event
 
 from artrefsync.api.r34_client import R34_Client
 from artrefsync.api.r34_model import R34_Post
-from artrefsync.boards.board_handler import ImageBoardHandler, Post
+from artrefsync.boards.board_handler import ImageBoardHandler
+from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 
 config = get_config()

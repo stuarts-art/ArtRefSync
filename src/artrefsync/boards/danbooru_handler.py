@@ -4,7 +4,8 @@ from datetime import datetime
 from threading import Event
 
 from artrefsync.api.danbooru_client import Danbooru_Client
-from artrefsync.boards.board_handler import ImageBoardHandler, Post
+from artrefsync.boards.board_handler import ImageBoardHandler
+from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 from artrefsync.constants import BOARD, DANBOORU
 from artrefsync.db.post_db import PostDb

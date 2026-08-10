@@ -6,8 +6,9 @@ import os
 import shutil
 import sys
 from datetime import UTC, datetime
-from functools import lru_cache
+from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from diskcache import Cache
 from simple_toml_configurator import Configuration
@@ -24,19 +25,58 @@ from artrefsync.constants import (
     STORE,
     TABLE,
 )
-from artrefsync.utils.utils import resource_path
+from artrefsync.utils.utils import censor_text, resource_path
 
+logger = logging.getLogger(__name__)
 
-@lru_cache
-def censor_text(text: str):
-    repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
-    repl_split = "_".join(
-        [
-            split[0] + repl_text[len(split) : 2 * len(split) - 2] + split[-1]
-            for split in text.split("_")
-        ]
-    )
-    return text[0] + repl_split[1:-1] + text[-1]
+default_config: dict[StrEnum, dict[StrEnum, Any]] = {
+    TABLE.APP: {
+        APP.THEME: "bootstrap-dark",
+        APP.LIMIT: 5000,
+        APP.LOG_LEVEL: "INFO",
+        APP.ID_LENGTH: 8,
+        APP.CACHE_DIR: ".metadata_cache",
+        APP.CACHE_TTL: 300,
+        APP.DB_DIR: ".db",
+        APP.DB_FILE_NAME: DB.TAGAPP_DB,
+        APP.DB_BLOB_NAME: DB.BLOB_DB,
+        APP.THUMBNAIL_WIDTH: 1280,
+        APP.THUMBNAIL_HEIGHT: 720,
+        APP.ONLY_RECENT_ENABLED: True,
+        APP.MAX_DOWNLOAD_THREADS: 8,
+        APP.BLUR_UNSAFE_ENABLED: False,
+    },
+    TABLE.R34: {
+        R34.ENABLED: False,
+        R34.ARTISTS: [],
+        R34.BLACK_LIST: [],
+        R34.API_KEY: "",
+    },
+    TABLE.E621: {
+        E621.ENABLED: False,
+        E621.ARTISTS: [],
+        E621.BLACK_LIST: [],
+        E621.API_KEY: "",
+        E621.USERNAME: "",
+    },
+    TABLE.DANBOORU: {
+        DANBOORU.ENABLED: False,
+        DANBOORU.ARTISTS: [],
+        DANBOORU.BLACK_LIST: [],
+        DANBOORU.API_KEY: "",
+        DANBOORU.USERNAME: "",
+    },
+    TABLE.EAGLE: {
+        EAGLE.ENABLED: False,
+        EAGLE.ENDPOINT: "http://localhost:41595/api",
+        EAGLE.LIBRARY: "",
+        EAGLE.ARTIST_FOLDER: "",
+    },
+    TABLE.LOCAL: {
+        LOCAL.ENABLED: True,
+        LOCAL.ARTIST_DIR: "media",
+    },
+}
 
 
 class Config:
@@ -50,7 +90,7 @@ class Config:
     def _reload_config(self, config_path=None, config_file_name=None):
         kwargs = {
             "config_path": config_path if config_path else self.config_path,
-            "defaults": self.default_config,
+            "defaults": default_config,
             "config_file_name": config_file_name
             if config_file_name
             else self.config_file_name,
@@ -73,6 +113,11 @@ class Config:
                 logging.StreamHandler(sys.stdout),
                 log_file_handler,
             ],
+        )
+        logger.info(
+            "Config initialized with config_path = %s, config_file_name = %s",
+            config_path,
+            config_file_name,
         )
 
     def censor_text(self, text):
@@ -120,68 +165,16 @@ class Config:
     def cache_ttl(self):
         return int(self.get(TABLE.APP, APP.CACHE_TTL, 300))
 
-    default_config = {  # noqa: RUF012
-        TABLE.APP: {
-            APP.THEME: "bootstrap-dark",
-            APP.LIMIT: 5000,
-            APP.LOG_LEVEL: "INFO",
-            APP.ID_LENGTH: 8,
-            APP.CACHE_DIR: ".metadata_cache",
-            APP.CACHE_TTL: 300,
-            APP.DB_DIR: ".db",
-            APP.DB_FILE_NAME: DB.TAGAPP_DB,
-            APP.DB_BLOB_NAME: DB.BLOB_DB,
-            APP.THUMBNAIL_WIDTH: 1280,
-            APP.THUMBNAIL_HEIGHT: 720,
-            APP.ONLY_RECENT_ENABLED: True,
-            APP.MAX_DOWNLOAD_THREADS: 8,
-            APP.BLUR_UNSAFE_ENABLED: False,
-        },
-        TABLE.R34: {
-            R34.ENABLED: False,
-            R34.ARTISTS: [],
-            R34.BLACK_LIST: [],
-            R34.API_KEY: "",
-        },
-        TABLE.E621: {
-            E621.ENABLED: False,
-            E621.ARTISTS: [],
-            E621.BLACK_LIST: [],
-            E621.API_KEY: "",
-            E621.USERNAME: "",
-        },
-        TABLE.DANBOORU: {
-            DANBOORU.ENABLED: False,
-            DANBOORU.ARTISTS: [],
-            DANBOORU.BLACK_LIST: [],
-            DANBOORU.API_KEY: "",
-            DANBOORU.USERNAME: "",
-        },
-        TABLE.EAGLE: {
-            EAGLE.ENABLED: False,
-            EAGLE.ENDPOINT: "http://localhost:41595/api",
-            EAGLE.LIBRARY: "",
-            EAGLE.ARTIST_FOLDER: "",
-        },
-        TABLE.LOCAL: {
-            LOCAL.ENABLED: True,
-            LOCAL.ARTIST_DIR: "media",
-        },
-    }
-
 
 _config: Config = None
 
 
 def set_config(config: Config):
-    print("SETTING CONFIG")
     global _config
     _config = config
 
 
 def get_config():
-    print("GET CONFIG")
     if _config is None:
-        print("SETTING CONFIG")
         set_config(Config())
     return _config

@@ -11,10 +11,11 @@ import ttkbootstrap as ttk
 from PIL import ImageTk
 from tkinterdnd2 import COPY, DND_FILES
 
-from artrefsync.boards.board_handler import Post, PostFile
+from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
+from artrefsync.stores.store_models import PostFile
 from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
@@ -174,39 +175,15 @@ class SimpleFrames:
             return SimpleFrames.frames[index]
 
     def init_bindings(self):
-        self.scroll_start = 0
-        self.w_held = False
-        self.w_start = time.time()
-        self.s_held = False
-        self.w_count = 0
         e_binder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         e_binder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
         e_binder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
-        self.text.bind("<KeyPress-w>", lambda e: self.set_w_held(True))
-        self.text.bind("<KeyRelease-w>", lambda e: self.set_w_held(False))
-        self.text.bind("<KeyPress-s>", lambda e: self.set_s_held(True))
-        self.text.bind("<KeyRelease-s>", lambda e: self.set_s_held(False))
         self.text.bind("<Key>", lambda e: self.text.after_idle(self.__keystroke, e))
         self.text.bind("<KeyRelease-space>", self.on_space)
         self.text.bind(
             "<FocusIn>", lambda e: self.text.after(100, self.add_escape_binding)
         )
         self.text.bind("<FocusOut>", self.unbind_canvas_escape)
-
-    def set_w_held(self, val):
-        if self.w_held != val:
-            if val:
-                self.w_start = time.time()
-                self.scroll_start = self.text.yview()
-            else:
-                self.w_start = 0
-            self.w_held = val
-        print(
-            f"w {time.time() - self.w_start, self.scroll_start[0] * self.text.winfo_height()}"
-        )
-
-    def set_s_held(self, val):
-        self.s_held = val
 
     def __keystroke(self, event: tk.Event):
         keycode = event.keycode

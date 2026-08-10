@@ -5,10 +5,10 @@ from threading import Lock
 
 import ttkbootstrap as ttk
 
-from artrefsync.boards.board_handler import PostFile
 from artrefsync.config import get_config
 from artrefsync.constants import BINDING, NAMES
 from artrefsync.db.post_db import PostDb
+from artrefsync.stores.store_models import PostFile
 from artrefsync.ui.widgets.GifAdvancedScrolling import CanvasImage
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import e_binder

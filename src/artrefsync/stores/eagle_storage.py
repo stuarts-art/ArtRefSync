@@ -7,11 +7,12 @@ from pathlib import Path
 
 from artrefsync.api.eagle_client import EagleClient
 from artrefsync.api.eagle_model import EagleFolder, EagleItem
-from artrefsync.boards.board_handler import PostFile
+from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 from artrefsync.constants import BOARD, EAGLE, STORE, TABLE
 from artrefsync.stores.link_cache import LinkCache
-from artrefsync.stores.storage import ImageStoreHandler, Post
+from artrefsync.stores.storage import ImageStoreHandler
+from artrefsync.stores.store_models import PostFile
 from artrefsync.utils.utils import str_dict
 
 config = get_config()

@@ -10,9 +10,6 @@ import ttkbootstrap as ttk
 from PIL import Image, ImageDraw, ImageTk
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from artrefsync.config import get_config
-
-config = get_config()
 logger = logging.getLogger(__name__)
 
 

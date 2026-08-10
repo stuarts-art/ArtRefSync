@@ -1,7 +1,7 @@
 import os
 import sys
 from collections import UserDict
-from functools import wraps
+from functools import lru_cache, wraps
 from pathlib import Path
 
 
@@ -49,3 +49,15 @@ def resource_path(relative_path):
         base_path = os.path.abspath("./_internal")
         os.makedirs(base_path, 0o771, exist_ok=True)
     return Path(os.path.join(base_path, relative_path)).resolve()
+
+
+@lru_cache
+def censor_text(text: str):
+    repl_text = "₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊✩‧₊˚౨ৎ˚₊✩‧₊₊"
+    repl_split = "_".join(
+        [
+            split[0] + repl_text[len(split) : 2 * len(split) - 2] + split[-1]
+            for split in text.split("_")
+        ]
+    )
+    return text[0] + repl_split[1:-1] + text[-1]

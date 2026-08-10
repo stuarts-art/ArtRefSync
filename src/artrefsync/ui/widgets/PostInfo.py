@@ -10,10 +10,11 @@ import ttkbootstrap as ttk
 from PIL import ImageTk
 from tkinterdnd2 import COPY, DND_FILES
 
-from artrefsync.boards.board_handler import Post, PostFile
+from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
+from artrefsync.stores.store_models import PostFile
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.image_utils import ImageUtils

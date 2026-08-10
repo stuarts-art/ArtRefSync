@@ -7,7 +7,7 @@ from dataclassdb import QueryBuilder
 from artrefsync.config import get_config
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
-from artrefsync.db.TagType import TagType
+from artrefsync.db.db_models import TagType
 from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.TkThreadCaller import thread_caller
 
@@ -74,6 +74,7 @@ class TagTab(ttk.Frame):
 
     def init_bindings(self):
         e_binder.bind(BINDING.ON_ARTIST_SELECT, self.update_artist, self)
+        e_binder.bind(BINDING.ON_ARTIST_CLEAR, self.update_artist, self)
         self.entry.bind("<KeyRelease>", self.on_key_release)
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
         self.tree.bind("<Button-1>", self.query_by_tag)

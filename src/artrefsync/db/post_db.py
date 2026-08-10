@@ -6,10 +6,11 @@ import sqlite3
 from dataclassdb import DataclassDb, QueryBuilder
 from tenacity import retry, stop_after_attempt
 
-from artrefsync.boards.board_handler import Post, PostFile
+from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 from artrefsync.constants import APP, TABLE
-from artrefsync.db.TagType import ArtistTagCount, PostTagLink, Tag, TagType
+from artrefsync.db.db_models import ArtistTagCount, PostTagLink, Tag, TagType
+from artrefsync.stores.store_models import PostFile
 from artrefsync.utils.utils import resource_path
 
 config = get_config()

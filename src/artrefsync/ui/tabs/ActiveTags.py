@@ -75,6 +75,8 @@ class ActiveTagsTab(ttk.Frame):
 
     def on_artist(self, artist, middle_click=False):
         logger.debug("Artist Recieved: %s, Middle Clicked: %d", artist, middle_click)
+        if not self.artist and not artist:
+            return
 
         if not self.is_artist(artist):
             return self.on_tag(artist, middle_clicked=middle_click)
@@ -135,16 +137,6 @@ class ActiveTagsTab(ttk.Frame):
         self.add_tag(tag)
         self.update_filter()
 
-    def on_remove_tag(self, event=None):
-        if event.widget and event.widget.text:
-            tag = event.widget.text
-            if self.remove_tag(tag):
-                self.update_filter()
-            if self.is_artist(tag):
-                e_binder.event_generate(BINDING.ON_ARTIST_SELECT, None, False)
-        if not self.active_tags:
-            self.forget_self()
-            self.clear_button.pack_forget()
 
     def remove_tag(self, tag) -> bool:
         removed = False
@@ -153,6 +145,8 @@ class ActiveTagsTab(ttk.Frame):
             self.artist = None
             self.grid_artist_button(forget=True)
             self.artist_button.update_text("")
+            e_binder.event_generate(BINDING.ON_ARTIST_SELECT, "")
+
         elif tag in self.active_tags:
             removed = True
             widget = self.active_tags.pop(tag)
@@ -207,6 +201,7 @@ class ActiveTagsTab(ttk.Frame):
         self.artist_button.update_text("")
         self.grid_clear_frame(forget=True)
         self.grid_artist_button(forget=True)
+        e_binder.event_generate(BINDING.ON_ARTIST_SELECT, "")
         self.update_filter()
 
     def update_filter(self):

@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from asyncio import Event
 
-from artrefsync.boards.board_handler import Post, PostFile
+from artrefsync.boards.board_models import Post
 from artrefsync.constants import BOARD, STORE
 from artrefsync.stores.link_cache import LinkCache
+from artrefsync.stores.store_models import PostFile
 
 
 class ImageStoreHandler(ABC):

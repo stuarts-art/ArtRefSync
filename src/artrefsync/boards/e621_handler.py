@@ -5,7 +5,8 @@ from threading import Event
 
 from artrefsync.api.e621_client import E621_Client
 from artrefsync.api.e621_model import E621_Post
-from artrefsync.boards.board_handler import ImageBoardHandler, Post
+from artrefsync.boards.board_handler import ImageBoardHandler
+from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 from artrefsync.constants import BOARD, E621
 from artrefsync.db.post_db import PostDb

@@ -9,11 +9,12 @@ from typing import ClassVar
 
 from PIL import Image
 
-from artrefsync.boards.board_handler import Post, PostFile
+from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler
+from artrefsync.stores.store_models import PostFile
 from artrefsync.utils.utils import resource_path, str_dict
 
 config = get_config()

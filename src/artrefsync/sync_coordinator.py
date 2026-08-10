@@ -1,11 +1,12 @@
 import concurrent
-import functools
 import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
+from threading import Event, Lock
 
-from artrefsync.boards.board_handler import ImageBoardHandler, Post, PostFile
+from artrefsync.boards.board_models import Post
+from artrefsync.stores.store_models import PostFile
+from artrefsync.boards.board_handler import ImageBoardHandler
 from artrefsync.boards.danbooru_handler import DanbooruHandler
 from artrefsync.boards.e621_handler import E621Handler
 from artrefsync.boards.rule34_handler import R34Handler
@@ -22,7 +23,7 @@ from artrefsync.constants import (
     TABLE,
 )
 from artrefsync.db.post_db import PostDb
-from artrefsync.db.TagType import ArtistTagCount, Tag
+from artrefsync.db.db_models import ArtistTagCount
 from artrefsync.stores.eagle_storage import EagleHandler
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.plain_file_storage import PlainLocalStorage
@@ -64,6 +65,37 @@ def sync_config(event: Event):
             sync(board, store, limit, event)
     finally:
         e_binder.event_generate(BINDING.ON_LOADING_DONE)
+
+
+def sync_artist(artist_name: str, board_name: str | BOARD, stop_event: Event | None = None, only_recent = False, limit: int | None = None):
+    try:
+        if not board_name:
+            logger.error("No board name provided")
+            return
+        elif not artist_name:
+            logger.error("No artist name provided")
+            return
+        board = BOARD(board_name)
+        match board:
+            case BOARD.E621:
+                board_handler = E621Handler(only_recent=only_recent)
+            case BOARD.DANBOORU:
+                board_handler = DanbooruHandler(only_recent=only_recent)
+            case BOARD.R34:
+                board_handler = R34Handler(only_recent=only_recent)
+        if limit is None:
+            limit = int(config[TABLE.APP][APP.LIMIT])
+        if config[TABLE.EAGLE][EAGLE.ENABLED]:
+            store_handler = EagleHandler()
+        elif config[TABLE.LOCAL][LOCAL.ENABLED]:
+            store_handler = PlainLocalStorage()
+
+        sync_coordinator = SyncCoordinator(
+            board_handler=board_handler, store_handler=store_handler, max_per_artist=limit
+        )
+        sync_coordinator.sync([artist_name])
+    finally:
+        e_binder.event_generate(BINDING.ON_ARTIST_SYNC_DONE)
 
 
 def sync_from_store(event: Event):
@@ -117,12 +149,15 @@ class SyncCoordinator:
         self,
         board_handler: ImageBoardHandler,
         store_handler: ImageStoreHandler,
-        max_per_artist: int = int(config[TABLE.APP][APP.LIMIT]),
+        max_per_artist: int | None = None,
         stop_event: Event | None = None,
     ):
         self.board_handler = board_handler
         self.store_handler = store_handler
-        self.max_per_artist = max_per_artist
+        if max_per_artist is None:
+            self.max_per_artist = int(config[TABLE.APP][APP.LIMIT])
+        else:
+            self.max_per_artist = max_per_artist
         self.stop_event: Event | None = stop_event
         self.store = store_handler.get_store()
         self.board = board_handler.get_board()
@@ -133,9 +168,12 @@ class SyncCoordinator:
         self.max_download_threads = int(config[TABLE.APP][APP.MAX_DOWNLOAD_THREADS])
         self.artist_list = self.board_handler.get_artist_list()
 
-    def sync(self):
+    def sync(self, artist_list: None | list[str] = None):
         try:
-            self.artist_list = self.board_handler.get_artist_list()
+            if artist_list:
+                self.artist_list = artist_list
+            else:
+                self.artist_list = self.board_handler.get_artist_list()
             self.sync_artist_metadata(self.artist_list)
             e_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
             for artist in self.artist_list:
@@ -360,9 +398,3 @@ class SyncCoordinator:
         with PostDb() as post_db:
             for type_, tags in type_tags.items():
                 post_db.update_tag_types(tags, type_)
-
-    @functools.lru_cache
-    def get_tag_id(self, tag: str):
-        with PostDb() as post_db:
-            tag_id = post_db.tags.insert(Tag(tag))
-            return tag_id

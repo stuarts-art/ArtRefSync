@@ -2,15 +2,17 @@ import logging
 import os
 import tkinter as tk
 from asyncio import Event
+from threading import Lock
 from tkinter.filedialog import askdirectory
 
 import ttkbootstrap as ttk
 
 from artrefsync.config import get_config
-from artrefsync.constants import TABLE, get_table_mapping
-from artrefsync.sync_coordinator import sync_config, sync_from_store
+from artrefsync.constants import BINDING, TABLE, get_table_mapping
+from artrefsync.sync_coordinator import sync_artist, sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
+from artrefsync.utils.EventManager import e_binder
 from artrefsync.utils.TkThreadCaller import thread_caller
 
 config = get_config()
@@ -23,7 +25,8 @@ class ConfigTab(ttk.Frame):
         super().__init__(root, *args, **kwargs)
         self.configure_style(root)
         style = ttk.Style()
-
+        self.sync_lock = Lock()
+        self.lock_owner = ""
         style.configure(
             "custom.TNotebook", tabposition="nw", borderwidth=0, tabmargins=0
         )
@@ -43,6 +46,8 @@ class ConfigTab(ttk.Frame):
         self.config_notebook = ttk.Notebook(self, style="custom.TNotebook")
         self.config_notebook.pack(expand=True, fill="both")
         self.init_control_tab()
+        e_binder.bind(BINDING.ON_ARTIST_SYNC, self.start_artist_sync, self)
+        e_binder[BINDING.SYNC_LOCK] = self.sync_lock
 
         self.load()
 
@@ -50,10 +55,8 @@ class ConfigTab(ttk.Frame):
         self.config_table_tabs = {}
         self.widget_dict = {}
         self.var_dict = {}
-        self.sync_running = False
         self.sync_event = Event()
         self.store_sync_running = False
-        self.store_sync_event = Event()
         self.frames = {}
 
         self.tab_groups = ["App", "Boards", "Stores"]
@@ -199,8 +202,103 @@ class ConfigTab(ttk.Frame):
                 config[table][table_field] = val
         config.reload_config()
 
+    def configure_style(self, root):
+        self.style = ttk.Style()
+
+    def start_sync(self):
+        func_name = "start_sync"
+        if not self.sync_lock.acquire(blocking=False):
+            if self.lock_owner == func_name:
+                logger.warning("Canceling %s.", func_name)
+                thread_caller.cancel(func_name)
+                self.sync_lock.release()
+                self.start_sync_button.configure(state="normal", text="Start Sync")
+                self.start_store_sync_button.configure(state="normal")
+                self.sync_lock.release()
+            else:
+                logger.warning(
+                    "Could not acquire sync for %s because %s is running.",
+                    func_name,
+                    self.lock_owner,
+                )
+                thread_caller.cancel()
+            return
+        try:
+            self.start_sync_button.configure(state="active", text="Cancel Sync")
+            self.start_store_sync_button.configure(state="disabled")
+            if config.log_level == "DEBUG":
+                sync_config(self.sync_event)
+                self.finish_sync()
+            else:
+                thread_caller.add(
+                    sync_config, self.finish_sync, func_name, self.sync_event
+                )
+        except Exception:
+            thread_caller.cancel(func_name)
+            logger.exception("Exception recieved while syncing. Resetting buttons.")
+            self.after_idle(self.finish_sync)
+
+    def finish_sync(self, *nargs, **kwargs):
+        logger.info("Sync Finished. Resetting button.")
+        self.start_sync_button.configure(state="normal", text="Start Sync")
+        self.start_store_sync_button.configure(state="normal")
+        config.reload_config()
+        self.lock_owner = ""
+        self.sync_event.clear()
+        self.sync_lock.release()
+
+    def start_artist_sync(self, artist="", board="", only_recent=False):
+        logger.info("START ARTIST SYNC %s, %s, %s", artist, board, only_recent)
+        func_name = "artist_sync"
+        if not self.sync_lock.acquire(blocking=False):
+            logger.warning("Failed to acquire lock.")
+            if self.lock_owner == func_name:
+                logger.warning("Canceling %s.", func_name)
+                thread_caller.cancel(func_name)
+                self.sync_lock.release()
+                self.start_sync_button.configure(state="normal", text="Start Sync")
+                self.start_store_sync_button.configure(state="normal")
+                return
+            else:
+                logger.warning(
+                    "Could not acquire sync for %s because %s is running.",
+                    func_name,
+                    self.lock_owner,
+                )
+        thread_caller.add(
+            sync_artist,
+            self.finish_artist_sync,
+            func_name,
+            artist_name=artist,
+            board_name=board,
+            stop_event=self.sync_event,
+            only_recent=only_recent,
+        )
+
+    def finish_artist_sync(self, *args, **kwargs):
+        self.sync_lock.release()
+        self.lock_owner = ""
+        logger.info("FINISH ARTIST SYNC")
+        e_binder.event_generate(BINDING.ON_LOADING_DONE)
+
+    def config_menu(self):
+        self.root.filemenu.add_command(
+            label="Edit Config", command=lambda: os.startfile(config.path)
+        )
+
     def start_store_sync(self):
-        if not self.store_sync_running:
+        func_name = "start_store_sync"
+        if not self.sync_lock.acquire(blocking=False):
+            if func_name == self.lock_owner:
+                logger.warning("Canceling %s.", func_name)
+                thread_caller.cancel(func_name)
+                self.finish_sync()
+            else:
+                logger.warning("Start sync called but could not acquire lock.")
+            return
+
+        try:
+            self.lock_owner = func_name
             self.store_sync_running = True
             self.start_store_sync_button.configure(
                 state="active", text="Cancel Sync", bootstyle="warning"
@@ -213,51 +311,20 @@ class ConfigTab(ttk.Frame):
                 thread_caller.add(
                     sync_from_store,
                     self.finish_store_sync,
-                    __name__,
-                    self.store_sync_event,
+                    func_name,
+                    self.sync_event,
                 )
-        else:
-            self.start_store_sync_button.configure(state="disabled")
-            self.store_sync_event.set()
+        except Exception:
+            thread_caller.cancel(func_name)
+            logger.exception("Exception recieved while syncing. Resetting buttons.")
+            self.after_idle(self.finish_sync)
 
     def finish_store_sync(self, *nargs, **kwargs):
         logger.info("Store sync Finished. Reseting button.")
-        self.store_sync_running = False
-        self.store_sync_event.clear()
+        self.sync_event.clear()
         self.start_store_sync_button.configure(
             state="normal", text="Start Store Sync", bootstyle="default"
         )
         self.start_sync_button.configure(state="normal")
         config.reload_config()
-
-    def start_sync(self):
-        if not self.sync_running:
-            self.sync_running = True
-            self.start_sync_button.configure(state="active", text="Cancel Sync")
-            self.start_store_sync_button.configure(state="disabled")
-            if config.log_level == "DEBUG":
-                sync_config(self.sync_event)
-                self.finish_sync()
-            else:
-                thread_caller.add(
-                    sync_config, self.finish_sync, __name__, self.sync_event
-                )
-        else:
-            self.start_sync_button.configure(state="disabled")
-            self.sync_event.set()
-
-    def finish_sync(self, *nargs, **kwargs):
-        logger.info("Sync Finished. Reseting button.")
-        self.sync_running = False
-        self.start_sync_button.configure(state="normal", text="Start Sync")
-        self.start_store_sync_button.configure(state="normal")
-        config.reload_config()
-        self.sync_event.clear()
-
-    def configure_style(self, root):
-        self.style = ttk.Style()
-
-    def config_menu(self):
-        self.root.filemenu.add_command(
-            label="Edit Config", command=lambda: os.startfile(config.path)
-        )
+        self.sync_lock.release()

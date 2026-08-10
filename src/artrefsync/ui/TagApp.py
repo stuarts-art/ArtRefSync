@@ -7,12 +7,14 @@ from pathlib import Path
 import ttkbootstrap as ttk
 from tkinterdnd2 import TkinterDnD
 
+from artrefsync.config import Config, set_config
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.EventManager import e_binder
 
 logger = logging.getLogger(__name__)
+
 
 def main():
     app = App()
@@ -34,8 +36,6 @@ class App(ttk.Window):
         self.project_path = Path(project_path).resolve()
         self.config_path = self.project_path / "config"
         os.chdir(project_path)
-
-        from artrefsync.config import Config, set_config
 
         config = Config(config_path=self.config_path, config_file_name="config")
         set_config(config)
