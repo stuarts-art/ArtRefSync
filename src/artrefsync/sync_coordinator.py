@@ -2,11 +2,10 @@ import concurrent
 import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event, Lock
+from threading import Event
 
-from artrefsync.boards.board_models import Post
-from artrefsync.stores.store_models import PostFile
 from artrefsync.boards.board_handler import ImageBoardHandler
+from artrefsync.boards.board_models import Post
 from artrefsync.boards.danbooru_handler import DanbooruHandler
 from artrefsync.boards.e621_handler import E621Handler
 from artrefsync.boards.rule34_handler import R34Handler
@@ -22,13 +21,14 @@ from artrefsync.constants import (
     R34,
     TABLE,
 )
-from artrefsync.db.post_db import PostDb
 from artrefsync.db.db_models import ArtistTagCount
-from artrefsync.stores.eagle_storage import EagleHandler
+from artrefsync.db.post_db import PostDb
+from artrefsync.stores.eagle_store_handler import EagleHandler
+from artrefsync.stores.file_store_handler import FileStoreHandler
 from artrefsync.stores.link_cache import LinkCache
-from artrefsync.stores.plain_file_storage import PlainLocalStorage
 from artrefsync.stores.storage import ImageStoreHandler
-from artrefsync.utils.EventManager import e_binder
+from artrefsync.stores.store_models import PostFile
+from artrefsync.utils.event_binder import event_binder
 
 config = get_config()
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ def sync_config(event: Event):
         if config[TABLE.EAGLE][EAGLE.ENABLED]:
             store = EagleHandler()
         elif config[TABLE.LOCAL][LOCAL.ENABLED]:
-            store = PlainLocalStorage()
+            store = FileStoreHandler()
 
         only_recent = config[TABLE.APP][APP.ONLY_RECENT_ENABLED]
 
@@ -64,10 +64,16 @@ def sync_config(event: Event):
             board = DanbooruHandler(only_recent, event)
             sync(board, store, limit, event)
     finally:
-        e_binder.event_generate(BINDING.ON_LOADING_DONE)
+        event_binder.event_generate(BINDING.ON_LOADING_DONE)
 
 
-def sync_artist(artist_name: str, board_name: str | BOARD, stop_event: Event | None = None, only_recent = False, limit: int | None = None):
+def sync_artist(
+    artist_name: str,
+    board_name: str | BOARD,
+    stop_event: Event | None = None,
+    only_recent=False,
+    limit: int | None = None,
+):
     try:
         if not board_name:
             logger.error("No board name provided")
@@ -88,14 +94,16 @@ def sync_artist(artist_name: str, board_name: str | BOARD, stop_event: Event | N
         if config[TABLE.EAGLE][EAGLE.ENABLED]:
             store_handler = EagleHandler()
         elif config[TABLE.LOCAL][LOCAL.ENABLED]:
-            store_handler = PlainLocalStorage()
+            store_handler = FileStoreHandler()
 
         sync_coordinator = SyncCoordinator(
-            board_handler=board_handler, store_handler=store_handler, max_per_artist=limit
+            board_handler=board_handler,
+            store_handler=store_handler,
+            max_per_artist=limit,
         )
         sync_coordinator.sync([artist_name])
     finally:
-        e_binder.event_generate(BINDING.ON_ARTIST_SYNC_DONE)
+        event_binder.event_generate(BINDING.ON_ARTIST_SYNC_DONE)
 
 
 def sync_from_store(event: Event):
@@ -104,7 +112,7 @@ def sync_from_store(event: Event):
         if config[TABLE.EAGLE][EAGLE.ENABLED]:
             store = EagleHandler()
         elif config[TABLE.LOCAL][LOCAL.ENABLED]:
-            store = PlainLocalStorage()
+            store = FileStoreHandler()
         if store is None:
             logger.warning("NO STORE ENABLED. ENDING SYNC")
             return
@@ -175,28 +183,29 @@ class SyncCoordinator:
             else:
                 self.artist_list = self.board_handler.get_artist_list()
             self.sync_artist_metadata(self.artist_list)
-            e_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+            self.remove_blacklisted_posts() # Additional check before downloading.
+            event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
             for artist in self.artist_list:
                 if self.stop_event and self.stop_event.is_set():
                     return
-                e_binder.event_generate(
+                event_binder.event_generate(
                     BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
                 )
                 self.sync_artist_files(artist)
 
-            e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
+            event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
             self.update_board_artist_tag_counts(self.board, self.artist_list)
         except Exception:
             logger.exception("Sync Failed.")
 
     def sync_artist_metadata(self, artists: list[str]):
-        e_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+        event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
         logger.info("Syncing artists: %s", artists)
         for artist in artists:
-            e_binder.event_generate(
+            event_binder.event_generate(
                 BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
             )
-            e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
+            event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
             if self.stop_event and self.stop_event.is_set():
                 return
             self.update_metadata(artist)
@@ -212,7 +221,7 @@ class SyncCoordinator:
 
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
-        e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
+        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
         updated_posts = []
         board_posts: dict[str, Post] = self.board_handler.get_posts(
             artist, self.max_per_artist
@@ -268,7 +277,7 @@ class SyncCoordinator:
             return missing_ids
 
     def download_missing_ids(self, artist):
-        e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Downloading missing")
+        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Downloading missing")
 
         missing_ids = self.get_missing_ids(artist)
         failure_list = []
@@ -278,7 +287,9 @@ class SyncCoordinator:
         with PostDb() as post_db:
             missing_posts = [post_db.posts.get(id=id) for id in missing_ids]
         if not missing_posts:
-            e_binder.event_generate(BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "")
+            event_binder.event_generate(
+                BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), ""
+            )
             return
 
         logger.info("Downloading %d missing posts for %s", len(missing_posts), artist)
@@ -292,20 +303,20 @@ class SyncCoordinator:
                     event=self.stop_event,
                 )
                 future_to_pid[future] = post.id
-            e_binder.event_generate(
+            event_binder.event_generate(
                 BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
             )
             for future in concurrent.futures.as_completed(future_to_pid.keys()):
                 try:
                     result = future.result()
-                    e_binder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
+                    event_binder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
                     if self.stop_event and self.stop_event.is_set():
                         logger.warning("Stop Event Recieved.")
                         executor.shutdown(wait=True, cancel_futures=True)
                         return
                     if isinstance(result, PostFile):
                         success_list.append(result)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.error(e)
 
                     failure_list.append(future_to_pid[future])
@@ -347,7 +358,7 @@ class SyncCoordinator:
         logger.info(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist
         )
-        e_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
+        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(
             str(self.board), artist
         )
@@ -370,31 +381,21 @@ class SyncCoordinator:
         return inserted_list
 
     def update_board_artist_tag_counts(self, board, artist_list):
-        board_map = defaultdict(int)
+        logger.info(
+            "Updating tag counts for board %s, artist_list: %s", board, artist_list
+        )
         with PostDb() as post_db:
             for artist in artist_list:
-                artist_map = defaultdict(int)
-                posts: list[Post] = post_db.posts.get_all(
-                    artist_name=artist, board=board
-                )
-                for post in posts:
-                    for tag in post.tags:
-                        artist_map[tag] += 1
-                        board_map[tag] += 1
-
-                artist_tag_count_list = [
-                    ArtistTagCount(artist, tag, count)
-                    for tag, count in artist_map.items()
-                ]
-                post_db.artist_tag_counts.insert_many(artist_tag_count_list)
-
-            board_tag_count_list = [
-                ArtistTagCount(board, tag, count) for tag, count in board_map.items()
-            ]
-            post_db.artist_tag_counts.insert_many(board_tag_count_list)
+                post_db.update_artist_tag_count(artist)
+            post_db.update_board_tag_counts(board)
 
     def update_tag_types(self):
         type_tags = self.board_handler.get_type_tags()
         with PostDb() as post_db:
             for type_, tags in type_tags.items():
                 post_db.update_tag_types(tags, type_)
+
+    def remove_blacklisted_posts(self):
+        # Removes posts with the blacklisted tags.
+        with PostDb() as post_db:
+            post_db.remove_black_listed_posts(self.board)

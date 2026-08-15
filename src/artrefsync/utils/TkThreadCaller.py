@@ -76,9 +76,11 @@ class TkThreadCaller:
                 else:
                     on_finish(result)
 
-                if cancel_key in self.cancel_map:
-                    if future in self.cancel_map[cancel_key]:
-                        self.cancel_map[cancel_key].discard(future)
+                if (
+                    cancel_key in self.cancel_map
+                    and future in self.cancel_map[cancel_key]
+                ):
+                    self.cancel_map[cancel_key].discard(future)
 
         except Exception:
             logger.exception("Exception raised on call_on_finish")

@@ -41,17 +41,17 @@ class ImageUtils:
 
         try:
             image = ImageUtils.getPilImage(file)
-            with ImageUtils._thumb_lock:
-                if not upscale or image.height > size[1]:
-                    thumbnail = image.copy()
-                    thumbnail.thumbnail(size=size)
-                else:
-                    resize = (int((size[1] / image.height) * image.width), size[1])
-                    thumbnail = image.resize(
-                        size=resize, resample=Image.Resampling.LANCZOS
-                    )
+            # with ImageUtils._thumb_lock:
+            if not upscale or image.height > size[1]:
+                thumbnail = image.copy()
+                thumbnail.thumbnail(size=size)
+            else:
+                resize = (int((size[1] / image.height) * image.width), size[1])
+                thumbnail = image.resize(
+                    size=resize, resample=Image.Resampling.LANCZOS
+                )
             return thumbnail
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(e)
 
     @staticmethod
@@ -268,6 +268,6 @@ class ImageUtils:
             img.seek(0)
             duration = img.info["duration"]
             duration = int(duration)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return 100
         return duration

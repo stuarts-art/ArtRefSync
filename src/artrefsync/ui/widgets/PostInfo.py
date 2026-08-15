@@ -16,7 +16,7 @@ from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.store_models import PostFile
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
 
@@ -117,16 +117,16 @@ class PostInfoTab(ttk.Frame):
         state = event.state
         ctrl_pressed = (state & 0x4) != 0
         widget_text = event.widget.text
-        e_binder.event_generate(BINDING.ON_ARTIST_SELECT, widget_text, ctrl_pressed)
+        event_binder.event_generate(BINDING.ON_ARTIST_SELECT, widget_text, ctrl_pressed)
 
     def on_tag_click(self, event: tk.Event):
         state = event.state
         ctrl_pressed = (state & 0x4) != 0
         widget_text = event.widget.text
-        e_binder.event_generate(BINDING.ON_TAG_SELECT, widget_text, ctrl_pressed)
+        event_binder.event_generate(BINDING.ON_TAG_SELECT, widget_text, ctrl_pressed)
 
     def add_bindings(self):
-        e_binder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
+        event_binder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
         self.file.drag_source_register(DND_FILES)
         self.file.dnd_bind("<<DragInitCmd>>", self.drag_init)
         self.file.bind("<Button-1>", self.start_file)
@@ -159,40 +159,44 @@ class PostInfoTab(ttk.Frame):
         with PostDb() as post_db:
             post: Post = post_db.posts.get(id=post_id)
             post_file: PostFile = post_db.files.get(id=post_id)
+
+        if not post or not post_file:
+            return
+        logger.info("Post and PostFile for %s recieved.", post_id)
+
+
         website = post.website
         domain = urlparse(website).netloc
         domain = domain.removeprefix("www.")
+        post.file_link = post_file.file
+        post.sample_link = post_file.preview
+        self.name.configure(text=post.name)
+        self.name.configure(text=post.name)
+        self.board_button.update_text(post_file.board)
+        self.artist_button.update_text(post_file.artist_name)
+        self.score_label.configure(text=post.score)
+        self.ext_button.update_text(post.ext)
+        self.dim_label.configure(text=f"{post.width}x{post.height}")
 
-        if post_file and post:
-            post.file_link = post_file.file
-            post.sample_link = post_file.preview
-            self.name.configure(text=post.name)
-            self.name.configure(text=post.name)
-            self.board_button.update_text(post_file.board)
-            self.artist_button.update_text(post_file.artist_name)
-            self.score_label.configure(text=post.score)
-            self.ext_button.update_text(post.ext)
-            self.dim_label.configure(text=f"{post.width}x{post.height}")
+        self.file.update_text(text=f"{post.file_link[:30]}...", data=post.file_link)
+        self.file_tooltip.text = (
+            f"{post.file_link}\n<L-Click> Open\n<R-Click>: Open In Explorer"
+        )
+        self.link_button.update_text(domain, post.website)
+        self.link_tooltip.text = f"{post.website}\n<L-Click>: Open in browser\n<R-Click>: Copy to clipboard"
 
-            self.file.update_text(text=f"{post.file_link[:30]}...", data=post.file_link)
-            self.file_tooltip.text = (
-                f"{post.file_link}\n<L-Click> Open\n<R-Click>: Open In Explorer"
-            )
-            self.link_button.update_text(domain, post.website)
-            self.link_tooltip.text = f"{post.website}\n<L-Click>: Open in browser\n<R-Click>: Copy to clipboard"
+        self.tags.config(state=tk.NORMAL)
+        self.tags.delete("1.0", tk.END)
+        for tag in post.tags:
+            tag_text = tag
+            if blur_tags:
+                blur_text = config.censor_text(tag)
+                self.blur_map[blur_text] = tag
+                tag_text = blur_text
+            self.tags.insert(tk.END, f"{tag_text}  ")
 
-            self.tags.config(state=tk.NORMAL)
-            self.tags.delete("1.0", tk.END)
-            for tag in post.tags:
-                tag_text = tag
-                if blur_tags:
-                    blur_text = config.censor_text(tag)
-                    self.blur_map[blur_text] = tag
-                    tag_text = blur_text
-                self.tags.insert(tk.END, f"{tag_text}  ")
-
-            self.tags.config(state=tk.DISABLED)
-            self.after_idle(self.after_on_post_select, post, post_file)
+        self.tags.config(state=tk.DISABLED)
+        self.after_idle(self.after_on_post_select, post, post_file)
 
     def after_on_post_select(self, post: Post, post_file: PostFile):
         if not post_file:
@@ -242,7 +246,7 @@ class PostInfoTab(ttk.Frame):
             tag_text = word
             if blur_tags:
                 tag_text = self.blur_map[word]
-            e_binder.event_generate(BINDING.ON_TAG_SELECT, tag_text, ctrl_pressed)
+            event_binder.event_generate(BINDING.ON_TAG_SELECT, tag_text, ctrl_pressed)
         return "break"
 
     def get_word_box(self, widget, index):
@@ -251,7 +255,7 @@ class PostInfoTab(ttk.Frame):
             end = widget.search(" ", index, tk.END)
             return start, end
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             return ""
 
     def drag_init(self, event):

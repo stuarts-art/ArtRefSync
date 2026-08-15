@@ -24,23 +24,45 @@ class EagleHandler(ImageStoreHandler):
     Helper class for interacting with Eagle using https://api.eagle.cool/
     """
 
+    handler_map = {}  # noqa: RUF012
+
     def __init__(self):
         logger.info("Initializing Eagle Handler")
         self.client = EagleClient()
+        self.library = ""
+        self.artists_folder_name = ""
+        self._artist_folder: EagleFolder.ListFolder = None
+
         self.reload_config()
         config.subscribe_reload(self.reload_config)
         logger.info("Initializing Eagle Handler Complete.")
 
-    def reload_config(self):
-        self.library = config[TABLE.EAGLE][EAGLE.LIBRARY]
-        self.artists_folder_name = config[TABLE.EAGLE][EAGLE.ARTIST_FOLDER]
+    def reload_config(self, library=None, artist_folder=None):
+        library = library if library else config[TABLE.EAGLE][EAGLE.LIBRARY]
+        artist_folder = (
+            artist_folder if artist_folder else config[TABLE.EAGLE][EAGLE.ARTIST_FOLDER]
+        )
+        config_modified = False
+        if not self.library or self.library != library:
+            self.library = library
+            config_modified = True
+        if not self.artists_folder_name or self.artists_folder_name != library:
+            self.library = library
+            config_modified = True
+        if not config_modified:
+            return
+
+        self.artists_folder_name = (
+            artist_folder if artist_folder else config[TABLE.EAGLE][EAGLE.ARTIST_FOLDER]
+        )
+
         self._artist_folder: EagleFolder.ListFolder = None
         self.board_id_map = str_dict()
         self.board_artist_id_map = str_dict(dict)
         self.id_artist_map = {}
         self.library_path_dict = {}
         self.pid_map = {}
-        self.switch_libary(self.library)
+        self.switch_library(self.library)
         self.get_artists_folder(refresh=True)
         logger.debug("%s \n%s", "Board Artist dict:", self.board_artist_id_map)
 
@@ -114,6 +136,7 @@ class EagleHandler(ImageStoreHandler):
             self.get_board_artist_id(board, artist)
 
     def get_board_artist_id(self, board: BOARD, artist: str) -> EagleFolder.ListFolder:
+
         if board not in self.board_id_map:
             board_folder = self.client.folder.create(
                 board, self.get_artists_folder().id
@@ -163,9 +186,8 @@ class EagleHandler(ImageStoreHandler):
         self.client.item.update(post.ext_id, post.tags, url=post.url)
 
     def get_artists_folder(self, refresh=False) -> EagleFolder.ListFolder:
-        if self._artist_folder is not None:
-            if not refresh:
-                return self._artist_folder
+        if (self._artist_folder is not None) and not refresh:
+            return self._artist_folder
         for folder in self.client.folder.list():
             if folder.name == self.artists_folder_name:
                 self._artist_folder = folder
@@ -190,8 +212,9 @@ class EagleHandler(ImageStoreHandler):
                 board_name,
                 len(self.board_artist_id_map[board_name]),
             )
+        return self._artist_folder
 
-    def switch_libary(self, library_string):
+    def switch_library(self, library_string):
         logger.info("Switching to library %s", library_string)
         history = self.client.library.history()
         for path in history:
@@ -215,8 +238,9 @@ class EagleHandler(ImageStoreHandler):
                 return self.client.item.thumbnail(post.ext_id)
             else:
                 return ""
-        except Exception:
+        except Exception:  # noqa: BLE001
             return ""
 
     def update_thumbnails(self, board: BOARD, artist: str):
         pass
+

@@ -1,6 +1,7 @@
 import logging
 import tkinter
 from dataclasses import dataclass
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,7 @@ class _EventBinding:
     root: tkinter.Widget
 
 
-class EventManager:
+class EventBinder:
     """
     Standard tkinter bindings can't easily pass data in events.
     This class provides a simplified solution leveraging the builtin "after" method.
@@ -23,14 +24,21 @@ class EventManager:
         self.sequence_bindings: dict[str, list[_EventBinding]] = {}
         self.map = {}
 
-    def __setitem__(self, key, value):
-        self.map[str(key)] = value
+    def __setitem__(self, key: str | StrEnum, value):
+        key = str(key)
+        self.map[key] = value
 
-    def __contains__(self, key):
-        return str(key) in self.map
+    def __contains__(self, key: str | StrEnum):
+        key = str(key)
+        return key in self.map
 
-    def __getitem__(self, key):
-        return self.map[str(key)]
+    def __getitem__(self, key: str | StrEnum):
+        key = str(key)
+        return self.map[key]
+
+    def get(self, key: StrEnum | str, default = None):
+        key = str(key)
+        self.map.get(key, default)
 
     def bind(self, sequence: str, func: callable, root: tkinter.Widget):
         sequence = str(sequence)
@@ -65,4 +73,4 @@ class EventManager:
             return default
 
 
-e_binder = EventManager()
+event_binder = EventBinder()

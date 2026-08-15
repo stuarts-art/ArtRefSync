@@ -8,7 +8,7 @@ from tenacity import retry, stop_after_attempt
 
 from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
-from artrefsync.constants import APP, TABLE
+from artrefsync.constants import APP, BOARD, DANBOORU, E621, R34, TABLE
 from artrefsync.db.db_models import ArtistTagCount, PostTagLink, Tag, TagType
 from artrefsync.stores.store_models import PostFile
 from artrefsync.utils.utils import resource_path
@@ -46,15 +46,14 @@ class PostDb:
         self.connection_owner = False
         if not self.connection:
             db_dir = db_dir if db_dir else config[TABLE.APP][APP.DB_DIR]
-            db_name = "shadow." + (
-                db_name if db_name else config[TABLE.APP][APP.DB_FILE_NAME]
-            )
+            db_name = db_name if db_name else config[TABLE.APP][APP.DB_FILE_NAME]
+
             if db_dir:
                 db_file_name = resource_path(f"{db_dir}/{db_name}")
                 os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
             else:
                 db_file_name = resource_path(db_name)
-            logger.debug("Connecting to Database: %s", db_file_name)
+            logger.info("Connecting to Database: %s", db_file_name)
             self.connection = sqlite3.connect(db_file_name)
             self.connection_owner = True
         self.commit = self.connection.commit
@@ -83,6 +82,9 @@ class PostDb:
         self.posts.CREATE.INDEX.IF.NOT.EXISTS("post_artist_index").ON(Post).par(
             "artist_name"
         ).execute()
+        self.files.CREATE.INDEX.IF.NOT.EXISTS("postfile_artist_index").ON(Post).par(
+            "artist_name"
+        ).execute()
 
     @retry(stop=stop_after_attempt(3))
     def update_tag_link_table(self, post_sql_id, tags):
@@ -105,22 +107,23 @@ class PostDb:
         return self.tags.insert(Tag(tag))
 
     @retry(stop=stop_after_attempt(3))
-    def get_board_artists(self) -> dict[str : list[str]]:
-        board_artists_dict = {}
-        select_result = self.posts.select_query(
-            "DISTINCT artist_name as artist_name",
-            "board",
-            as_dict=True,
-            single_row=False,
-        )
+    def get_board_artists(self) -> dict[str, dict[str, int]]:
+        board_artist_count: dict[str, dict[str, int]] = {}
 
-        for row in select_result:
-            board = str(row["board"])
-            artist = row["artist_name"]
-            if board not in board_artists_dict:
-                board_artists_dict[board] = []
-            board_artists_dict[board].append(artist)
-        return board_artists_dict
+        for board in [TABLE.E621, TABLE.R34, TABLE.DANBOORU]:
+            board_artist_count[board] = {}
+            artist_list = config[board]["artists"]
+            for artist in artist_list:
+                board_artist_count[board][artist] = 0
+
+            with QueryBuilder(self.connection) as qb:
+                qb.SELECT("tag", "count").FROM(ArtistTagCount)
+                qb.WHERE("artist").eq(board, quotes=True)
+                qb.AND("tag").IN.placeholders(*artist_list)
+                artist_count_list = qb.execute()
+            for artist, count in artist_count_list:
+                board_artist_count[board][artist] = count
+        return board_artist_count
 
     @retry(stop=stop_after_attempt(3))
     def post_counts_for_tags(self, tags: list[str]):
@@ -183,6 +186,41 @@ class PostDb:
 
         return tag_counts
 
+    def update_artist_tag_count(self, artist):
+        if not artist:
+            logger.info("Artist %s has no tag counts.", artist)
+            return
+        with QueryBuilder(self.connection) as qb:
+            qb.BEGIN.TRANSACTION.end()
+            qb.DELETE.FROM(ArtistTagCount).WHERE("artist").eq.quote(artist).end()
+            qb.INSERT.INTO(ArtistTagCount).par("artist", "tag", "count")
+            qb.SELECT(f'"{artist}"', "t.tag", "count(*) AS count")
+            qb.from_(PostTagLink, "pt")
+            qb.join(Tag, "t", "t.sql_id = pt.tag_id")
+            qb.join(Post, "p", "p.sql_id = pt.post_id")
+            qb.WHERE("p.artist_name").eq.quote(artist)
+            qb.GROUP.BY("p.artist_name", "t.tag").end()
+            qb.END.TRANSACTION.end()
+            qb.execute_script()
+
+    def update_board_tag_counts(self, board):
+
+        if not board:
+            logger.warning("Update board tag counts called without board")
+            return
+        artist_list = config[board]["artists"]
+
+        with QueryBuilder(self.connection) as qb:
+            qb.BEGIN.TRANSACTION.end()
+            qb.DELETE.FROM(ArtistTagCount).WHERE("artist").eq.quote(board).end()
+            qb.INSERT.INTO(ArtistTagCount).par("artist", "tag", "count")
+            qb.SELECT(f'"{board}"', "tag", "SUM(count) as count")
+            qb.FROM(ArtistTagCount)
+            qb.WHERE("artist").IN.quote(*artist_list, par=True)
+            qb.GROUP.BY("tag").end()
+            qb.END.TRANSACTION.end()
+            qb.execute_script()
+
     @retry(stop=stop_after_attempt(3))
     def posts_in_intersection(
         self,
@@ -240,3 +278,30 @@ class PostDb:
             return rows[0][0]
         else:
             return [row[0] for row in rows]
+
+    def remove_black_listed_posts(self, board):
+        black_list = config[board]["black_list"]
+        logger.info("Removing black listed posts for board %s", board)
+        with QueryBuilder(self.connection) as qb:
+            qb.SELECT("DISTINCT pt.post_id", "p.id")
+            qb.from_(PostTagLink, "pt")
+            qb.join(Tag, "t", "t.sql_id = pt.tag_id")
+            qb.join(Post, "p", "p.sql_id = pt.post_id")
+            qb.WHERE("t.tag").IN.quote(*black_list, par=True)
+            qb.AND("p.board").eq.quote(board)
+            result = qb.execute()
+
+        if not result:
+            logger.info("Black list empty")
+            return
+
+        sql_ids, ids = zip(*result)
+        with QueryBuilder(self.connection) as qb:
+            qb.BEGIN.TRANSACTION.end()
+            qb.DELETE.FROM(PostTagLink).WHERE("post_id").IN.quote(
+                *sql_ids, par=True
+            ).end()
+            qb.DELETE.FROM(Post).WHERE("sql_id").IN.quote(*sql_ids, par=True).end()
+            qb.DELETE.FROM(PostFile).WHERE("id").IN.quote(*ids, par=True).end()
+            qb.END.TRANSACTION.end()
+            qb.execute_script()

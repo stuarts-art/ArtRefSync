@@ -5,19 +5,20 @@ import ttkbootstrap as ttk
 from dataclassdb import QueryBuilder
 
 from artrefsync.config import get_config
-from artrefsync.constants import APP, BINDING, TABLE
-from artrefsync.db.post_db import PostDb
+from artrefsync.constants import APP, BINDING, TABLE, TK
 from artrefsync.db.db_models import TagType
-from artrefsync.utils.EventManager import e_binder
+from artrefsync.db.post_db import PostDb
+from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.TkThreadCaller import thread_caller
 
 config = get_config()
 logger = logging.getLogger(__name__)
 
+
 class TagTab(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
         self.root = root
-        logger.info("Init Tag Tab")
+        logger.info("Initializing Tag Tab.")
         super().__init__(root, *args, **kwargs)
 
         self.curr_artist = ""
@@ -31,7 +32,10 @@ class TagTab(ttk.Frame):
             self.ui_frame, image=None, compound="left"
         )
         self.tree = ttk.Treeview(
-            self, columns=("Count"), show="tree", takefocus=True, *kwargs
+            self,
+            columns=("Count"),
+            show="tree",
+            takefocus=True,
         )
 
         self.tag_type_menu = ttk.Menu(self.tag_type_button)
@@ -47,11 +51,13 @@ class TagTab(ttk.Frame):
         self.type_tags = set()
 
         with PostDb() as post_db:
+            logger.info("Getting tag types")
             query = (
                 QueryBuilder(post_db.connection).SELECT.DISTINCT("type").FROM(TagType)
             )
             rows = query.execute(as_dict=False)
         self.tag_types = [""] + [row[0] for row in rows]
+        logger.info("tag_types =  %s", self.tag_types)
 
         for tag in self.tag_types:
             label = str(tag)
@@ -73,11 +79,11 @@ class TagTab(ttk.Frame):
         logger.info('Selected "%s"', selected_board)
 
     def init_bindings(self):
-        e_binder.bind(BINDING.ON_ARTIST_SELECT, self.update_artist, self)
-        e_binder.bind(BINDING.ON_ARTIST_CLEAR, self.update_artist, self)
+        event_binder.bind(BINDING.ON_ARTIST_SELECT, self.update_artist, self)
+        event_binder.bind(BINDING.ON_ARTIST_CLEAR, self.update_artist, self)
         self.entry.bind("<KeyRelease>", self.on_key_release)
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
-        self.tree.bind("<Button-1>", self.query_by_tag)
+        self.tree.bind("<ButtonRelease-1>", self.query_by_tag)
         self.tree.bind("<Button-2>", self.on_middle_tag)
         self.tree.bind("<Key>", self.__keystroke)
 
@@ -94,15 +100,15 @@ class TagTab(ttk.Frame):
         shift_pressed = (state & 0x1) != 0  # noqa: F841
 
         if keysym in ["Return", "grave"]:
-            self.query_by_tag(event)
+            return self.query_by_tag(event)
         elif keysym == "w":
-            self.tree.event_generate("<Up>")
+            return self.tree.event_generate("<Up>")
         elif keysym == "a":
-            self.tree.event_generate("<Shift-Tab>")
+            return self.tree.event_generate("<Shift-Tab>")
         elif keysym == "s":
-            self.tree.event_generate("<Down>")
+            return self.tree.event_generate("<Down>")
         elif keysym == "d":
-            self.tree.event_generate("<Tab>")
+            return self.tree.event_generate("<Tab>")
         else:
             return ""
 
@@ -123,13 +129,10 @@ class TagTab(ttk.Frame):
         self.on_key_release()
 
     def is_artist(self, artist):
-        if (
-            artist in e_binder[BINDING.ARTIST_SET]
-            or artist in e_binder[BINDING.BOARD_SET]
-        ):
-            return True
-        else:
-            return False
+        return (
+            artist in event_binder[BINDING.ARTIST_SET]
+            or artist in event_binder[BINDING.BOARD_SET]
+        )
 
     def on_key_release(self, e=None):
         artist = self.curr_artist
@@ -149,45 +152,50 @@ class TagTab(ttk.Frame):
 
     def get_tag_counts(self, artist, text, type_):
         with PostDb() as post_db:
-            tags = post_db.get_tag_counts(artist, text, type_)
+            # tags = post_db.get_tag_counts(artist, text, type_, limit = 1000)
+            tags = post_db.get_tag_counts(artist = artist, search=text, type_=type_ )
         return tags
 
     def update_tree_with_tags(self, tags):
+
         for item in self.tree.get_children():
-            if item not in tags:
-                self.tree.delete(item)
+            self.tree.delete(item)
+
 
         for i, (tag, count) in enumerate(tags):
-            if not self.is_artist(tag):
-                tag_text: str = tag
-                if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
-                    tag_text = config.censor_text(tag_text)
-                if self.tree.exists(tag):
-                    self.tree.move(tag, "", i)
-                else:
-                    self.tree.insert("", i, iid=tag, text=tag_text, values=(count,))
+            if self.is_artist(tag):
+                continue
+            if i >= 500:
+                return
+            tag_text: str = tag
+            if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
+                tag_text = config.censor_text(tag_text)
+            if self.tree.exists(tag):
+                self.tree.move(tag, "", i)
+            else:
+                self.tree.insert("", i, iid=tag, text=tag_text, values=(count,))
+            
 
-    def get_tag_counts(self, artist, text, type_):
-        with PostDb() as post_db:
-            tags = post_db.get_tag_counts(artist, text, type_, limit=50)
-        return tags
-
-    def query_by_tag(self, event: tk.Event = None):
+    def query_by_tag(self, event: tk.Event):
+        print(event)
+        print(event.type)
         state = event.state
         ctrl_pressed = (state & 0x4) != 0
-        tag = self.tree.identify_row(event.y)
 
-        if self.tree.selection():
-            if tag in e_binder[BINDING.ARTIST_SET]:
-                e_binder.event_generate(BINDING.ON_ARTIST_SELECT, tag, ctrl_pressed)
-            else:
-                e_binder.event_generate(BINDING.ON_TAG_SELECT, tag, ctrl_pressed)
+        if event.type == TK.MOUSE_PRESS:
+            tag = self.tree.identify_row(event.y)
         else:
-            children = self.tree.children
-            if children:
-                self.tree.selection_set(children[0])
+            tag = self.tree.selection()[0]
+
+        if tag in event_binder[BINDING.ARTIST_SET]:
+            event_binder.event_generate(BINDING.ON_ARTIST_SELECT, tag, ctrl_pressed)
+        else:
+            event_binder.event_generate(BINDING.ON_TAG_SELECT, tag, ctrl_pressed)
+        # else:
+        #     event_binder.event_generate(BINDING.ON_TAG_SELECT, tag, ctrl_pressed)
+        return "break"
 
     def on_middle_tag(self, e=None):
         tag = self.tree.identify_row(e.y)
         logger.info("Middle click received for %s", tag)
-        e_binder.event_generate(BINDING.ON_TAG_SELECT, tag, True)
+        event_binder.event_generate(BINDING.ON_TAG_SELECT, tag, True)

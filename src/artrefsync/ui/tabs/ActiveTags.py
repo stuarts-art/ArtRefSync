@@ -6,14 +6,14 @@ import ttkbootstrap as ttk
 
 from artrefsync.constants import BINDING
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.event_binder import event_binder
 
 logger = logging.getLogger(__name__)
 
 
 class ActiveTagsTab(ttk.Frame):
     def __init__(self, root, *args, **kwargs):
-        logger.info("Init Active Tags Tab.")
+        logger.info("Initializing Active Tags Tab.")
         super().__init__(root, *args, **kwargs)
         self.font = nametofont("TkDefaultFont")
         self.artist = None
@@ -39,9 +39,9 @@ class ActiveTagsTab(ttk.Frame):
 
     def add_bindings(self):
         self.clear_button.bind("<Button-1>", self.clear_active)
-        e_binder.bind(BINDING.ON_ARTIST_CLEAR, self.clear_active, self)
-        e_binder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist, self)
-        e_binder.bind(BINDING.ON_TAG_SELECT, self.on_tag, self)
+        event_binder.bind(BINDING.ON_ARTIST_CLEAR, self.clear_active, self)
+        event_binder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist, self)
+        event_binder.bind(BINDING.ON_TAG_SELECT, self.on_tag, self)
 
     def remove_tag_cmd(self, e):
         widget = e.widget
@@ -71,7 +71,7 @@ class ActiveTagsTab(ttk.Frame):
         self.pack(side=tk.LEFT, expand=tk.TRUE, fill=tk.X)
 
     def is_artist(self, artist):
-        return artist in e_binder[BINDING.ARTIST_SET] | e_binder[BINDING.BOARD_SET]
+        return artist in event_binder[BINDING.ARTIST_SET] | event_binder[BINDING.BOARD_SET]
 
     def on_artist(self, artist, middle_click=False):
         logger.debug("Artist Recieved: %s, Middle Clicked: %d", artist, middle_click)
@@ -102,7 +102,7 @@ class ActiveTagsTab(ttk.Frame):
 
         if not middle_clicked:
             if len(self.active_tags) == 1:
-                t, widget = self.active_tags.popitem()
+                _, widget = self.active_tags.popitem()
                 widget.update_text(tag)
                 self.active_tags[tag] = widget
                 self.update_filter()
@@ -145,7 +145,7 @@ class ActiveTagsTab(ttk.Frame):
             self.artist = None
             self.grid_artist_button(forget=True)
             self.artist_button.update_text("")
-            e_binder.event_generate(BINDING.ON_ARTIST_SELECT, "")
+            event_binder.event_generate(BINDING.ON_ARTIST_CLEAR, "")
 
         elif tag in self.active_tags:
             removed = True
@@ -193,7 +193,7 @@ class ActiveTagsTab(ttk.Frame):
 
         self.grid_clear_frame(forget=False)
 
-    def clear_active(self, event=None, update=True):
+    def clear_active(self, *args):
         while self.active_tags:
             _, widget = self.active_tags.popitem()
             widget.destroy()
@@ -201,7 +201,7 @@ class ActiveTagsTab(ttk.Frame):
         self.artist_button.update_text("")
         self.grid_clear_frame(forget=True)
         self.grid_artist_button(forget=True)
-        e_binder.event_generate(BINDING.ON_ARTIST_SELECT, "")
+        event_binder.event_generate(BINDING.ON_ARTIST_SELECT, "")
         self.update_filter()
 
     def update_filter(self):
@@ -211,7 +211,7 @@ class ActiveTagsTab(ttk.Frame):
         self.update_idletasks()
         logger.info("Updating filter to be: %s", tags)
         self.last_filter = tags
-        e_binder.event_generate(BINDING.ON_FILTER_UPDATE, tags)
+        event_binder.event_generate(BINDING.ON_FILTER_UPDATE, tags)
 
     def forget_self(self):
         logger.info("Forgetting Active Tags from Grid")

@@ -30,7 +30,7 @@ class DIRS(StrEnum):
     THUMBNAIL = ".thumbnail"
 
 
-class PlainLocalStorage(ImageStoreHandler):
+class FileStoreHandler(ImageStoreHandler):
     def __init__(self):
         logger.info("Plain File Store Handler Init Start")
         self.artist_base_folder = Path(
@@ -187,7 +187,7 @@ class PlainLocalStorage(ImageStoreHandler):
                     with Image.open(post.thumbnail) as img:
                         if img.width != thumb_width and img.height != thumb_height:
                             thumbnail_flag = True
-                except Exception:
+                except Exception:  # noqa: BLE001
                     thumbnail_flag = True
             if not thumbnail_flag:
                 continue

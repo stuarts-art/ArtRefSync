@@ -6,13 +6,14 @@ from threading import Lock
 from tkinter.filedialog import askdirectory
 
 import ttkbootstrap as ttk
+from tenacity import retry, stop_after_attempt
 
 from artrefsync.config import get_config
 from artrefsync.constants import BINDING, TABLE, get_table_mapping
 from artrefsync.sync_coordinator import sync_artist, sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.TkThreadCaller import thread_caller
 
 config = get_config()
@@ -46,11 +47,12 @@ class ConfigTab(ttk.Frame):
         self.config_notebook = ttk.Notebook(self, style="custom.TNotebook")
         self.config_notebook.pack(expand=True, fill="both")
         self.init_control_tab()
-        e_binder.bind(BINDING.ON_ARTIST_SYNC, self.start_artist_sync, self)
-        e_binder[BINDING.SYNC_LOCK] = self.sync_lock
+        event_binder.bind(BINDING.ON_ARTIST_SYNC, self.start_artist_sync, self)
+        event_binder[BINDING.SYNC_LOCK] = self.sync_lock
 
         self.load()
 
+    @retry(stop=stop_after_attempt(3))
     def load(self):
         self.config_table_tabs = {}
         self.widget_dict = {}
@@ -96,6 +98,7 @@ class ConfigTab(ttk.Frame):
         )
         self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
 
+    @retry(stop=stop_after_attempt(3))
     def reload(self):
         config.reload_config()
         for table, frame in self.frames.items():
@@ -279,7 +282,7 @@ class ConfigTab(ttk.Frame):
         self.sync_lock.release()
         self.lock_owner = ""
         logger.info("FINISH ARTIST SYNC")
-        e_binder.event_generate(BINDING.ON_LOADING_DONE)
+        event_binder.event_generate(BINDING.ON_LOADING_DONE)
 
     def config_menu(self):
         self.root.filemenu.add_command(

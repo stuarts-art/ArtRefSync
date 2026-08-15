@@ -16,7 +16,7 @@ from artrefsync.config import get_config
 from artrefsync.constants import APP, BINDING, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.store_models import PostFile
-from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
 
@@ -32,10 +32,10 @@ class PhotoImageGallery(ttk.Frame):
 
         self.init_vars()
         self.init_widgets()
-        self.init_scafolding()
+        self.init_scaffolding()
         self.init_bindings()
         logger.info("Init Photo Image Complete.")
-        e_binder[BINDING.GALLERY_WIDGET] = self
+        event_binder[BINDING.GALLERY_WIDGET] = self
 
     def init_vars(self):
         logger.info("Init vars")
@@ -62,8 +62,8 @@ class PhotoImageGallery(ttk.Frame):
         self.text.tag_configure("center", justify="center")
         self.text.config(state="disabled")
 
-    def init_scafolding(self):
-        logger.info("Init safolding")
+    def init_scaffolding(self):
+        logger.info("Init scaffolding")
         self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
         self.scrolled_text.grid(row=1, column=0, sticky=tk.NSEW)
@@ -72,8 +72,8 @@ class PhotoImageGallery(ttk.Frame):
         logger.info("Init bindings")
         self.bind("<Configure>", self.update_width)
         self.bind("<FocusIn>", self.simple_frames.on_swap)
-        e_binder.bind(BINDING.ON_FILTER_UPDATE, self.change_tags, self)
-        e_binder.bind(BINDING.ON_SORT_BY_UPDATE, self.update_posts, self)
+        event_binder.bind(BINDING.ON_FILTER_UPDATE, self.change_tags, self)
+        event_binder.bind(BINDING.ON_SORT_BY_UPDATE, self.update_posts, self)
 
     def update_sort_var(self, e: tk.Event):
         self.sort_menu.post(
@@ -86,33 +86,33 @@ class PhotoImageGallery(ttk.Frame):
             self.frame_width.set(width - 50)
 
     def change_tags(self, tags=None):
+        logger.info("Updating tags to be %s", self.tags)
         if self.tags == tags:
             return
         if tags is None:
             tags = []
         self.tags = tags
-        logger.info("Updating tags to be %s", self.tags)
         self.text.see("1.0")
         self.update_posts()
 
     def update_posts(self, *args, **kwargs):
-        cancle_key = "get_sorted_posts"
-        sort_by = e_binder.get_or_default(BINDING.SORT_BY, "id")
-        sort_dir = e_binder.get_or_default(BINDING.SORT_DIR, "DESC")
+        cancel_key = "get_sorted_posts"
+        sort_by = event_binder.get_or_default(BINDING.SORT_BY, "id")
+        sort_dir = event_binder.get_or_default(BINDING.SORT_DIR, "DESC")
         logger.info(
             "Displaying image gallery, sorted by: %s %s, with tags: %s",
             sort_by,
             sort_dir,
             self.tags,
         )
-        e_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, "Working...")
+        # event_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, "Working...")
         thread_caller.add(
             self.get_sorted_posts,
             self.simple_frames.change_posts,
-            cancle_key,
-            self.tags,
-            sort_by,
-            sort_dir,
+            cancel_key,
+            tags = self.tags,
+            sort_by=sort_by,
+            sort_dir = sort_dir,
         )
 
         thread_caller.add(
@@ -125,16 +125,16 @@ class PhotoImageGallery(ttk.Frame):
 
     def update_count(self, row):
         if row:
-            e_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, row)
+            event_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, row)
         else:
-            e_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, 0)
+            event_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, 0)
 
     def get_sorted_posts(
-        self, tags, sort_by="", sort_dir="", limit=1000, offset=0, as_count=False
+        self, tags, sort_by="", sort_dir="", limit=200, offset=0, as_count = False
     ):
         with PostDb() as post_db:
             sorted_posts = post_db.posts_in_intersection(
-                tags, sort_by, sort_dir, limit=limit, offset=offset, as_count=as_count
+                tags, sort_by, sort_dir, limit=limit, offset=offset, as_count= as_count
             )
         return sorted_posts
 
@@ -142,7 +142,6 @@ class PhotoImageGallery(ttk.Frame):
 class SimpleFrames:
     frames: ClassVar[list[SimplePhotoLabel]] = []
     frame_map: ClassVar[dict] = {}
-
 
     def __init__(self, scrolled_text: ttk.ScrolledText, width_var, height_var):
         self.scrolled_text = scrolled_text
@@ -175,9 +174,9 @@ class SimpleFrames:
             return SimpleFrames.frames[index]
 
     def init_bindings(self):
-        e_binder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
-        e_binder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
-        e_binder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
+        event_binder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
+        event_binder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
+        event_binder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
         self.text.bind("<Key>", lambda e: self.text.after_idle(self.__keystroke, e))
         self.text.bind("<KeyRelease-space>", self.on_space)
         self.text.bind(
@@ -186,17 +185,15 @@ class SimpleFrames:
         self.text.bind("<FocusOut>", self.unbind_canvas_escape)
 
     def __keystroke(self, event: tk.Event):
-        keycode = event.keycode
         keysym = event.keysym
         state = event.state
 
         ctrl_pressed = (state & 0x4) != 0
-        shift_pressed = (state & 0x1) != 0
 
         if keysym == "q":
-            e_binder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
+            event_binder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
         elif keysym == "e":
-            e_binder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
+            event_binder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
         elif keysym in ["w", "Up"]:
             self.text.event_generate("<MouseWheel>", delta=60)
         elif keysym in ["a", "Left"]:
@@ -206,16 +203,16 @@ class SimpleFrames:
         elif keysym in ["d", "Right"]:
             self.throttled_focus_next()
         elif keysym == "z":
-            e_binder.event_generate(BINDING.ON_TEXT_Z)
+            event_binder.event_generate(BINDING.ON_TEXT_Z)
         elif keysym == "x":
-            e_binder.event_generate(BINDING.ON_TEXT_X)
+            event_binder.event_generate(BINDING.ON_TEXT_X)
         elif keysym == "c":
             if ctrl_pressed:
                 self.on_ctrl_c()
             else:
-                e_binder.event_generate(BINDING.ON_TEXT_C)
+                event_binder.event_generate(BINDING.ON_TEXT_C)
         elif keysym == "grave":
-            e_binder.event_generate(BINDING.ON_TEXT_ESCAPE)
+            event_binder.event_generate(BINDING.ON_TEXT_ESCAPE)
 
         else:
             return ""
@@ -242,13 +239,17 @@ class SimpleFrames:
     def on_space(self, *e):
         logger.info("ON SPACE")
         if self.selected and self.selected.bbox:
-            e_binder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid)
+            event_binder.event_generate(
+                BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid
+            )
         else:
             for frame in self.frames:
                 if frame.bbox:
                     self.text.see(frame)
                     self.add_select_tag(frame, False, False)
-                    e_binder.event_generate(BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid)
+                    event_binder.event_generate(
+                        BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid
+                    )
                     break
 
     def unbind_canvas_escape(self, *_):
@@ -282,7 +283,7 @@ class SimpleFrames:
 
     def on_double_button_1(self, e):
         self.text.focus_set()
-        e_binder.event_generate(
+        event_binder.event_generate(
             BINDING.ON_IMAGE_DOUBLE_CLICK, self.post_ids[e.widget.idx]
         )
 
@@ -319,7 +320,7 @@ class SimpleFrames:
             posts = []
         if posts == SimplePhotoLabel.post_ids:
             return
-
+        logger.info("%s posts recieved for change_post", len(posts))
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts
         self.text.see(self.frames[0])
@@ -370,7 +371,7 @@ class SimpleFrames:
     def updated_selected_post(self, pid):
         if self.last_selected != pid:
             self.last_selected = pid
-            e_binder.event_generate(BINDING.ON_POST_SELECT, self.selected.pid)
+            event_binder.event_generate(BINDING.ON_POST_SELECT, self.selected.pid)
 
     @property
     def selected(self) -> SimplePhotoLabel:
@@ -395,7 +396,7 @@ class SimpleFrames:
         if platform.system() == "Windows":
             files = ",".join([f"'{path}'" for path in file_paths])
             command = f'powershell -command "Set-Clipboard -Path {files}"'
-            subprocess.run(command, shell=True)
+            subprocess.run(command, shell=True)  # noqa: PLW1510
         else:
             logger.warning("Copy not implemented for OS %s", platform.system())
 
@@ -552,7 +553,7 @@ class SimpleFrames:
             for i in range(idx, idx + 8):
                 try:
                     SimpleFrames.frames[i].get_image()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     break
         else:
             logger.debug("Visibility: FALSE for %s. Resetting.", widget.pid)
@@ -583,8 +584,8 @@ class ImageCache:
         self.deque.append(key)
         self.cache[key] = value
         while len(self.deque) > self.max_size - 1:
-            rkey = self.deque.popleft()
-            self.cache.pop(rkey)
+            r_key = self.deque.popleft()
+            self.cache.pop(r_key)
 
     def remove(self, key):
         if key in self.cache:
@@ -594,12 +595,12 @@ class ImageCache:
 
 
 class SimplePhotoLabel(tk.Label):
-    post_ids = list()
-    post_files: dict[str, PostFile] = {}
+    post_ids = []  # noqa: RUF012
+    post_files: dict[str, PostFile] = {}  # noqa: RUF012
     photo_cache = ImageCache()
     text: ttk.Text = None
-    default_height = 10
-    default_width = 12
+    default_height = 40
+    default_width = 14
     get_image_cancel_key = "photo_label_get_image"
 
     @staticmethod
@@ -612,7 +613,9 @@ class SimplePhotoLabel(tk.Label):
     def get_post_file(pid) -> PostFile:
         if pid not in SimplePhotoLabel.post_files:
             with PostDb() as post_db:
-                file = post_db.files[pid] if pid in post_db.files else None
+                file = post_db.files.get(pid)
+            if not file:
+                return None
             SimplePhotoLabel.post_files[pid] = file
         return SimplePhotoLabel.post_files[pid]
 
@@ -715,7 +718,7 @@ class SimplePhotoLabel(tk.Label):
                 (self.width_var.get(), self.height_var.get()),
             )
             return thumb_size
-        except Exception:
+        except Exception:  # noqa: BLE001
             return (self.width_var.get(), self.height_var.get())
 
     def get_image(self, force_update=False):
@@ -742,7 +745,7 @@ class SimplePhotoLabel(tk.Label):
             self.config(image=None)
 
             text_width = self.root.winfo_width()
-            self.thumbsize = (text_width, self.height_var.get())
+            self.thumb_size = (text_width, self.height_var.get())
             if self.file.ext not in ["webm", "mp4"] and self.image_h > 400:
                 logger.debug("Upscaling file %s to the full file", self.file_name)
                 self.file_name = self.file.file
@@ -759,7 +762,7 @@ class SimplePhotoLabel(tk.Label):
                 self.set_image,
                 self.get_image_cancel_key,
                 self.file_name,
-                self.thumbsize,
+                self.thumb_size,
                 False,
                 blur,
             )
@@ -774,3 +777,4 @@ class SimplePhotoLabel(tk.Label):
         self.config(image=photo, height=photo.height(), width=photo.width())
         self.loading = False
         logger.debug("Setting Image")
+        self.update_idletasks()

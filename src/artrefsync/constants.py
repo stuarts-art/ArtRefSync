@@ -20,12 +20,25 @@ class NAMES(StrEnum):
     VIEWER_TAB = auto()
 
 
+class TK(StrEnum):
+    KEY_PRESS = "2"
+    MOUSE_PRESS = "5"
+
+class ICON(StrEnum):
+    FOLDER_OPEN = "🗁"
+    FOLDER_CLOSED = "🗀"
+    TAG = "🏷"
+    INFO = "ⓘ"
+    SETTINGS = '⚙'
+    ARTISTS = "🎨"
+
 class BINDING(StrEnum):
     GALLERY_WIDGET = auto()
     VIEWER_WIDGET = auto()
     # Mapped vars
     ARTIST_SET = auto()
     BOARD_SET = auto()
+    BOARD_ARTIST_MAP = auto()
     SORT_BY = auto()
     SORT_DIR = auto()
     SYNC_LOCK = auto()

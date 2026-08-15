@@ -45,7 +45,7 @@ def resource_path(relative_path):
         return Path(relative_path)
     try:
         base_path = sys._MEIPASS
-    except Exception:
+    except Exception:  # noqa: BLE001
         base_path = os.path.abspath("./_internal")
         os.makedirs(base_path, 0o771, exist_ok=True)
     return Path(os.path.join(base_path, relative_path)).resolve()

@@ -6,9 +6,7 @@ import os
 import shutil
 import sys
 from datetime import UTC, datetime
-from enum import StrEnum
 from pathlib import Path
-from typing import Any
 
 from diskcache import Cache
 from simple_toml_configurator import Configuration
@@ -16,8 +14,6 @@ from simple_toml_configurator import Configuration
 from artrefsync.constants import (
     APP,
     BOARD,
-    DANBOORU,
-    DB,
     E621,
     EAGLE,
     LOCAL,
@@ -25,59 +21,10 @@ from artrefsync.constants import (
     STORE,
     TABLE,
 )
+from artrefsync.default_config import default_config
 from artrefsync.utils.utils import censor_text, resource_path
 
 logger = logging.getLogger(__name__)
-
-default_config: dict[StrEnum, dict[StrEnum, Any]] = {
-    TABLE.APP: {
-        APP.THEME: "bootstrap-dark",
-        APP.LIMIT: 5000,
-        APP.LOG_LEVEL: "INFO",
-        APP.ID_LENGTH: 8,
-        APP.CACHE_DIR: ".metadata_cache",
-        APP.CACHE_TTL: 300,
-        APP.DB_DIR: ".db",
-        APP.DB_FILE_NAME: DB.TAGAPP_DB,
-        APP.DB_BLOB_NAME: DB.BLOB_DB,
-        APP.THUMBNAIL_WIDTH: 1280,
-        APP.THUMBNAIL_HEIGHT: 720,
-        APP.ONLY_RECENT_ENABLED: True,
-        APP.MAX_DOWNLOAD_THREADS: 8,
-        APP.BLUR_UNSAFE_ENABLED: False,
-    },
-    TABLE.R34: {
-        R34.ENABLED: False,
-        R34.ARTISTS: [],
-        R34.BLACK_LIST: [],
-        R34.API_KEY: "",
-    },
-    TABLE.E621: {
-        E621.ENABLED: False,
-        E621.ARTISTS: [],
-        E621.BLACK_LIST: [],
-        E621.API_KEY: "",
-        E621.USERNAME: "",
-    },
-    TABLE.DANBOORU: {
-        DANBOORU.ENABLED: False,
-        DANBOORU.ARTISTS: [],
-        DANBOORU.BLACK_LIST: [],
-        DANBOORU.API_KEY: "",
-        DANBOORU.USERNAME: "",
-    },
-    TABLE.EAGLE: {
-        EAGLE.ENABLED: False,
-        EAGLE.ENDPOINT: "http://localhost:41595/api",
-        EAGLE.LIBRARY: "",
-        EAGLE.ARTIST_FOLDER: "",
-    },
-    TABLE.LOCAL: {
-        LOCAL.ENABLED: True,
-        LOCAL.ARTIST_DIR: "media",
-    },
-}
-
 
 class Config:
     def __init__(self, config_path="config", config_file_name="config"):

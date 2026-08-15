@@ -11,7 +11,7 @@ from PIL import Image, ImageTk
 
 from artrefsync.config import get_config
 from artrefsync.constants import BINDING
-from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.image_utils import ImageUtils
 
 config = get_config()
@@ -219,11 +219,11 @@ class CanvasImage:
 
     def pack(self, **kw):
         """Exception: cannot use pack with this widget"""
-        raise Exception("Cannot use pack with the widget " + self.__class__.__name__)
+        raise Exception("Cannot use pack with the widget " + self.__class__.__name__)  # noqa: TRY002
 
     def place(self, **kw):
         """Exception: cannot use place with this widget"""
-        raise Exception("Cannot use place with the widget " + self.__class__.__name__)
+        raise Exception("Cannot use place with the widget " + self.__class__.__name__)  # noqa: TRY002
 
     # noinspection PyUnusedLocal
     def __scroll_x(self, *args, **kwargs):
@@ -334,7 +334,7 @@ class CanvasImage:
     def outside(self, x, y):
         """Checks if the point (x,y) is outside the image area"""
         bbox = self.canvas.coords(self.container)  # get image area
-        if bbox[0] < x < bbox[2] and bbox[1] < y < bbox[3]:
+        if (bbox[0] < x < bbox[2]) and (bbox[1] < y < bbox[3]):  # noqa: SIM103
             return False  # point (x,y) is inside the image area
         else:
             return True  # point (x,y) is outside the image area
@@ -413,9 +413,9 @@ class CanvasImage:
             ]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
                 self.canvas.event_generate("<MouseWheel>", delta=+120)
             elif event.keysym in ["z"]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
-                e_binder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE)
+                event_binder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE)
             elif event.keysym in ["c"]:  # scroll down: keys 'S', 'Down' or 'Numpad-2'
-                e_binder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE)
+                event_binder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE)
 
             else:
                 logger.info(

@@ -7,7 +7,7 @@ from threading import Lock
 import cv2
 import ttkbootstrap as ttk
 from PIL import ImageTk
-from tkinterdnd2 import DND_FILES, TkinterDnD
+from tkinterdnd2 import DND_FILES
 
 from artrefsync.config import get_config
 from artrefsync.utils.image_utils import ImageUtils
@@ -17,7 +17,8 @@ from artrefsync.utils.TkThreadCaller import thread_caller
 config = get_config()
 logger = logging.getLogger(__name__)
 
-class ImageCache: # WIP Video/Gif Viewer
+
+class ImageCache:  # WIP Video/Gif Viewer
     def __init__(self, max_size=50):
         self.cache = OrderedDict()
         self.deque = deque()
@@ -42,21 +43,21 @@ class ImageCache: # WIP Video/Gif Viewer
             self.cache.move_to_end(key, last=False)
         self.cache[key] = value
         while len(self.deque) > self.max_size:
-            rkey = self.deque.pop()
+            r_key = self.deque.pop()
             self.pop_count += 1
 
-            self.cache.pop(rkey)
+            self.cache.pop(r_key)
             if self.pop_count % 20 == 0:
-                logger.info("Popped id: %s, total popped: %s", rkey, self.pop_count)
+                logger.info("Popped id: %s, total popped: %s", r_key, self.pop_count)
 
     def clear(self):
         self.deque.clear()
         while self.cache:
             self.cache.popitem()
 
+
 class ImageBuffer:
-    def __init__(
-        self, size=1080, index: ttk.IntVar = None):
+    def __init__(self, size=1080, index: ttk.IntVar = None):
         self.lock = Lock()
         self.frame_count = 1
         self.count = 0
@@ -76,7 +77,7 @@ class ImageBuffer:
                 return int(self.gif.get(cv2.CAP_PROP_POS_FRAMES))
             else:
                 self.gif.set(cv2.CAP_PROP_POS_FRAMES, frame)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return 0
 
     def __contains__(self, index):
@@ -141,8 +142,8 @@ class ImageBuffer:
         else:
             self.frames[0] = [ImageUtils.get_cv2_pil_image(path)]
             self.frame_count = 1
-            self.fps=1
-            self.delay=1
+            self.fps = 1
+            self.delay = 1
             self.delay = None
 
     def get_frame(self, index):
@@ -187,9 +188,7 @@ class ImageBuffer:
 
 
 class ImagePlayer:
-    def __init__(
-        self, parent, size: int, index: IntegerVar
-    ):
+    def __init__(self, parent, size: int, index: IntegerVar):
         self.parent = parent
         self.size = size
         self.index: IntegerVar = index
@@ -227,7 +226,7 @@ class ImagePlayer:
             self.ui_frame,
             from_=0,
             to=100,
-            variable=self.index.dummyvar,
+            variable=self.index.dummy_var,
             length=400,
             command=self.on_scale,
         )
@@ -299,7 +298,6 @@ class ImagePlayer:
         if index in self.after_map:
             return
 
-
         image = self.buffer[index]
         if image is None:
             return
@@ -329,21 +327,10 @@ class ImagePlayer:
             self.displayed_index = index
 
             self.start = time.time()
-            if len(self.buffer) > 1:
-                if self.playing and not self.scaling:
-                    self.index += 1
-                    self.index %= len(self.buffer)
+            if len(self.buffer) > 1 and self.playing and not self.scaling:
+                self.index += 1
+                self.index %= len(self.buffer)
         self.schedule_play()
 
     def schedule_play(self):
         self.set_future = thread_caller.add(self.play, None, "play")
-
-
-if __name__ == "__main__":
-    size = 1080
-    app = ttk.Window(size=(size, size))
-    TkinterDnD._require(app)
-    index = IntegerVar(value=0)
-    with  thread_caller:
-        player = ImagePlayer(app, 1080, index)
-        app.mainloop()

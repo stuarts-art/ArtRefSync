@@ -82,13 +82,13 @@ class DanbooruHandler(ImageBoardHandler):
                 created_datetime = datetime.fromisoformat(d_post.created_at)
                 create_timestamp = int(created_datetime.timestamp())
                 tags.append(str(created_datetime.year))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 create_timestamp = 0
 
             try:
                 updated_datetime = datetime.fromisoformat(d_post.updated_at)
                 update_timestamp = int(updated_datetime.timestamp())
-            except Exception:
+            except Exception:  # noqa: BLE001
                 update_timestamp = 0
 
             tags.append(rating)

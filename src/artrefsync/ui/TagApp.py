@@ -8,10 +8,11 @@ import ttkbootstrap as ttk
 from tkinterdnd2 import TkinterDnD
 
 from artrefsync.config import Config, set_config
-from artrefsync.constants import APP, BINDING, TABLE
+from artrefsync.constants import APP, BINDING, ICON, TABLE
+from artrefsync.ui.widgets.LoadingBar import LoadingBars
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.EventManager import e_binder
+from artrefsync.utils.event_binder import event_binder
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +82,7 @@ class App(ttk.Window):
         self.init_bindings()
         self.init_top_bar_vars()
         self.gallery.text.focus_set()
-        self.after_idle(e_binder.event_generate, BINDING.ON_FILTER_UPDATE)
-        self.artist_tab.lift()
+        self.after_idle(event_binder.event_generate, BINDING.ON_FILTER_UPDATE)
 
         logger.info("App Init Complete")
 
@@ -126,16 +126,16 @@ class App(ttk.Window):
         self.left_bar.grid(row=0, column=0, sticky=tk.NSEW)
 
         self.left_artist_icon = RoundedIcon(
-            self.left_bar, text="🎨", size=30, pack_kwargs={"side": tk.TOP}
+            self.left_bar, text=ICON.ARTISTS, size=30, pack_kwargs={"side": tk.TOP}
         )
         self.left_tag_icon = RoundedIcon(
-            self.left_bar, text="🏷", size=30, pack_kwargs={"side": tk.TOP}
+            self.left_bar, text=ICON.TAG, size=30, pack_kwargs={"side": tk.TOP}
         )
         self.left_info_icon = RoundedIcon(
-            self.left_bar, text="ⓘ", size=30, pack_kwargs={"side": tk.TOP}
+            self.left_bar, text=ICON.INFO, size=30, pack_kwargs={"side": tk.TOP}
         )
         self.left_config_icon = RoundedIcon(
-            self.left_bar, text="⚙", size=30, pack_kwargs={"side": tk.TOP}
+            self.left_bar, text=ICON.SETTINGS, size=30, pack_kwargs={"side": tk.TOP}
         )
 
         self.left_tabs = ttk.Frame(self.bar.mid_left)
@@ -149,16 +149,16 @@ class App(ttk.Window):
             self.right, variable=self.temp_loading_var, maximum=100, length=200
         )
         self.temp_loading.grid(row=0, column=0)
+        self.loading_bar = LoadingBars(self.bar._bot)
 
     def init_tabs(self):
         from artrefsync.ui.tabs.ActiveTags import ActiveTagsTab
         from artrefsync.ui.tabs.ArtistTab import ArtistTab
         from artrefsync.ui.tabs.SortByTab import SortByTab
         from artrefsync.ui.tabs.TagTab import TagTab
-        from artrefsync.ui.widgets.LoadingBar import LoadingBars
         from artrefsync.ui.widgets.PostInfo import PostInfoTab
 
-        logger.info("Init tabs")
+        logger.info("Initializing tabs")
         self.artist_tab = ArtistTab(self.left_tabs).grid(
             row=0, column=0, sticky=tk.NSEW
         )
@@ -169,7 +169,7 @@ class App(ttk.Window):
         self.active_tab = ActiveTagsTab(self.bar.top_mid)
         self.sort_by_tab = SortByTab(self.bar.top_right)
         self.sort_by_tab.pack(side="right", padx=5)
-        self.loading_bar = LoadingBars(self.bar._bot)
+        self.artist_tab.lift()
 
     def tab_toggle_closure(self, widget: ttk.Frame):
         def raise_toggle_widget(event: tk.Event):
@@ -189,7 +189,7 @@ class App(ttk.Window):
 
     def init_top_bar_vars(self):
         self.top_right_text = ttk.StringVar(value="")
-        e_binder.bind(
+        event_binder.bind(
             BINDING.ON_SET_TOP_RIGHT_TEXT,
             lambda x: self.top_right_text.set(f"{x}"),
             self.bar,
@@ -204,22 +204,16 @@ class App(ttk.Window):
         from artrefsync.ui.widgets.PhotoGallery import PhotoImageGallery
 
         logger.info("Init Views")
-        self.temp_loading_var.set(30)
-        self.config_tab = ConfigTab(self.right)
-        self.temp_loading_var.set(40)
+        self.gallery = PhotoImageGallery(self.right).grid(
+            column=0, row=0, sticky=tk.NSEW
+        )
         self.image_viewer = ViewerTab(self.right)
-        self.temp_loading_var.set(50)
-        self.image_viewer.grid(column=0, row=0, sticky=tk.NSEW)
-        self.temp_loading_var.set(60)
-        self.image_viewer.grid_forget()
-        self.temp_loading_var.set(70)
-        self.gallery = PhotoImageGallery(self.right)
-        self.gallery.grid(column=0, row=0, sticky=tk.NSEW)
+        self.config_tab = ConfigTab(self.right)
 
     def init_bindings(self):
         logger.info("Init Bindings")
         self.config_tab.clear_button.bind("<Button-1>", self.toggle_config)
-        self.bind_all("<Control-Key-3>", self.focus_galery)
+        self.bind_all("<Control-Key-1>", self.focus_galery)
         self.bind_all("<Control-Key-4>", self.toggle_config)
         self.bind_all("<Control-comma>", self.toggle_config)
         self.artist_tab.entry.bind("<Shift-Tab>", self.focus_galery)

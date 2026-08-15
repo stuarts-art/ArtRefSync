@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 from threading import Event
 
 from artrefsync.api.r34_client import R34_Client
@@ -21,7 +21,7 @@ class R34Handler(ImageBoardHandler):
     Class to handle requesting and handling messages from the image board R34
     """
 
-    def __init__(self, only_recent=False, stop_event: Event = None):
+    def __init__(self, only_recent=False, stop_event: Event | None = None):
         self.only_recent = only_recent
         self.stop_event = stop_event
         logger.info("Initialize R34 Handler")
@@ -51,7 +51,6 @@ class R34Handler(ImageBoardHandler):
 
     def get_posts(self, tag, post_limit=None) -> dict[str, Post]:
         posts = {}
-
         last_id = None
         if self.only_recent:
             with PostDb() as post_db:
@@ -74,24 +73,25 @@ class R34Handler(ImageBoardHandler):
             tag = tag.split()[0]  # Remove query and metatags
         logger.debug("Recieved %s from client.", len(r34_posts))
 
-        for rpost in r34_posts:
+        for r_post in r34_posts:
             skip_rpost = False
-            website = f"https://rule34.xxx/index.php?page=post&s=view&id={rpost.id}"
-            post_id = Post.make_storage_id(rpost.id, self.get_board())
-            ext = rpost.file_url.split(".")[-1]
+            website = f"https://rule34.xxx/index.php?page=post&s=view&id={r_post.id}"
+            post_id = Post.make_storage_id(r_post.id, self.get_board())
+            ext = r_post.file_url.split(".")[-1]
 
-            tags = rpost.tags + [tag, BOARD.R34.value, ext]
-            rating = f"rating_{rpost.rating}"
+            tags = r_post.tags + [tag, BOARD.R34.value, ext]
+            rating = f"rating_{r_post.rating}"
             tags.append(rating)
             for black_listed in self.black_list:
-                if black_listed in rpost.tags:
+                if black_listed in r_post.tags:
                     logger.debug(f"Skipping {post_id} for {black_listed}. ({website})")
                     skip_rpost = True
                     break
+
             if skip_rpost:
                 continue
 
-            for info in rpost.tag_info:
+            for info in r_post.tag_info:
                 if info.type == "tag":
                     continue
                 self.type_tags[info.type].add(info.tag)
@@ -102,42 +102,44 @@ class R34Handler(ImageBoardHandler):
 
             try:
                 created_datetime = datetime.strptime(
-                    rpost.created_at, "%a %b %d %H:%M:%S %z %Y"
+                    r_post.created_at, "%a %b %d %H:%M:%S %z %Y"
                 )
                 create_timestamp = int(created_datetime.timestamp())
                 tags.append(str(created_datetime.year))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 create_timestamp = 0
 
             try:
-                updated_datetime = datetime.fromtimestamp(rpost.change)
+                updated_datetime = datetime.fromtimestamp(r_post.change, UTC)
                 update_timestamp = int(updated_datetime.timestamp())
                 if created_datetime == 0:
                     create_timestamp = update_timestamp
-            except Exception:
+            except Exception:  # noqa: BLE001
                 update_timestamp = 0
 
             post = Post(
                 id=post_id,
-                ext_id=rpost.id,
+                ext_id=r_post.id,
                 name=f"{post_id}-{tag}",
                 artist_name=tag,
                 tags=list(dict.fromkeys(tags)),
                 board=self.board,
-                score=rpost.score,
-                url=rpost.file_url,
+                score=r_post.score,
+                url=r_post.file_url,
                 website=website,
-                md5=rpost.hash,
+                md5=r_post.hash,
                 update_timestamp=update_timestamp,
                 create_timestamp=create_timestamp,
-                height=rpost.height,
-                width=rpost.width,
+                height=r_post.height,
+                width=r_post.width,
                 ratio=(
-                    rpost.width / rpost.height if rpost.width and rpost.height else None
+                    r_post.width / r_post.height
+                    if r_post.width and r_post.height
+                    else None
                 ),
-                sample_link=rpost.sample_url,
-                preview_link=rpost.preview_url,
-                file_link=rpost.file_url,
+                sample_link=r_post.sample_url,
+                preview_link=r_post.preview_url,
+                file_link=r_post.file_url,
                 ext=ext,
             )
             posts[post_id] = post

@@ -60,10 +60,9 @@ class LinkCache:
     def get_file_from_link(self, link: str) -> str:
         if link not in self._link_cache:
             suffix = f".{link.split('.')[-1]}"
-            temp = NamedTemporaryFile(
+            temp = NamedTemporaryFile(  # noqa: SIM115
                 mode="wb", suffix=suffix, dir=self.temp_dir.name, delete=False
             )
-            self.temp_dir
             self.download_link_to_file(link, temp)
             self._link_cache[link] = temp.name
         return self._link_cache[link]
