@@ -12,7 +12,6 @@ from dataclassdb import DataclassDb, QueryBuilder
 from artrefsync.api.eagle_client import EagleClient
 from artrefsync.config import get_config
 from artrefsync.constants import APP, EAGLE, TABLE
-from artrefsync.utils.utils import resource_path
 
 config = get_config()
 
@@ -68,10 +67,10 @@ class EagleDb:
             db_dir = config[TABLE.APP][APP.DB_DIR]
             db_name = "eagle.db"
             if db_dir:
-                db_file_name = resource_path(f"{db_dir}/{db_name}")
+                db_file_name = config.resource_path(f"{db_dir}/{db_name}")
                 os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
             else:
-                db_file_name = resource_path(db_name)
+                db_file_name = config.resource_path(db_name)
             self.connection = sqlite3.connect(db_file_name)
             self.connection_owner = True
         self.commit = self.connection.commit

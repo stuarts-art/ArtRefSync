@@ -1,6 +1,7 @@
 import logging
 
 import ttkbootstrap as ttk
+import tkinter as tk
 
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 
@@ -89,18 +90,30 @@ class ModernTopBar(ttk.Frame):
         self.sidebar_left_toggle.pack(side="left", padx=5)
         self.sidebar_left_toggle.bind("<ButtonPress-1>", self.toggle_left_sidebar)
 
-    def toggle_left_sidebar(self, event=None):
-        left_info = self.mid_left.grid_info()
-        if left_info:
-            self.sidebar_left_toggle.update_text("◨")
-            self.mid_left.grid_forget()
-            self.mid_left_sep.grid_forget()
-            self.update_idletasks()
-        else:
+    def toggle_topbar(self, toggle_on=None):
+        print(f"Top bar, {toggle_on}, {self.mid_left.grid_info()}")
+        if toggle_on is None or isinstance(toggle_on, tk.Event):
+            toggle_on = not self._top.grid_info()
+
+        if toggle_on and not self._top.grid_info():
+            self._top.grid(column=0, row=0, sticky="new", columnspan=3)
+        elif not toggle_on and self._top.grid_info():
+            self._top.grid_forget()
+
+    def toggle_left_sidebar(self, toggle_on=None):
+        print(f"Mid Left, {toggle_on}, {self.mid_left.grid_info()}")
+
+        if toggle_on is None or isinstance(toggle_on, tk.Event):
+            toggle_on = not self.mid_left.grid_info()
+
+        if toggle_on and not self.mid_left.grid_info():
             self.sidebar_left_toggle.update_text("◧")
             self.mid_left.grid(column=0, row=0, sticky="nws")
             self.mid_left_sep.grid(column=1, row=0, sticky="ns")
-            self.update_idletasks()
+        elif not toggle_on and self.mid_left.grid_info():
+            self.sidebar_left_toggle.update_text("◨")
+            self.mid_left.grid_forget()
+            self.mid_left_sep.grid_forget()
 
     def toggle_right_sidebar(self, event=None):
         right_info = self.mid_right.grid_info()

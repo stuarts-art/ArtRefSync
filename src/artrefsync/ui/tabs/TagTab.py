@@ -10,6 +10,7 @@ from artrefsync.db.db_models import TagType
 from artrefsync.db.post_db import PostDb
 from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.TkThreadCaller import thread_caller
+from artrefsync.utils.utils import censor_text
 
 config = get_config()
 logger = logging.getLogger(__name__)
@@ -71,7 +72,6 @@ class TagTab(ttk.Frame):
 
         self.after(100, self.on_key_release)
         config.subscribe_reload(self.on_key_release)
-
         self.init_bindings()
 
     def on_board_menu_select(self):
@@ -81,6 +81,7 @@ class TagTab(ttk.Frame):
     def init_bindings(self):
         event_binder.bind(BINDING.ON_ARTIST_SELECT, self.update_artist, self)
         event_binder.bind(BINDING.ON_ARTIST_CLEAR, self.update_artist, self)
+        event_binder.bind(BINDING.ON_DB_UPDATE, self.on_key_release, self)
         self.entry.bind("<KeyRelease>", self.on_key_release)
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
         self.tree.bind("<ButtonRelease-1>", self.query_by_tag)
@@ -169,7 +170,7 @@ class TagTab(ttk.Frame):
                 return
             tag_text: str = tag
             if config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
-                tag_text = config.censor_text(tag_text)
+                tag_text = censor_text(tag_text)
             if self.tree.exists(tag):
                 self.tree.move(tag, "", i)
             else:

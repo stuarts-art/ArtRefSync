@@ -57,7 +57,7 @@ class EventBinder:
                 self[sequence] = args
         if sequence in self.sequence_bindings:
             for binding in self.sequence_bindings[sequence]:
-                binding.root.after(0, binding.func, *args)
+                binding.root.after(0, binding.func, *args, **kwargs)
         elif sequence.startswith("on_"):
             logger.debug(
                 "Sequence %s not bound. Currently bound keys: %s.",

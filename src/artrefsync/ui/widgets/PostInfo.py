@@ -17,6 +17,7 @@ from artrefsync.db.post_db import PostDb
 from artrefsync.stores.store_models import PostFile
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.event_binder import event_binder
+from artrefsync.utils.utils import censor_text
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
 
@@ -190,7 +191,7 @@ class PostInfoTab(ttk.Frame):
         for tag in post.tags:
             tag_text = tag
             if blur_tags:
-                blur_text = config.censor_text(tag)
+                blur_text = censor_text(tag)
                 self.blur_map[blur_text] = tag
                 tag_text = blur_text
             self.tags.insert(tk.END, f"{tag_text}  ")

@@ -63,6 +63,7 @@ class ArtistTab(ttk.Frame):
         self.tree.bind("<Key>", self.__keystroke)
         self.board_menu_button.bind("<Return>", self.open_menu)
         self.tree.bind("<Button-1>", self.update_folder_icon, add=True)
+        event_binder.bind(BINDING.ON_DB_UPDATE, self.load_config, self)
 
     def load_config(self):
         if self.tree.get_children():

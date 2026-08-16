@@ -24,13 +24,15 @@ class TK(StrEnum):
     KEY_PRESS = "2"
     MOUSE_PRESS = "5"
 
+
 class ICON(StrEnum):
     FOLDER_OPEN = "🗁"
     FOLDER_CLOSED = "🗀"
     TAG = "🏷"
     INFO = "ⓘ"
-    SETTINGS = '⚙'
+    SETTINGS = "⚙"
     ARTISTS = "🎨"
+
 
 class BINDING(StrEnum):
     GALLERY_WIDGET = auto()
@@ -43,26 +45,28 @@ class BINDING(StrEnum):
     SORT_DIR = auto()
     SYNC_LOCK = auto()
 
-    ON_LOAD_LEFT_SET = auto()
-    ON_LOAD_MID_SET = auto()
-    ON_LOAD_RIGHT_SET = auto()
-    ON_LOAD_LEFT_INCR = auto()
-    ON_LOAD_RIGHT_INCR = auto()
-    ON_LOADING_DONE = auto()
-    ON_POST_SELECT = auto()
-    ON_POST_FOCUS_CHANGE = auto()
-    ON_PREV_GALLERY_IMAGE = auto()
-    ON_NEXT_GALLERY_IMAGE = auto()
-    ON_IMAGE_VISIBILITY = auto()
-    ON_IMAGE_DOUBLE_CLICK = auto()
+    ON_ARTIST_CLEAR = auto()
     ON_ARTIST_SELECT = auto()
     ON_ARTIST_SYNC = auto()
     ON_ARTIST_SYNC_DONE = auto()
-    ON_ARTIST_CLEAR = auto()
-    ON_TAG_SELECT = auto()
+    ON_DB_UPDATE = auto()
     ON_FILTER_UPDATE = auto()
-    ON_SORT_BY_UPDATE = auto()
+    ON_IMAGE_DOUBLE_CLICK = auto()
+    ON_IMAGE_VISIBILITY = auto()
+    ON_LOAD_LEFT_INCR = auto()
+    ON_LOAD_LEFT_SET = auto()
+    ON_LOAD_MID_SET = auto()
+    ON_LOAD_RIGHT_INCR = auto()
+    ON_LOAD_RIGHT_SET = auto()
+    ON_LOADING_DONE = auto()
+    ON_NEXT_GALLERY_IMAGE = auto()
+    ON_POST_FOCUS_CHANGE = auto()
+    ON_POST_SELECT = auto()
+    ON_PREV_GALLERY_IMAGE = auto()
     ON_SET_TOP_RIGHT_TEXT = auto()
+    ON_SORT_BY_UPDATE = auto()
+    ON_TAG_SELECT = auto()
+    ON_TOGGLE_UI = auto()
     ON_ZOOM_DELTA = auto()
 
     ON_TEXT_ESCAPE = auto()

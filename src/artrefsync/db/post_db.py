@@ -11,7 +11,6 @@ from artrefsync.config import get_config
 from artrefsync.constants import APP, BOARD, DANBOORU, E621, R34, TABLE
 from artrefsync.db.db_models import ArtistTagCount, PostTagLink, Tag, TagType
 from artrefsync.stores.store_models import PostFile
-from artrefsync.utils.utils import resource_path
 
 config = get_config()
 logger = logging.getLogger(__name__)
@@ -49,11 +48,11 @@ class PostDb:
             db_name = db_name if db_name else config[TABLE.APP][APP.DB_FILE_NAME]
 
             if db_dir:
-                db_file_name = resource_path(f"{db_dir}/{db_name}")
+                db_file_name = config.resource_path(f"{db_dir}/{db_name}")
                 os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
             else:
-                db_file_name = resource_path(db_name)
-            logger.info("Connecting to Database: %s", db_file_name)
+                db_file_name = config.resource_path(db_name)
+            logger.debug("Connecting to Database: %s", db_file_name)
             self.connection = sqlite3.connect(db_file_name)
             self.connection_owner = True
         self.commit = self.connection.commit

@@ -36,9 +36,18 @@ class App(ttk.Window):
         """
         self.project_path = Path(project_path).resolve()
         self.config_path = self.project_path / "config"
+        self._internal_path = self.project_path / "_internal"
+        global resource_path_override
+        resource_path_override = self._internal_path
         os.chdir(project_path)
+        os.makedirs(self.config_path, exist_ok=True)
+        os.makedirs(self._internal_path, exist_ok=True)
 
-        config = Config(config_path=self.config_path, config_file_name="config")
+        config = Config(
+            config_path=self.config_path,
+            config_file_name="config",
+            internal_override=self._internal_path,
+        )
         set_config(config)
         theme = config[TABLE.APP][APP.THEME]
         theme = "bootstrap-dark" if not theme else theme
@@ -187,6 +196,20 @@ class App(ttk.Window):
 
         return raise_toggle_widget
 
+    def toggle_top_bar(self, toggle_on=None):
+        if toggle_on is None:
+            top_status = self.bar._top.grid_info()
+            toggle_on = not top_status
+
+        if toggle_on and self.bar._top.grid_info():
+            return
+        if toggle_on and self.bar.mid_left.grid_info():
+            return
+
+        self.bar.toggle_topbar(toggle_on=toggle_on)
+        self.bar.toggle_left_sidebar(toggle_on=toggle_on)
+        self.update_idletasks()
+
     def init_top_bar_vars(self):
         self.top_right_text = ttk.StringVar(value="")
         event_binder.bind(
@@ -228,6 +251,7 @@ class App(ttk.Window):
             "<Button-1>", self.tab_toggle_closure(self.post_info_tab)
         )
         self.left_config_icon.bind("<Button-1>", self.toggle_config)
+        event_binder.bind(BINDING.ON_TOGGLE_UI, self.toggle_top_bar, self.bar)
 
     def focus_galery(self, e):
         self.gallery.scrolled_text.text.focus_set()

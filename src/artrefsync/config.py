@@ -22,25 +22,29 @@ from artrefsync.constants import (
     TABLE,
 )
 from artrefsync.default_config import default_config
-from artrefsync.utils.utils import censor_text, resource_path
+from artrefsync.utils.utils import censor_text
 
 logger = logging.getLogger(__name__)
 
+
 class Config:
-    def __init__(self, config_path="config", config_file_name="config"):
+    def __init__(
+        self, config_path="config", config_file_name="config", internal_override=""
+    ):
         self.config_path = config_path
         self.config_file_name = config_file_name
         self._subscribed_reload = []
         self.__caches = {}
         self._reload_config(self.config_path, self.config_file_name)
+        self._internal_override = internal_override
 
     def _reload_config(self, config_path=None, config_file_name=None):
         kwargs = {
             "config_path": config_path if config_path else self.config_path,
             "defaults": default_config,
-            "config_file_name": config_file_name
-            if config_file_name
-            else self.config_file_name,
+            "config_file_name": (
+                config_file_name if config_file_name else self.config_file_name
+            ),
         }
         self.settings = Configuration(**kwargs)
         self.path = self.settings._full_config_path
@@ -67,12 +71,23 @@ class Config:
             config_file_name,
         )
 
-    def censor_text(self, text):
-        if self[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]:
-            return censor_text(text)
+    def resource_path(self, relative_path):
+        if os.path.isabs(relative_path):
+            return Path(relative_path)
+        try:
+            if self._internal_override:
+                base_path = self._internal_override
+            else:
+                base_path = sys._MEIPASS
+        except Exception:  # noqa: BLE001
+            base_path = os.path.abspath("./_internal")
+            os.makedirs(base_path, 0o771, exist_ok=True)
+
+        return Path(os.path.join(base_path, relative_path)).resolve()
+
 
     def cache(self, subdir: str = "") -> Cache:
-        key = resource_path(f"{self[TABLE.APP][APP.CACHE_DIR]}/{subdir}")
+        key = self.resource_path(f"{self[TABLE.APP][APP.CACHE_DIR]}/{subdir}")
         if key not in self.__caches:
             self.__caches[key] = Cache(key)
         return self.__caches[key]

@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from enum import StrEnum, auto
 from pathlib import Path
+import logging
 from typing import ClassVar
 
 from PIL import Image
@@ -15,10 +16,9 @@ from artrefsync.constants import APP, BOARD, LOCAL, STORE, TABLE
 from artrefsync.stores.link_cache import LinkCache
 from artrefsync.stores.storage import ImageStoreHandler
 from artrefsync.stores.store_models import PostFile
-from artrefsync.utils.utils import resource_path, str_dict
+from artrefsync.utils.utils import str_dict
 
 config = get_config()
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class FileStoreHandler(ImageStoreHandler):
     def __init__(self):
         logger.info("Plain File Store Handler Init Start")
         self.artist_base_folder = Path(
-            resource_path(f"{config[TABLE.LOCAL][LOCAL.ARTIST_DIR]}")
+            config.resource_path(f"{config[TABLE.LOCAL][LOCAL.ARTIST_DIR]}")
         )
         self.dir_base_map = {}
         self._dir_map: dict[DIRS, dict[BOARD, dict[str, str]]] = str_dict(str_dict)

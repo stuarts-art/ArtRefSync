@@ -74,6 +74,7 @@ class PhotoImageGallery(ttk.Frame):
         self.bind("<FocusIn>", self.simple_frames.on_swap)
         event_binder.bind(BINDING.ON_FILTER_UPDATE, self.change_tags, self)
         event_binder.bind(BINDING.ON_SORT_BY_UPDATE, self.update_posts, self)
+        event_binder.bind(BINDING.ON_DB_UPDATE, self.update_posts, self)
 
     def update_sort_var(self, e: tk.Event):
         self.sort_menu.post(
@@ -273,7 +274,7 @@ class SimpleFrames:
         label.bind("<Visibility>", self.on_visibility)
         label.bind("<MouseWheel>", self.bind_scroll)
         label.bind("<ButtonRelease-1>", self.add_select_tag_handler)
-        label.bind("<Double-Button-1>", self.on_double_button_1)
+        label.bind("<Double-1>", self.on_double_button_1)
         label.drag_source_register(DND_FILES)
         label.dnd_bind("<<DragInitCmd>>", self.drag_binding)
         self.text.window_create(tk.END, window=label, padx=3, pady=3)

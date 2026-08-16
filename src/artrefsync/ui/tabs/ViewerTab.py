@@ -45,9 +45,10 @@ class ViewerTab(ttk.Frame):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.canvas_image.grid(row=0, column=0)
-        self.init_gif_control()
         self.clear_button = RoundedIcon(self, text="✕", size=(25, 25))
         self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
+        self.gif_controls = ttk.Frame(self)
+        self.init_gif_control()
 
     def init_bindings(self):
         self.clear_button.bind("<Button-1>", self.close_image_viewer)
@@ -79,8 +80,6 @@ class ViewerTab(ttk.Frame):
             self.canvas_image.toggle_play(toggle_play=False)
 
     def init_gif_control(self):
-        self.gif_controls = ttk.Frame(self)
-        self.gif_controls.grid(row=1, column=0)
         self.count_button = RoundedIcon(
             self.gif_controls, text_variable=self.index_var, command=self.toggle_play
         )
@@ -110,12 +109,18 @@ class ViewerTab(ttk.Frame):
             ),
         )
 
-        self.leftleft_button.grid(row=0, column=1)
-        self.left_button.grid(row=0, column=2)
-        self.count_button.grid(row=0, column=3)
-        self.scale.grid(row=0, column=4)
-        self.right_button.grid(row=0, column=5)
-        self.rightright_button.grid(row=0, column=6)
+        self.leftleft_button.grid(row=0, column=1, padx=0, pady=0)
+        self.left_button.grid(row=0, column=2, padx=0, pady=0)
+        self.count_button.grid(row=0, column=3, padx=0, pady=0)
+        self.scale.grid(row=0, column=4, padx=0, pady=0)
+        self.right_button.grid(row=0, column=5, padx=0, pady=0)
+        self.rightright_button.grid(row=0, column=6, padx=0, pady=0)
+
+    def toggle_gif_control(self, toggle_on=True):
+        if toggle_on:
+            self.gif_controls.place(relx=0.5, rely=1.0, anchor=tk.S)
+        else:
+            self.gif_controls.place_forget()
 
     def on_focus_in(self, e):
         if self.after_add_binding_id:
@@ -123,6 +128,12 @@ class ViewerTab(ttk.Frame):
         self.after_add_binding_id = self.after(100, self.add_escape_binding)
 
     def open_image_viewer(self, pid):
+        logger.info("Opening Image Viewer")
+        if self.grid_info():
+            return
+
+        event_binder.event_generate(BINDING.ON_TOGGLE_UI, toggle_on=False)
+
         if pid is None:
             return
         self.canvas_image.canvas.focus_set()
@@ -132,6 +143,7 @@ class ViewerTab(ttk.Frame):
         self.update_viewer_image(pid)
 
     def close_image_viewer(self, _=None):
+        logger.info("Closing Image Viewer")
         if self.after_add_binding_id:
             self.after_cancel(self.after_add_binding_id)
         self.canvas_image.cancel_next_frame()
@@ -140,6 +152,7 @@ class ViewerTab(ttk.Frame):
             logger.info("Closing Image Viewer")
             event_binder[BINDING.GALLERY_WIDGET].lift()
             self.grid_forget()
+            event_binder.event_generate(BINDING.ON_TOGGLE_UI, toggle_on=True)
 
     def unbind_canvas_escape(self, *_):
         if self.after_add_binding_id:
@@ -153,6 +166,8 @@ class ViewerTab(ttk.Frame):
         self.canvas_image.canvas.bind("<Escape>", self.close_image_viewer)
 
     def update_viewer_image(self, pid):
+        if not self.grid_info():
+            return
         self.last_open_time = time.time()
         thread_caller.cancel(__name__)
         self.canvas_image.cancel_next_frame()
@@ -186,6 +201,8 @@ class ViewerTab(ttk.Frame):
         frame_count = len(self.canvas_image.frames)
         state = "normal" if frame_count > 1 else "disabled"
         self.scale.configure(to=frame_count, state=state)
+        self.toggle_gif_control(toggle_on=frame_count > 1)
+        # event_binder.event_generate(BINDING.ON_TOGGLE_UI, False)
 
     def prev_frame(self, e=None):
         if self.grid_info() and self.canvas_image:

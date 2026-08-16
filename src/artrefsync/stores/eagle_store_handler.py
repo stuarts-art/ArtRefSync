@@ -24,7 +24,10 @@ class EagleHandler(ImageStoreHandler):
     Helper class for interacting with Eagle using https://api.eagle.cool/
     """
 
+
     handler_map = {}  # noqa: RUF012
+    library_path_dict = {}
+    switched_to_lib = ""
 
     def __init__(self):
         logger.info("Initializing Eagle Handler")
@@ -60,7 +63,6 @@ class EagleHandler(ImageStoreHandler):
         self.board_id_map = str_dict()
         self.board_artist_id_map = str_dict(dict)
         self.id_artist_map = {}
-        self.library_path_dict = {}
         self.pid_map = {}
         self.switch_library(self.library)
         self.get_artists_folder(refresh=True)
@@ -216,6 +218,10 @@ class EagleHandler(ImageStoreHandler):
 
     def switch_library(self, library_string):
         logger.info("Switching to library %s", library_string)
+        if EagleHandler.switched_to_lib == library_string:
+            return
+        EagleHandler.switched_to_lib = library_string
+
         history = self.client.library.history()
         for path in history:
             library_str = path.split("/")[-1]

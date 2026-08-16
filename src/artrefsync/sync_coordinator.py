@@ -75,6 +75,11 @@ def sync_artist(
     limit: int | None = None,
 ):
     try:
+        event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, 1)
+        event_binder.event_generate(
+            BINDING.ON_LOAD_MID_SET,
+            f"Syncing {'recent' if only_recent else 'all'} posts for {artist_name}",
+        )
         if not board_name:
             logger.error("No board name provided")
             return
@@ -103,7 +108,7 @@ def sync_artist(
         )
         sync_coordinator.sync([artist_name])
     finally:
-        event_binder.event_generate(BINDING.ON_ARTIST_SYNC_DONE)
+        event_binder.event_generate(BINDING.ON_LOADING_DONE)
 
 
 def sync_from_store(event: Event):
@@ -183,7 +188,7 @@ class SyncCoordinator:
             else:
                 self.artist_list = self.board_handler.get_artist_list()
             self.sync_artist_metadata(self.artist_list)
-            self.remove_blacklisted_posts() # Additional check before downloading.
+            self.remove_blacklisted_posts()  # Additional check before downloading.
             event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
             for artist in self.artist_list:
                 if self.stop_event and self.stop_event.is_set():
@@ -191,10 +196,10 @@ class SyncCoordinator:
                 event_binder.event_generate(
                     BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
                 )
-                self.sync_artist_files(artist)
+                if self.sync_artist_files(artist):
+                    self.update_board_artist_tag_counts(self.board, self.artist_list)
+                    event_binder.event_generate(BINDING.ON_DB_UPDATE)
 
-            event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating Tag table.")
-            self.update_board_artist_tag_counts(self.board, self.artist_list)
         except Exception:
             logger.exception("Sync Failed.")
 
@@ -211,13 +216,22 @@ class SyncCoordinator:
             self.update_metadata(artist)
         self.update_tag_types()
 
-    def sync_artist_files(self, artist):
-        logger.info("Starting sync artist %s", artist)
+    def sync_artist_files(self, artist:str) -> int:
+        """ Syncs missing files to the local store.
 
+        Args:
+            artist (str): Artist name
+
+        Returns:
+            int: Number of updated files
+        """
+        logger.info("Starting sync artist %s", artist)
         self.update_post_file_table(artist)
-        self.download_missing_ids(artist)
-        self.update_post_file_table(artist=artist)
-        logger.debug("Ending sync artist %s", artist)
+        downloaded = self.download_missing_ids(artist)
+        if downloaded:
+            self.update_post_file_table(artist=artist)
+            return len(downloaded)
+        return 0
 
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
