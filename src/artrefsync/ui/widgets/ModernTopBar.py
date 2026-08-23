@@ -1,7 +1,7 @@
 import logging
+import tkinter as tk
 
 import ttkbootstrap as ttk
-import tkinter as tk
 
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 
@@ -69,7 +69,7 @@ class ModernTopBar(ttk.Frame):
         self.mid_left_sep = ttk.Separator(self._mid, orient="vertical")
         self.mid_mid = ttk.Frame(self._mid)
         self.mid_right_sep = ttk.Separator(self._mid, orient="vertical")
-        self.mid_right = ttk.Frame(self._mid, padding=5, style=self.side_style)
+        self.mid_right = ttk.Frame(self._mid, padding=0, style=self.side_style)
         self.mid_left.grid(column=0, row=0, sticky="nws")
         self.mid_left_sep.grid(column=1, row=0, sticky="ns")
         self.mid_mid.grid(column=2, row=0, sticky="nswe")
@@ -91,7 +91,6 @@ class ModernTopBar(ttk.Frame):
         self.sidebar_left_toggle.bind("<ButtonPress-1>", self.toggle_left_sidebar)
 
     def toggle_topbar(self, toggle_on=None):
-        print(f"Top bar, {toggle_on}, {self.mid_left.grid_info()}")
         if toggle_on is None or isinstance(toggle_on, tk.Event):
             toggle_on = not self._top.grid_info()
 
@@ -101,7 +100,6 @@ class ModernTopBar(ttk.Frame):
             self._top.grid_forget()
 
     def toggle_left_sidebar(self, toggle_on=None):
-        print(f"Mid Left, {toggle_on}, {self.mid_left.grid_info()}")
 
         if toggle_on is None or isinstance(toggle_on, tk.Event):
             toggle_on = not self.mid_left.grid_info()

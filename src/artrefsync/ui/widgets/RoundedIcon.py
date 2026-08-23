@@ -34,6 +34,8 @@ class RoundedIcon(ttk.Label):
         hover_color="#595253",
         command=None,
         data=None,
+        font = None
+
     ):
 
         if not RoundedIcon.font:

@@ -85,7 +85,6 @@ class Config:
 
         return Path(os.path.join(base_path, relative_path)).resolve()
 
-
     def cache(self, subdir: str = "") -> Cache:
         key = self.resource_path(f"{self[TABLE.APP][APP.CACHE_DIR]}/{subdir}")
         if key not in self.__caches:
@@ -113,7 +112,17 @@ class Config:
             reload()
 
     def __getitem__(self, field: TABLE | STORE | BOARD) -> dict:
-        return self.settings.config[field]
+        if (
+            type(field) is str
+            or isinstance(field, TABLE)
+            or isinstance(field, BOARD)
+            or isinstance(field, STORE)
+        ):
+            return self.settings.config[field]
+        else:
+            class_name = field.__class__.__name__.lower()
+            value = field.value
+            return self.settings.config[class_name][value]
 
     def get(
         self, table: TABLE, field: TABLE | STORE | BOARD, default

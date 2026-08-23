@@ -66,6 +66,7 @@ class ConfigTab(ttk.Frame):
             "App": [TABLE.APP],
             "Boards": [TABLE.E621, TABLE.R34, TABLE.DANBOORU],
             "Stores": [TABLE.EAGLE, TABLE.LOCAL],
+            "Hotkeys": [TABLE.HOTKEY]
         }
         self.group_widgets = {}
 

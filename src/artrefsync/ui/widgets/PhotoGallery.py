@@ -4,7 +4,6 @@ import subprocess
 import time
 import tkinter as tk
 from collections import deque
-from threading import Event, Lock
 from typing import ClassVar
 
 import ttkbootstrap as ttk
@@ -13,7 +12,7 @@ from tkinterdnd2 import COPY, DND_FILES
 
 from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
-from artrefsync.constants import APP, BINDING, TABLE
+from artrefsync.constants import APP, BINDING, HOTKEY, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.store_models import PostFile
 from artrefsync.utils.event_binder import event_binder
@@ -106,14 +105,13 @@ class PhotoImageGallery(ttk.Frame):
             sort_dir,
             self.tags,
         )
-        # event_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, "Working...")
         thread_caller.add(
             self.get_sorted_posts,
             self.simple_frames.change_posts,
             cancel_key,
-            tags = self.tags,
+            tags=self.tags,
             sort_by=sort_by,
-            sort_dir = sort_dir,
+            sort_dir=sort_dir,
         )
 
         thread_caller.add(
@@ -131,11 +129,11 @@ class PhotoImageGallery(ttk.Frame):
             event_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, 0)
 
     def get_sorted_posts(
-        self, tags, sort_by="", sort_dir="", limit=200, offset=0, as_count = False
+        self, tags, sort_by="", sort_dir="", limit=200, offset=0, as_count=False
     ):
         with PostDb() as post_db:
             sorted_posts = post_db.posts_in_intersection(
-                tags, sort_by, sort_dir, limit=limit, offset=offset, as_count= as_count
+                tags, sort_by, sort_dir, limit=limit, offset=offset, as_count=as_count
             )
         return sorted_posts
 
@@ -151,8 +149,6 @@ class SimpleFrames:
         self.width_var = width_var
         self.height_var = height_var
 
-        self.space_lock = Lock()
-        self.last_space = time.time() - 1000
         self.post_ids = []
         self.focused = None
         self.focused_idx = None
@@ -178,12 +174,12 @@ class SimpleFrames:
         event_binder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         event_binder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
         event_binder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
-        self.text.bind("<Key>", lambda e: self.text.after_idle(self.__keystroke, e))
+        self.text.bind("<FocusOut>", self.unbind_canvas_escape)
         self.text.bind("<KeyRelease-space>", self.on_space)
+        self.text.bind("<Key>", lambda e: self.text.after_idle(self.__keystroke, e))
         self.text.bind(
             "<FocusIn>", lambda e: self.text.after(100, self.add_escape_binding)
         )
-        self.text.bind("<FocusOut>", self.unbind_canvas_escape)
 
     def __keystroke(self, event: tk.Event):
         keysym = event.keysym
@@ -195,14 +191,14 @@ class SimpleFrames:
             event_binder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
         elif keysym == "e":
             event_binder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
-        elif keysym in ["w", "Up"]:
-            self.text.event_generate("<MouseWheel>", delta=60)
-        elif keysym in ["a", "Left"]:
+        elif keysym in config[HOTKEY.UP_LIST]:
             self.throttled_focus_prev()
-        elif keysym in ["s", "Down"]:
-            self.text.event_generate("<MouseWheel>", delta=-60)
-        elif keysym in ["d", "Right"]:
+        elif keysym in config[HOTKEY.LEFT_LIST]:
+            event_binder.event_generate(BINDING.ON_GALLERY_SHIFT_TAB)
+        elif keysym in config[HOTKEY.DOWN_LIST]:
             self.throttled_focus_next()
+        elif keysym == "Return":
+            event_binder.event_generate(BINDING.ON_GALLERY_SHIFT_TAB, True)
         elif keysym == "z":
             event_binder.event_generate(BINDING.ON_TEXT_Z)
         elif keysym == "x":
@@ -214,6 +210,10 @@ class SimpleFrames:
                 event_binder.event_generate(BINDING.ON_TEXT_C)
         elif keysym == "grave":
             event_binder.event_generate(BINDING.ON_TEXT_ESCAPE)
+        elif keysym == "Tab":
+            event_binder.event_generate(BINDING.ON_GALLERY_SHIFT_TAB)
+        elif keysym == "BackSpace":
+            event_binder.event_generate(BINDING.RUN_TAG_REMOVE_LAST)
 
         else:
             return ""
@@ -280,8 +280,6 @@ class SimpleFrames:
         self.text.window_create(tk.END, window=label, padx=3, pady=3)
         self.text.tag_add("center", label)
 
-        self.scrolling = Event()
-
     def on_double_button_1(self, e):
         self.text.focus_set()
         event_binder.event_generate(
@@ -324,18 +322,31 @@ class SimpleFrames:
         logger.info("%s posts recieved for change_post", len(posts))
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts
-        self.text.see(self.frames[0])
         self.update()
-        self.text.after(100, lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
+        self.text.update_idletasks()
+        # self.text.after(100, lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
+        if self.frames:
+            event_binder.event_generate(BINDING.ON_POST_SELECT, self.frames[0].pid)
 
     def update(self, reset=True):
         logger.info("Updating Image Gallery")
+        # self.text.yview_moveto(0.0)
+        # self.update_focus()
+        # self.text.update_idletasks()
+        # self.focus_on_idx(0)
+        # self.text.mark_set("insert", "1.0")
+        self.text.yview_moveto(0)
+        self.focus_on_idx(0)
+        # self.text.see("1.0")
+
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
+        self.text.yview_moveto(0)
         for i, frame in enumerate(self.frames):
             if frame.bbox:
                 frame.get_image(True)
             elif reset:
                 frame.reset()
+        self.text.after(100, self.text.yview_moveto, 0)
 
     def add_select_tag_handler(self, e: tk.Event):
         self.text.focus_set()
@@ -441,7 +452,6 @@ class SimpleFrames:
             return
         frame = self.frames[idx]
         self.text.see(frame)
-        self.scrolling.clear()
 
     def scroll_delta(self, delta):
         self.text.event_generate("<MouseWheel>", delta=delta)
@@ -506,7 +516,7 @@ class SimpleFrames:
             for frame in self.frames:
                 if frame.bbox:
                     frame.event_generate("<Button-1>")
-                    break
+                    # break
 
     def focus_prev_row(self, e=None):
         label: SimplePhotoLabel = self.selected
@@ -633,6 +643,7 @@ class SimplePhotoLabel(tk.Label):
             width=self.default_width,
             padx=5,
             pady=5,
+            takefocus=False,
             **kwargs,
         )
         self.image_h = None

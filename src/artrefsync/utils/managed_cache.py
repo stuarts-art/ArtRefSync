@@ -8,6 +8,7 @@ class ManagedCache:  # WIP Video/Gif Viewer
     def __init__(self, max_size=50):
         self.cache = OrderedDict()
         self.deque = deque()
+        self.popped = deque()
         self.max_size = 50
         self.pop_count = 0
 
@@ -30,9 +31,9 @@ class ManagedCache:  # WIP Video/Gif Viewer
         self.cache[key] = value
         while len(self.deque) > self.max_size:
             rkey = self.deque.pop()
-            self.pop_count += 1
-
+            self.popped.append(rkey)
             self.cache.pop(rkey)
+
             if self.pop_count % 20 == 0:
                 logger.debug("Popped id: %s, total popped: %s", rkey, self.pop_count)
 

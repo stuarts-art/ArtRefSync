@@ -12,14 +12,14 @@ from tkinterdnd2 import COPY, DND_FILES
 
 from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
-from artrefsync.constants import APP, BINDING, TABLE
+from artrefsync.constants import APP, BINDING, HOTKEY, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.store_models import PostFile
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.event_binder import event_binder
-from artrefsync.utils.utils import censor_text
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
+from artrefsync.utils.utils import censor_text
 
 config = get_config()
 logger = logging.getLogger(__name__)
@@ -38,17 +38,20 @@ class PostInfoTab(ttk.Frame):
         self.blur_map = {}
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, minsize=200)
-        self.grid_rowconfigure(5, weight=1)
+        self.grid_rowconfigure(1, minsize=200)
+        self.grid_rowconfigure(7, weight=1)
 
-        self.thumbnail = ttk.Label(self)
-        self.thumbnail.grid(column=0, row=0, sticky=tk.NSEW)
+        self.tab_label = ttk.Label(self, text="Info", anchor="center")
+        self.tab_label.grid(column=0, row=0)
+
+        self.thumbnail = ttk.Label(self, anchor="center")
+        self.thumbnail.grid(column=0, row=1, sticky=tk.NSEW)
         self.name = ttk.Label(
             self, cursor="arrow", justify=tk.LEFT, wraplength=240, border=1
         )
-        self.name.grid(column=0, row=1, sticky=tk.EW)
+        self.name.grid(column=0, row=2, sticky=tk.EW)
         self.artist_frame = ttk.Labelframe(self, text="Artist")
-        self.artist_frame.grid(column=0, row=2, sticky=tk.EW, ipady=0)
+        self.artist_frame.grid(column=0, row=3, sticky=tk.EW, ipady=0)
         self.board_button = RoundedIcon.from_text(
             self.artist_frame, "", self.colors.primary, command=self.on_artist_click
         )
@@ -59,7 +62,7 @@ class PostInfoTab(ttk.Frame):
         self.artist_button.pack(side=tk.LEFT)
 
         self.small_details_frame = ttk.Frame(self)
-        self.small_details_frame.grid(column=0, row=3, sticky=tk.EW)
+        self.small_details_frame.grid(column=0, row=4, sticky=tk.EW)
         score_frame = ttk.Labelframe(self.small_details_frame, text="Score")
         ext_frame = ttk.Labelframe(self.small_details_frame, text="Ext")
 
@@ -85,16 +88,16 @@ class PostInfoTab(ttk.Frame):
             "File",
             self.colors.primary,
         )
-        self.file.grid(column=0, row=4, sticky=tk.NSEW)
+        self.file.grid(column=0, row=5, sticky=tk.NSEW)
         self.file_tooltip = ttk.ToolTip(self.file)
 
         self.link_button = RoundedIcon.from_text(
             self, "Link", self.colors.primary, command=self.on_link_click
-        ).grid(column=0, row=5, sticky=tk.NSEW)
+        ).grid(column=0, row=6, sticky=tk.NSEW)
         self.link_tooltip = ttk.ToolTip(self.link_button)
 
         self.tags_frame = ttk.Frame(self)
-        self.tags_frame.grid(column=0, row=6, sticky=tk.NSEW)
+        self.tags_frame.grid(column=0, row=7, sticky=tk.NSEW)
 
         self.tags = ttk.ScrolledText(
             self.tags_frame, wrap=tk.WORD, width=text_width, cursor="arrow"
@@ -109,6 +112,30 @@ class PostInfoTab(ttk.Frame):
         self.grid_propagate(False)
 
         self.add_bindings()
+
+    def add_bindings(self):
+        self.bind("<Key>", self.__keystroke)
+        event_binder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
+        self.file.drag_source_register(DND_FILES)
+        self.file.dnd_bind("<<DragInitCmd>>", self.drag_init)
+        self.file.bind("<Button-1>", self.start_file)
+        self.file.bind("<Button-3>", self.start_file_dir)
+        self.link_button.bind("<Button-3>", self.copy_to_clipboard)
+
+        self.tags.text.bind("<Button-1>", self.on_text_tag_click)
+
+    def __keystroke(self, event: tk.Event):
+        keycode = event.keycode  # noqa: F841
+        keysym = event.keysym
+        state = event.state
+        ctrl_pressed = (state & 0x4) != 0  # noqa: F841
+        shift_pressed = (state & 0x1) != 0  # noqa: F841
+
+        if keysym in config[HOTKEY.ZOOM_OUT_LIST] + ["Tab"]:
+            event_binder.event_generate(BINDING.ON_ICON_TAG, focus_entry = False)
+
+        elif keysym in config[HOTKEY.ZOOM_IN_LIST]:
+            event_binder.event_generate(BINDING.ON_ICON_ARTIST, focus_entry = False)
 
     def on_link_click(self, event: tk.Event):
         if data := event.widget.data:
@@ -125,16 +152,6 @@ class PostInfoTab(ttk.Frame):
         ctrl_pressed = (state & 0x4) != 0
         widget_text = event.widget.text
         event_binder.event_generate(BINDING.ON_TAG_SELECT, widget_text, ctrl_pressed)
-
-    def add_bindings(self):
-        event_binder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
-        self.file.drag_source_register(DND_FILES)
-        self.file.dnd_bind("<<DragInitCmd>>", self.drag_init)
-        self.file.bind("<Button-1>", self.start_file)
-        self.file.bind("<Button-3>", self.start_file_dir)
-        self.link_button.bind("<Button-3>", self.copy_to_clipboard)
-
-        self.tags.text.bind("<Button-1>", self.on_text_tag_click)
 
     def start_file(self, event):
         file = self.file.data
@@ -154,6 +171,7 @@ class PostInfoTab(ttk.Frame):
         self.update()
 
     def on_post_select(self, post_id):
+
         blur_tags = config[TABLE.APP][APP.BLUR_UNSAFE_ENABLED]
 
         logger.info("On Post Select, post id: %s", post_id)

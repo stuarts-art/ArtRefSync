@@ -37,6 +37,7 @@ class App(ttk.Window):
         self.project_path = Path(project_path).resolve()
         self.config_path = self.project_path / "config"
         self._internal_path = self.project_path / "_internal"
+        self.last_widget = None
         global resource_path_override
         resource_path_override = self._internal_path
         os.chdir(project_path)
@@ -58,13 +59,13 @@ class App(ttk.Window):
             scaling=2,
             title="Art Ref Sync",
         )
+        self.initialize_db()
 
         TkinterDnD._require(self)
         self.init_scaffolding()
         self.temp_loading_var.set(10)
         self.update_idletasks()
         self.temp_loading.start()
-        self.after_idle(self.initialize_db)
         self.after(100, self.load_config)
 
     def initialize_db(self):
@@ -76,7 +77,7 @@ class App(ttk.Window):
     def load_config(self):
         self.focus_set()
         logger.info("Starting App")
-        self.last_widget = ""
+        self.last_widget = None
 
         self.temp_loading_var.set(20)
         self.update_idletasks()
@@ -100,6 +101,7 @@ class App(ttk.Window):
         from artrefsync.utils.TkThreadCaller import thread_caller
 
         thread_caller.root = self
+
         with thread_caller, link_cache:
             try:
                 self.mainloop()
@@ -121,7 +123,7 @@ class App(ttk.Window):
 
         self.bar.mid_left.rowconfigure(0, weight=1)
         self.bar.mid_left.columnconfigure(0, weight=0, minsize=30)
-        self.bar.mid_left.columnconfigure(1, weight=1)
+        self.bar.mid_left.columnconfigure(2, weight=1)
 
         self.bar.mid_right.rowconfigure(0, weight=1)
         self.bar.mid_right.columnconfigure(0, weight=1, minsize=250)
@@ -132,19 +134,35 @@ class App(ttk.Window):
         self.right.columnconfigure(0, weight=1)
 
         self.left_bar = ttk.Frame(self.bar.mid_left)
-        self.left_bar.grid(row=0, column=0, sticky=tk.NSEW)
+        self.left_bar.grid(row=0, column=0, sticky=tk.NS, padx=(0, 5))
 
         self.left_artist_icon = RoundedIcon(
-            self.left_bar, text=ICON.ARTISTS, size=30, pack_kwargs={"side": tk.TOP}
+            self.left_bar,
+            text=ICON.ARTISTS,
+            size=30,
+            pack_kwargs={"side": tk.TOP},
+            font=("Helvetica", 10),
         )
         self.left_tag_icon = RoundedIcon(
-            self.left_bar, text=ICON.TAG, size=30, pack_kwargs={"side": tk.TOP}
+            self.left_bar,
+            text=ICON.TAG,
+            size=30,
+            pack_kwargs={"side": tk.TOP},
+            font=("Helvetica", 10),
         )
         self.left_info_icon = RoundedIcon(
-            self.left_bar, text=ICON.INFO, size=30, pack_kwargs={"side": tk.TOP}
+            self.left_bar,
+            text=ICON.INFO,
+            size=30,
+            pack_kwargs={"side": tk.TOP},
+            font=("Helvetica", 10),
         )
         self.left_config_icon = RoundedIcon(
-            self.left_bar, text=ICON.SETTINGS, size=30, pack_kwargs={"side": tk.TOP}
+            self.left_bar,
+            text=ICON.SETTINGS,
+            size=30,
+            pack_kwargs={"side": tk.TOP},
+            font=("Helvetica", 10),
         )
 
         self.left_tabs = ttk.Frame(self.bar.mid_left)
@@ -179,18 +197,32 @@ class App(ttk.Window):
         self.sort_by_tab = SortByTab(self.bar.top_right)
         self.sort_by_tab.pack(side="right", padx=5)
         self.artist_tab.lift()
+        self.last_widget = self.artist_tab
+
+    def on_gallery_shift_tab(self, focus_entry=False):
+        if self.last_widget:
+            widget: ttk.Frame = self.left_tabs.nametowidget(self.last_widget)
+            if focus_entry:
+                if entry := getattr(widget, "entry", ""):
+                    entry.focus_set()
+            elif tree := getattr(widget, "tree", ""):
+                tree.focus_set()
 
     def tab_toggle_closure(self, widget: ttk.Frame):
-        def raise_toggle_widget(event: tk.Event):
-            widget_name = widget.winfo_name()
-
+        def raise_toggle_widget(focus_entry=True):
             if not self.left_tabs.grid_info():
-                self.left_tabs.grid(row=0, column=1, sticky=tk.NSEW)
+                self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
+
+            if self.last_widget != widget:
+                self.last_widget = widget
                 widget.lift()
-                self.last_widget = widget_name
-            elif self.last_widget != widget_name:
-                self.last_widget = widget_name
-                widget.lift()
+                if focus_entry and (entry := getattr(widget, "entry", "")):
+                    entry.focus_set()
+                elif tree := getattr(widget, "tree", ""):
+                    tree.focus_set()
+                else:
+                    widget.focus_set()
+
             else:
                 self.left_tabs.grid_forget()
 
@@ -236,26 +268,69 @@ class App(ttk.Window):
     def init_bindings(self):
         logger.info("Init Bindings")
         self.config_tab.clear_button.bind("<Button-1>", self.toggle_config)
-        self.bind_all("<Control-Key-1>", self.focus_galery)
+        self.bind_all("<Control-Key-1>", self.focus_artists)
+        self.bind_all("<Control-Key-2>", self.focus_tags)
+        self.bind_all("<Control-Key-3>", self.focus_gallery)
         self.bind_all("<Control-Key-4>", self.toggle_config)
         self.bind_all("<Control-comma>", self.toggle_config)
-        self.artist_tab.entry.bind("<Shift-Tab>", self.focus_galery)
-        self.tag_tab.entry.bind("<Shift-Tab>", self.focus_galery)
+
         self.top_widget = None
         self.config_tab.clear_button.bind("<Button-1>", self.toggle_config)
-        self.left_tag_icon.bind("<Button-1>", self.tab_toggle_closure(self.tag_tab))
+
+        self.left_tag_icon.bind("<Button-1>", event_binder.closure(BINDING.ON_ICON_TAG))
         self.left_artist_icon.bind(
-            "<Button-1>", self.tab_toggle_closure(self.artist_tab)
+            "<Button-1>", lambda _: event_binder.closure(BINDING.ON_ICON_ARTIST)()
         )
         self.left_info_icon.bind(
-            "<Button-1>", self.tab_toggle_closure(self.post_info_tab)
+            "<Button-1>", lambda _: event_binder.closure(BINDING.ON_ICON_INFO)()
         )
-        self.left_config_icon.bind("<Button-1>", self.toggle_config)
+        self.left_config_icon.bind(
+            "<Button-1>", lambda _: event_binder.closure(BINDING.ON_ICON_CONFIG)()
+        )
         event_binder.bind(BINDING.ON_TOGGLE_UI, self.toggle_top_bar, self.bar)
+        event_binder.bind(BINDING.ON_GALLERY_SHIFT_TAB, self.on_gallery_shift_tab, self)
+        event_binder.bind(BINDING.RUN_FOCUS_GALLERY, self.focus_gallery, self)
 
-    def focus_galery(self, e):
+        event_binder.bind(
+            BINDING.ON_ICON_TAG, self.tab_toggle_closure(self.tag_tab), self
+        )
+        event_binder.bind(
+            BINDING.ON_ICON_ARTIST, self.tab_toggle_closure(self.artist_tab), self
+        )
+        event_binder.bind(
+            BINDING.ON_ICON_INFO, self.tab_toggle_closure(self.post_info_tab), self
+        )
+
+        event_binder.bind(BINDING.ON_ICON_CONFIG, self.toggle_config, self)
+        self.tab_toggle_closure(self.left_info_icon)
+
+    def focus_artists(self, e):
+        widget = self.artist_tab
+        widget_name = widget.winfo_name()
+        if not self.left_tabs.grid_info():
+            self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
+            widget.lift()
+            self.last_widget = widget_name
+        elif self.last_widget != widget_name:
+            self.last_widget = widget_name
+            widget.lift()
+        widget.entry.focus_set()
+
+    def focus_tags(self, e):
+        widget = self.tag_tab
+        widget_name = widget.winfo_name()
+        if not self.left_tabs.grid_info():
+            self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
+            widget.lift()
+            self.last_widget = widget_name
+        elif self.last_widget != widget_name:
+            self.last_widget = widget_name
+            widget.lift()
+        widget.entry.focus_set()
+
+    def focus_gallery(self, e=None):
+        self.gallery.lift()
         self.gallery.scrolled_text.text.focus_set()
-        return "break"
 
     def toggle_config(self, event=None):
         if self.config_tab.grid_info():

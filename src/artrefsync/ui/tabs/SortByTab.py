@@ -1,82 +1,16 @@
 import logging
 import tkinter as tk
-from itertools import cycle
 
 import ttkbootstrap as ttk
 
 from artrefsync.config import get_config
 from artrefsync.constants import BINDING
-from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
+from artrefsync.ui.tabs.RoundedDropDown import RoundedDropDown
+from artrefsync.ui.tabs.Toggle import Toggle
 from artrefsync.utils.event_binder import event_binder
-from artrefsync.utils.image_utils import ImageUtils
 
 config = get_config()
-logger = logging.getLogger()
-
-
-
-class RoundedDropDown(ttk.Label):
-    def __init__(
-        self,
-        root,
-        options,
-        on_select,
-        variable=None,
-        use_image=True,
-        radius=10,
-        **kwargs,
-    ):
-        logger.info("Init Rounded DropDown.")
-        self.colors = ttk.Style().colors
-        self.menu = ttk.Menu(root)
-        self.variable = variable if variable else ttk.StringVar
-        self.image = None
-        if use_image:
-            width = RoundedIcon.text_width(max(options, key=len))
-            self.image = ImageUtils.get_round_colored_rect(
-                width + 10, 30, radius=radius, as_photoimage=True
-            )
-        super().__init__(
-            root, textvariable=self.variable, compound="center", image=self.image
-        )
-        for option in options:
-            self.menu.add_radiobutton(
-                label=f" {option} ",
-                value=option,
-                variable=self.variable,
-                command=on_select,
-            )
-        self.bind("<Button-1>", self.on_label_click)
-
-    def get(self):
-        return self.variable.get()
-
-    def on_label_click(self, e: tk.Event):
-        self.menu.post(
-            e.widget.winfo_rootx() + 5,
-            e.widget.winfo_rooty() + e.widget.winfo_height() + 5,
-        )
-
-
-class Toggle(ttk.Label):
-    def __init__(self, root, options_map: dict, on_select=None, variable=None):
-        self.cycle = cycle(options_map.items())
-        text, label = next(self.cycle)
-        self.variable = variable if variable else ttk.StringVar()
-        self.variable.set(text)
-        self.on_select = on_select
-        super().__init__(root, text=label)
-        self.bind("<Button-1>", self.on_click)
-
-    def on_click(self, _):
-        text, label = next(self.cycle)
-        self.config(text=label)
-        self.variable.set(text)
-        if self.on_select:
-            self.on_select(self.get())
-
-    def get(self):
-        return self.variable.get()
+logger = logging.getLogger(__name__)
 
 
 class SortByTab(ttk.Frame):

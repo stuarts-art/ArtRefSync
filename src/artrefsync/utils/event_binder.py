@@ -49,7 +49,7 @@ class EventBinder:
 
     def event_generate(self, sequence: str, *args, **kwargs):
         sequence = str(sequence)
-        logger.debug("Generating event for sequence: %s", sequence)
+        logger.info("Generating event for sequence: %s", sequence)
         if args:
             if len(args) == 1:
                 self[sequence] = args[0]
@@ -64,7 +64,21 @@ class EventBinder:
                 sequence,
                 self.sequence_bindings.keys(),
             )
-
+        
+    def closure(self, sequence, use_event = False, returns_break = True):
+        """Returns a closure method method that can be passed to normal bind calls"""
+        
+        if use_event:
+            def gen_event(event):
+                self.event_generate(sequence, event)
+                if returns_break:
+                    return "break"
+        else:
+            def gen_event(*args, **kwargs):
+                self.event_generate(sequence, *args, **kwargs)
+                if returns_break:
+                    return "break"
+        return gen_event
 
     def get_or_default(self, key, default):
         if str(key) in self.map:

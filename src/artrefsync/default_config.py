@@ -1,4 +1,4 @@
-from artrefsync.constants import APP, DANBOORU, DB, E621, EAGLE, LOCAL, R34, TABLE
+from artrefsync.constants import APP, DANBOORU, DB, E621, EAGLE, HOTKEY, LOCAL, R34, TABLE
 
 
 from enum import StrEnum
@@ -52,4 +52,15 @@ default_config: dict[StrEnum, dict[StrEnum, Any]] = {
         LOCAL.ENABLED: True,
         LOCAL.ARTIST_DIR: "media",
     },
+    TABLE.HOTKEY: {
+        HOTKEY.UP_LIST: ["w", "k", "Up"],
+        HOTKEY.LEFT_LIST: ["a", "h", "Left"],
+        HOTKEY.DOWN_LIST: ["s", "j", "Down"],
+        HOTKEY.RIGHT_LIST: ["d", "l", "Right"],
+        HOTKEY.ZOOM_OUT_LIST: ["q", "u", "minus"],
+        HOTKEY.ZOOM_IN_LIST: ["e", "o", "equal"],
+        HOTKEY.ZOOMED_PREV_LIST: ["z", "m", "underscore"],
+        HOTKEY.ZOOMED_NEXT_LIST: ["c", "period", "plus"],
+        
+    }
 }

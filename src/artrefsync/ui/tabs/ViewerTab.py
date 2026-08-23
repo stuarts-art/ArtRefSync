@@ -58,6 +58,7 @@ class ViewerTab(ttk.Frame):
         event_binder.bind(BINDING.ON_POST_SELECT, self.update_viewer_image, self)
         event_binder.bind(BINDING.ON_FILTER_UPDATE, self.close_image_viewer, self)
         event_binder.bind(BINDING.ON_TEXT_ESCAPE, self.close_image_viewer, self)
+        event_binder.bind(BINDING.ON_CLOSE_VIEWER, self.close_image_viewer, self)
         event_binder.bind(BINDING.ON_TEXT_Z, self.prev_frame, self)
         event_binder.bind(BINDING.ON_TEXT_X, self.toggle_play, self)
         event_binder.bind(BINDING.ON_TEXT_C, self.next_frame, self)
@@ -81,7 +82,7 @@ class ViewerTab(ttk.Frame):
 
     def init_gif_control(self):
         self.count_button = RoundedIcon(
-            self.gif_controls, text_variable=self.index_var, command=self.toggle_play
+            self.gif_controls, text_variable=self.index_var, command=self.toggle_play, size=30
         )
         self.scale = ttk.Scale(
             self.gif_controls,
@@ -92,29 +93,32 @@ class ViewerTab(ttk.Frame):
             command=lambda e: self.after_idle(self.on_scale),
         )
 
-        self.left_button = RoundedIcon(self.gif_controls, "˂", command=self.prev_frame)
-        self.leftleft_button = RoundedIcon(
-            self.gif_controls,
-            "˂˂",
-            command=lambda x: event_binder.event_generate(
-                BINDING.ON_PREV_GALLERY_IMAGE
-            ),
+        self.left_button = RoundedIcon(self.gif_controls, "<", command=self.prev_frame, size = 30)
+        self.pause_play_button = RoundedIcon(
+            self.gif_controls, "⏸", command=self.toggle_play, size=30
+ 
         )
-        self.right_button = RoundedIcon(self.gif_controls, "˃", command=self.next_frame)
+        self.right_button = RoundedIcon(self.gif_controls, "˃", command=self.next_frame, size=30)
         self.rightright_button = RoundedIcon(
             self.gif_controls,
             "˃˃",
             command=lambda x: event_binder.event_generate(
                 BINDING.ON_NEXT_GALLERY_IMAGE
             ),
+            size=30
         )
 
-        self.leftleft_button.grid(row=0, column=1, padx=0, pady=0)
-        self.left_button.grid(row=0, column=2, padx=0, pady=0)
-        self.count_button.grid(row=0, column=3, padx=0, pady=0)
-        self.scale.grid(row=0, column=4, padx=0, pady=0)
-        self.right_button.grid(row=0, column=5, padx=0, pady=0)
-        self.rightright_button.grid(row=0, column=6, padx=0, pady=0)
+        self.pause_play_button.grid(row=0, column=0, padx=0, pady=0)
+        self.left_button.grid(row=0, column=1, padx=0, pady=0)
+        self.right_button.grid(row=0, column=2, padx=0, pady=0)
+        self.scale.grid(row=0, column=3, padx=0, pady=0)
+        self.count_button.grid(row=0, column=4, padx=0, pady=0)
+        self.canvas_image.playing.trace_add("write", self.on_playing_change)
+
+    def on_playing_change(self, *args):
+        text = "⏸" if self.canvas_image.playing.get() else "▶"
+        self.pause_play_button.config(text = text)
+    
 
     def toggle_gif_control(self, toggle_on=True):
         if toggle_on:
@@ -214,7 +218,7 @@ class ViewerTab(ttk.Frame):
 
     def toggle_play(self, e=None):
         if self.grid_info() and self.canvas_image:
-            self.canvas_image.toggle_pause()
+            playing = self.canvas_image.toggle_pause()
 
     def resize_gif(self, e=None):
         if self.grid_info() and self.canvas_image:

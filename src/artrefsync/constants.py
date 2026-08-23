@@ -1,4 +1,4 @@
-from enum import StrEnum, auto
+from enum import Enum, StrEnum, auto
 
 __all__ = [
     "APP",
@@ -20,9 +20,16 @@ class NAMES(StrEnum):
     VIEWER_TAB = auto()
 
 
-class TK(StrEnum):
-    KEY_PRESS = "2"
-    MOUSE_PRESS = "5"
+class EVENT:
+    # Tk Event Constants
+    class TYPE(StrEnum):
+        KEY = "2"
+        BUTTON = "5"
+
+    class NUM(Enum):
+        LEFT = 1
+        MIDDLE = 2
+        RIGHT = 3
 
 
 class ICON(StrEnum):
@@ -45,6 +52,11 @@ class BINDING(StrEnum):
     SORT_DIR = auto()
     SYNC_LOCK = auto()
 
+    # Run: Triggers event
+    RUN_FOCUS_GALLERY = auto()
+    RUN_TAG_REMOVE_LAST = auto()
+
+    # On: Triggered by event
     ON_ARTIST_CLEAR = auto()
     ON_ARTIST_SELECT = auto()
     ON_ARTIST_SYNC = auto()
@@ -67,7 +79,13 @@ class BINDING(StrEnum):
     ON_SORT_BY_UPDATE = auto()
     ON_TAG_SELECT = auto()
     ON_TOGGLE_UI = auto()
+    ON_CLOSE_VIEWER = auto()
     ON_ZOOM_DELTA = auto()
+    ON_GALLERY_SHIFT_TAB = auto()
+    ON_ICON_TAG = auto()
+    ON_ICON_ARTIST = auto()
+    ON_ICON_INFO = auto()
+    ON_ICON_CONFIG = auto()
 
     ON_TEXT_ESCAPE = auto()
     ON_TEXT_Z = auto()
@@ -99,6 +117,7 @@ def get_table_mapping():
         TABLE.DANBOORU: DANBOORU,
         TABLE.EAGLE: EAGLE,
         TABLE.LOCAL: LOCAL,
+        TABLE.HOTKEY: HOTKEY,
     }
 
 
@@ -109,6 +128,7 @@ class TABLE(StrEnum):
     DANBOORU = auto()
     EAGLE = auto()
     LOCAL = auto()
+    HOTKEY = auto()
 
 
 class APP(StrEnum):
@@ -196,6 +216,17 @@ class STATS(StrEnum):
     SKIP_COUNT = auto()
     FAILED_COUNT = auto()
     METADATA_CACHE_HIT = auto()
+
+
+class HOTKEY(StrEnum):
+    LEFT_LIST = auto()
+    RIGHT_LIST = auto()
+    UP_LIST = auto()
+    DOWN_LIST = auto()
+    ZOOM_IN_LIST = auto()
+    ZOOM_OUT_LIST = auto()
+    ZOOMED_NEXT_LIST = auto()
+    ZOOMED_PREV_LIST = auto()
 
 
 class TTKColor(StrEnum):

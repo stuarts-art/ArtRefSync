@@ -42,6 +42,7 @@ class ActiveTagsTab(ttk.Frame):
         event_binder.bind(BINDING.ON_ARTIST_CLEAR, self.clear_active, self)
         event_binder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist, self)
         event_binder.bind(BINDING.ON_TAG_SELECT, self.on_tag, self)
+        event_binder.bind(BINDING.RUN_TAG_REMOVE_LAST, self.remove_last_tag, self)
 
     def remove_tag_cmd(self, e):
         widget = e.widget
@@ -158,6 +159,16 @@ class ActiveTagsTab(ttk.Frame):
 
         self.update_idletasks()
         return removed
+    
+    def remove_last_tag(self, tag = "", *args, **kwargs) -> bool:
+        if tag and tag in self.active_tags or tag == self.artist:
+            self.remove_tag(tag)
+        elif self.active_tags:
+            keys = list(self.active_tags.keys())
+            tag = keys[-1]
+            self.remove_tag(tag)
+        elif self.artist:
+            self.remove_tag(self.artist)
 
     def add_artist(self, artist=""):
         if artist == self.artist:
