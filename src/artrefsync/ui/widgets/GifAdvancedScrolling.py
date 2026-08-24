@@ -152,6 +152,7 @@ class CanvasImage:
 
         self.index = 0
         self.path = path  # path to the image, should be public for outer classes
+
         self.update_frame_size()
         self.__scale = self.imscale * self.__ratio  # image pyramide scale
         self.__reduction = 2  # reduction degree of image pyramid
@@ -196,7 +197,7 @@ class CanvasImage:
                 self.after_next_frame_id = self.__imframe.after(
                     self.duration, self.show_next_frame, path
                 )
-        for i in [1, 2]:
+        for i in [1]:
             next_index = (self.index + i) % len(self.frames)
             if next_index not in self.frames:
                 self.__imframe.after_idle(self.frames.__getitem__, next_index)
@@ -268,13 +269,13 @@ class CanvasImage:
         """Exception: cannot use pack with this widget"""
         raise Exception(
             "Cannot use pack with the widget " + self.__class__.__name__
-        )  # noqa: TRY002
+        )
 
     def place(self, **kw):
         """Exception: cannot use place with this widget"""
         raise Exception(
             "Cannot use place with the widget " + self.__class__.__name__
-        )  # noqa: TRY002
+        )
 
     # noinspection PyUnusedLocal
     def __scroll_x(self, *args, **kwargs):

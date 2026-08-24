@@ -102,11 +102,11 @@ class App(ttk.Window):
 
         thread_caller.root = self
 
-        with thread_caller, link_cache:
-            try:
+        try:
+            with thread_caller, link_cache:
                 self.mainloop()
-            except Exception:
-                logger.exception("Exception Raised")
+        except Exception:
+            logger.exception("Exception Raised")
 
     def init_scaffolding(self):
 
@@ -201,18 +201,24 @@ class App(ttk.Window):
 
     def on_gallery_shift_tab(self, focus_entry=False):
         if self.last_widget:
-            widget: ttk.Frame = self.left_tabs.nametowidget(self.last_widget)
+            if not self.left_tabs.grid_info():
+                self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
+                self.update_idletasks()
+            widget = self.last_widget
             if focus_entry:
                 if entry := getattr(widget, "entry", ""):
                     entry.focus_set()
             elif tree := getattr(widget, "tree", ""):
                 tree.focus_set()
+            else:
+                widget.focus_set()
+
 
     def tab_toggle_closure(self, widget: ttk.Frame):
         def raise_toggle_widget(focus_entry=True):
             if not self.left_tabs.grid_info():
                 self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
-
+                self.update_idletasks()
             if self.last_widget != widget:
                 self.last_widget = widget
                 widget.lift()
@@ -302,17 +308,16 @@ class App(ttk.Window):
         )
 
         event_binder.bind(BINDING.ON_ICON_CONFIG, self.toggle_config, self)
-        self.tab_toggle_closure(self.left_info_icon)
+        # self.tab_toggle_closure(self.left_info_icon)
 
     def focus_artists(self, e):
         widget = self.artist_tab
-        widget_name = widget.winfo_name()
         if not self.left_tabs.grid_info():
             self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
             widget.lift()
-            self.last_widget = widget_name
-        elif self.last_widget != widget_name:
-            self.last_widget = widget_name
+            self.last_widget = widget
+        elif self.last_widget != widget:
+            self.last_widget = widget
             widget.lift()
         widget.entry.focus_set()
 

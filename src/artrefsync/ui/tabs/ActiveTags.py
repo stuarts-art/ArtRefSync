@@ -146,7 +146,6 @@ class ActiveTagsTab(ttk.Frame):
             self.artist = None
             self.grid_artist_button(forget=True)
             self.artist_button.update_text("")
-            event_binder.event_generate(BINDING.ON_ARTIST_CLEAR, "")
 
         elif tag in self.active_tags:
             removed = True

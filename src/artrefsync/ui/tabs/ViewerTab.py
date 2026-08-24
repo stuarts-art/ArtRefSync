@@ -40,13 +40,15 @@ class ViewerTab(ttk.Frame):
         self.gif_top = False
         self.curr_focus = None
         self.after_add_binding_id = None
+        self.gif_active = False
+        self.in_frame = False
+        self.delayed_leave_job = None
 
     def init_widgets(self):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.canvas_image.grid(row=0, column=0)
         self.clear_button = RoundedIcon(self, text="✕", size=(25, 25))
-        self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
         self.gif_controls = ttk.Frame(self)
         self.init_gif_control()
 
@@ -114,6 +116,31 @@ class ViewerTab(ttk.Frame):
         self.scale.grid(row=0, column=3, padx=0, pady=0)
         self.count_button.grid(row=0, column=4, padx=0, pady=0)
         self.canvas_image.playing.trace_add("write", self.on_playing_change)
+        self.bind("<Enter>", self.on_enter, add=True)
+        self.bind("<Leave>", self.delayed_leave, add=True)
+
+    def on_enter(self, e):
+        if self.delayed_leave_job:
+            self.after_cancel(self.delayed_leave_job)
+            self.delayed_leave_job = None
+
+        self.in_frame = True
+        self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
+        if self.gif_active:
+            self.gif_controls.place(relx=0.5, rely=.99, anchor=tk.S)
+
+    def delayed_leave(self, e):
+        self.in_frame = False
+        if self.delayed_leave_job:
+            self.after_cancel(self.delayed_leave_job)
+        self.delayed_leave_job = self.after(1000, self.on_leave, e)
+    
+
+    def on_leave(self, e):
+        self.clear_button.place_forget()
+        self.delayed_leave_job = None
+        if not self.in_frame:
+            self.gif_controls.place_forget()
 
     def on_playing_change(self, *args):
         text = "⏸" if self.canvas_image.playing.get() else "▶"
@@ -122,8 +149,11 @@ class ViewerTab(ttk.Frame):
 
     def toggle_gif_control(self, toggle_on=True):
         if toggle_on:
-            self.gif_controls.place(relx=0.5, rely=1.0, anchor=tk.S)
+            self.gif_active = True
+            if self.in_frame == True:
+                self.gif_controls.place(relx=0.5, rely=1.0, anchor=tk.S)
         else:
+            self.gif_active = False
             self.gif_controls.place_forget()
 
     def on_focus_in(self, e):
@@ -192,12 +222,8 @@ class ViewerTab(ttk.Frame):
             thread_caller.cancel(self.cancel_key)
             self.curr_focus = self.canvas_image.canvas.focus_get()
             self.canvas_image.canvas.focus_set()
-            self.cancel_key = thread_caller.add(
-                self.canvas_image.load_media,
-                self.on_canvas_set_image,
-                self.cancel_key,
-                filename,
-            )
+            self.canvas_image.load_media(filename)
+            self.on_canvas_set_image()
             self.pid = pid
 
     def on_canvas_set_image(self, *args):

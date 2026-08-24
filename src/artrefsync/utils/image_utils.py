@@ -22,8 +22,6 @@ class ImageUtils:
         return ttk.PhotoImage()
 
     @classmethod
-    @functools.lru_cache(maxsize=100)
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     def getPilImage(cls, file: str, height=None, width=None) -> Image.Image:
         logger.debug("Cache-Miss, Getting Image")
         if not os.path.exists(file):
@@ -36,7 +34,6 @@ class ImageUtils:
         return image
 
     @staticmethod
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
     def getPilImageThumb(file: str, size: tuple, upscale=False):
 
         try:
@@ -55,8 +52,6 @@ class ImageUtils:
             logger.warning(e)
 
     @staticmethod
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @functools.lru_cache(maxsize=50)
     def get_tk_thumb(file: str, size=(1080, 720), radius=0):
         image = ImageUtils.getPilImageThumb(file, size=size)
         if radius:
@@ -66,8 +61,6 @@ class ImageUtils:
             return ImageTk.PhotoImage(image=image)
 
     @staticmethod
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @functools.lru_cache
     def getrounded_rect(size, radius) -> Image.Image:
         """
         Produces a rounded grey-scale rectangle, useful for layer masking with putalpha.
@@ -87,8 +80,6 @@ class ImageUtils:
         return image
 
     @staticmethod
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    @functools.lru_cache(maxsize=20)
     def get_round_colored_rect(
         width, height, radius, fill="white", as_photoimage=False
     ) -> Image.Image:
@@ -131,7 +122,6 @@ class ImageUtils:
     k_size = 20
 
     @staticmethod
-    @functools.lru_cache(maxsize=50)
     def get_cv2_rgb_array(file, size, blur=False) -> cv2.typing.MatLike:
         cv_image = ImageUtils.cv2_image_open(file)
         if cv_image is None:
@@ -186,20 +176,22 @@ class ImageUtils:
             raise FileNotFoundError()
 
         if ImageUtils.is_multiple_frames(file):
-            return ImageUtils.get_cv2_frame(file, size, blur)
+            image = ImageUtils.get_cv2_frame(file, size, blur)
         else:
             image_array = ImageUtils.get_cv2_rgb_array(file, size, blur)
-            img = Image.fromarray(image_array)
-            if as_photoimage:
-                return ImageTk.PhotoImage(img)
-            else:
-                return img
+            image = Image.fromarray(image_array)
+
+        if as_photoimage:
+            return ImageTk.PhotoImage(image)
+        else:
+            return image
 
     @staticmethod
     def get_cv2_frame(file, size=(1080, 1080), blur=False):
         gif = cv2.VideoCapture(file)
         ret, frame = gif.read()
         if not ret:
+            gif.release()
             return None
         if size:
             h, w = frame.shape[:2]
@@ -208,6 +200,7 @@ class ImageUtils:
         if blur:
             ImageUtils.cv2_image_blur(frame)
         image_frame = ImageUtils.cv_array_to_image(frame)
+        gif.release()
         return image_frame
 
     @staticmethod

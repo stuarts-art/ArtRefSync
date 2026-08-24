@@ -136,6 +136,12 @@ class PostInfoTab(ttk.Frame):
 
         elif keysym in config[HOTKEY.ZOOM_IN_LIST]:
             event_binder.event_generate(BINDING.ON_ICON_ARTIST, focus_entry = False)
+        elif keysym in config[HOTKEY.RIGHT_LIST]:
+            event_binder.event_generate(BINDING.RUN_FOCUS_GALLERY)
+        elif keysym in config[HOTKEY.UP_LIST]:
+            self.tags.text.yview_scroll(-1, "units")
+        elif keysym in config[HOTKEY.DOWN_LIST]:
+            self.tags.text.yview_scroll(1, "units")
 
     def on_link_click(self, event: tk.Event):
         if data := event.widget.data:

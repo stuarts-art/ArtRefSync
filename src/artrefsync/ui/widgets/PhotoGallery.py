@@ -15,6 +15,7 @@ from artrefsync.config import get_config
 from artrefsync.constants import APP, BINDING, HOTKEY, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.store_models import PostFile
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
@@ -47,7 +48,7 @@ class PhotoImageGallery(ttk.Frame):
 
     def init_widgets(self):
         logger.info("Init widgets")
-        self.scrolled_text = ttk.ScrolledText(self, autohide=False)
+        self.scrolled_text = ttk.ScrolledText(self, autohide=True)
         self.text = self.scrolled_text.text
         self.simple_frames = SimpleFrames(
             self.scrolled_text, self.frame_width, self.frame_height
@@ -66,6 +67,13 @@ class PhotoImageGallery(ttk.Frame):
         self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
         self.scrolled_text.grid(row=1, column=0, sticky=tk.NSEW)
+        self.to_top_button = RoundedIcon(self, text="˄", size=(25, 25))
+        self.to_top_button.place(relx=0.99, rely=0.99, anchor=tk.SE)
+        self.bind("<Enter>", self.place_top_button, add=True)
+        self.bind("<Leave>", self.remove_top_button, add=True)
+        self.to_top_button.bind(
+            "<Button-1>", lambda e: self.simple_frames.add_select_tag("1.0")
+        )
 
     def init_bindings(self):
         logger.info("Init bindings")
@@ -74,6 +82,15 @@ class PhotoImageGallery(ttk.Frame):
         event_binder.bind(BINDING.ON_FILTER_UPDATE, self.change_tags, self)
         event_binder.bind(BINDING.ON_SORT_BY_UPDATE, self.update_posts, self)
         event_binder.bind(BINDING.ON_DB_UPDATE, self.update_posts, self)
+
+    def place_top_button(self, e):
+        w = self.winfo_width()
+        h = self.winfo_height()
+
+        self.to_top_button.place(x=w - 5, y=h - 5, anchor=tk.SE)
+
+    def remove_top_button(self, e):
+        self.to_top_button.place_forget()
 
     def update_sort_var(self, e: tk.Event):
         self.sort_menu.post(
@@ -84,6 +101,8 @@ class PhotoImageGallery(ttk.Frame):
         if e.widget == self:
             width = self.winfo_width()
             self.frame_width.set(width - 50)
+
+            self.place_top_button(e)
 
     def change_tags(self, tags=None):
         logger.info("Updating tags to be %s", self.tags)
@@ -195,6 +214,8 @@ class SimpleFrames:
             self.throttled_focus_prev()
         elif keysym in config[HOTKEY.LEFT_LIST]:
             event_binder.event_generate(BINDING.ON_GALLERY_SHIFT_TAB)
+        elif keysym in config[HOTKEY.RIGHT_LIST]:
+            event_binder.event_generate(BINDING.ON_TOGGLE_UI)
         elif keysym in config[HOTKEY.DOWN_LIST]:
             self.throttled_focus_next()
         elif keysym == "Return":
@@ -323,21 +344,14 @@ class SimpleFrames:
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts
         self.update()
-        self.text.update_idletasks()
-        # self.text.after(100, lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
-        if self.frames:
-            event_binder.event_generate(BINDING.ON_POST_SELECT, self.frames[0].pid)
+        self.add_select_tag("1.0")
+        self.text.after(100, lambda: self.frames[0].event_generate("<ButtonRelease-1>"))
+        self.frames[0].event_generate("<ButtonRelease-1>")
 
     def update(self, reset=True):
         logger.info("Updating Image Gallery")
-        # self.text.yview_moveto(0.0)
-        # self.update_focus()
-        # self.text.update_idletasks()
-        # self.focus_on_idx(0)
-        # self.text.mark_set("insert", "1.0")
         self.text.yview_moveto(0)
         self.focus_on_idx(0)
-        # self.text.see("1.0")
 
         thread_caller.cancel(SimplePhotoLabel.get_image_cancel_key)
         self.text.yview_moveto(0)
@@ -362,6 +376,7 @@ class SimpleFrames:
             if ranges:
                 self.text.tag_remove("sel", 1.0, tk.END)
             self.text.tag_add("sel", widget)
+            self.text.see(widget)
         elif ctrl_pressed:
             if "sel" in self.text.tag_names(widget):
                 logger.debug("Removing sel tag from %s", widget.pid)
