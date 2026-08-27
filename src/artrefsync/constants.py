@@ -55,12 +55,13 @@ class BINDING(StrEnum):
     # Run: Triggers event
     RUN_FOCUS_GALLERY = auto()
     RUN_TAG_REMOVE_LAST = auto()
+    RUN_SYNC = auto()
+    RUN_STORE_SYNC = auto()
 
     # On: Triggered by event
     ON_ARTIST_CLEAR = auto()
     ON_ARTIST_SELECT = auto()
-    ON_ARTIST_SYNC = auto()
-    ON_ARTIST_SYNC_DONE = auto()
+    ON_ARTIST_UPDATE = auto()
     ON_DB_UPDATE = auto()
     ON_FILTER_UPDATE = auto()
     ON_IMAGE_DOUBLE_CLICK = auto()

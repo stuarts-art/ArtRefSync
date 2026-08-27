@@ -1,3 +1,3 @@
-from artrefsync import App
+from artrefsync import cli
 
-App().start()
+cli()

@@ -46,20 +46,16 @@ class TagTab(ttk.Frame):
             )
             rows = query.execute(as_dict=False)
         self.tag_types = [("Tags", "")] + [row[0] for row in rows]
-        
-        
+
         self.tag_type_menu = RoundedDropDown(
-            root = self.ui_frame,
-            options = self.tag_types,
-            on_select= self.on_board_menu_select,
-            # self.update_posts,
-            variable= self.tag_type_var,
+            root=self.ui_frame,
+            options=self.tag_types,
+            on_select=self.on_board_menu_select,
+            variable=self.tag_type_var,
             radius=10,
             use_image=True,
             fill=self.colors.get(TTKColor.DARK),
         ).pack(side=tk.RIGHT)
-
-        
 
         self.tree = ttk.Treeview(
             self,
@@ -68,35 +64,12 @@ class TagTab(ttk.Frame):
             takefocus=True,
         )
 
-        # self.tag_type_menu = ttk.Menu(self.tag_type_button)
-        # self.tag_type_button["menu"] = self.tag_type_menu
-
         self.ui_frame.pack(side=tk.TOP, fill="x")
         self.entry.pack(side="left", fill="x")
-        # self.tag_type_button.pack(side="left")
 
         self.tree.pack(side=tk.TOP, fill="both", expand=True)
         self.tree.column("#0", width=0, anchor="w", stretch=True)
         self.tree.column("#1", width=80, stretch=0, anchor="e")
-
-        # with PostDb() as post_db:
-        #     logger.info("Getting tag types")
-        #     query = (
-        #         QueryBuilder(post_db.connection).SELECT.DISTINCT("type").FROM(TagType)
-        #     )
-        #     rows = query.execute(as_dict=False)
-        # self.tag_types = [""] + [row[0] for row in rows]
-        # logger.info("tag_types =  %s", self.tag_types)
-
-        # for tag in self.tag_types:
-        #     label = str(tag)
-        #     self.tag_type_menu.add_radiobutton(
-        #         label=label,
-        #         value=label,
-        #         variable=self.tag_type_var,
-        #         compound="left",
-        #         command=self.on_board_menu_select,
-        #     )
 
         self.after(100, self.on_entry_update)
         config.subscribe_reload(self.on_entry_update)
@@ -104,49 +77,42 @@ class TagTab(ttk.Frame):
 
     def on_board_menu_select(self):
         selected_board = self.tag_type_menu.get()
-        # selected_board = self.tag_type_var.get()
-        if selected_board == "Tags": 
+        if selected_board == "Tags":
             selected_board = ""
         logger.info('Selected "%s"', selected_board)
 
     def init_bindings(self):
-        event_binder.bind(BINDING.ON_ARTIST_SELECT, self.update_artist, self)
-        event_binder.bind(BINDING.ON_ARTIST_CLEAR, self.update_artist, self)
-        event_binder.bind(BINDING.ON_DB_UPDATE, self.on_entry_update, self)
-
-        # Entry Keybinds
-        self.entry.bind("<Tab>", event_binder.closure(BINDING.ON_ICON_ARTIST), add=False)
+        self.entry.bind(
+            "<Tab>", event_binder.closure(BINDING.ON_ICON_ARTIST), add=False
+        )
         self.entry.bind("<Return>", lambda e: self.tree.focus_set())
         self.entry.bind("<KeyRelease>", self.on_entry_update)
+        self.tag_type_var.trace_add("write", self.on_entry_update)
 
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
         self.tree.bind("<Key>", self.__keystroke)
         self.tree.bind("<ButtonRelease-1>", self.query_by_tag)
         self.tree.bind("<Button-2>", self.on_middle_tag)
 
-        self.tag_type_var.trace_add("write", self.__on_tag_type_update)
+        event_binder.bind(BINDING.ON_ARTIST_UPDATE, self.update_artist, self)
+        event_binder.bind(BINDING.ON_DB_UPDATE, self.on_entry_update, self)
 
-    def __on_tag_type_update(self, *args):
-        self.on_entry_update()
 
     def __keystroke(self, event: tk.Event):
-        keycode = event.keycode  # noqa: F841
         keysym = event.keysym
         state = event.state
         ctrl_pressed = (state & 0x4) != 0
-        shift_pressed = (state & 0x1) != 0  # noqa: F841
 
         target = ""
         tag = self.tree.focus()
-        if not tag:
-            if children := self.tree.get_children():
-                target = children[0]
+        if not tag and (children := self.tree.get_children()):
+            target = children[0]
 
         if keysym in config[HOTKEY.ZOOM_IN_LIST] + ["Tab"]:
-            event_binder.event_generate(BINDING.ON_ICON_INFO, focus_entry = False)
+            event_binder.event_generate(BINDING.ON_ICON_INFO, focus_entry=False)
 
         elif keysym in config[HOTKEY.ZOOM_OUT_LIST]:
-            event_binder.event_generate(BINDING.ON_ICON_ARTIST, focus_entry = False)
+            event_binder.event_generate(BINDING.ON_ICON_ARTIST, focus_entry=False)
 
         elif keysym == "Tab":
             event_binder.event_generate(BINDING.ON_ICON_ARTIST)
@@ -169,7 +135,7 @@ class TagTab(ttk.Frame):
             else:
                 event_binder.event_generate(BINDING.ON_TAG_SELECT, tag, ctrl_pressed)
             return "break"
-        
+
         if target:
             self.tree.focus(target)
             self.tree.selection_set(target)
@@ -178,23 +144,23 @@ class TagTab(ttk.Frame):
         return "break"
 
     def on_tree_focusin(self, e):
-        
+
         if tag := self.tree.focus():
             self.tree.focus(tag)
             self.tree.selection_set(tag)
             self.tree.see(tag)
-        elif children:= self.tree.get_children():
+        elif children := self.tree.get_children():
             child = children[0]
             self.tree.focus(child)
             self.tree.selection_set(child)
             self.tree.see(child)
 
-
     def update_artist(self, artist, middle=False):
         if artist != self.curr_artist:
-            self.curr_artist = artist
             if not artist:
                 self.curr_artist = ""
+            elif self.is_artist(artist):
+                self.curr_artist = artist
         self.on_entry_update()
 
     def is_artist(self, artist):
@@ -221,15 +187,13 @@ class TagTab(ttk.Frame):
 
     def get_tag_counts(self, artist, text, type_):
         with PostDb() as post_db:
-            # tags = post_db.get_tag_counts(artist, text, type_, limit = 1000)
-            tags = post_db.get_tag_counts(artist = artist, search=text, type_=type_ )
+            tags = post_db.get_tag_counts(artist=artist, search=text, type_=type_)
         return tags
 
     def update_tree_with_tags(self, tags):
 
         for item in self.tree.get_children():
             self.tree.delete(item)
-
 
         for i, (tag, count) in enumerate(tags):
             if self.is_artist(tag):
@@ -243,7 +207,6 @@ class TagTab(ttk.Frame):
                 self.tree.move(tag, "", i)
             else:
                 self.tree.insert("", i, iid=tag, text=tag_text, values=(count,))
-            
 
     def query_by_tag(self, event: tk.Event):
         state = event.state

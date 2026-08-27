@@ -9,8 +9,8 @@ import ttkbootstrap as ttk
 from tenacity import retry, stop_after_attempt
 
 from artrefsync.config import get_config
-from artrefsync.constants import BINDING, TABLE, get_table_mapping
-from artrefsync.sync_coordinator import sync_artist, sync_config, sync_from_store
+from artrefsync.constants import APP, BINDING, TABLE, get_table_mapping
+from artrefsync.sync_coordinator import sync_config, sync_from_store
 from artrefsync.ui.widgets.InputTreeView import InputTreeviewFrame
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.event_binder import event_binder
@@ -47,7 +47,8 @@ class ConfigTab(ttk.Frame):
         self.config_notebook = ttk.Notebook(self, style="custom.TNotebook")
         self.config_notebook.pack(expand=True, fill="both")
         self.init_control_tab()
-        event_binder.bind(BINDING.ON_ARTIST_SYNC, self.start_artist_sync, self)
+        event_binder.bind(BINDING.RUN_SYNC, self.start_sync, self)
+        event_binder.bind(BINDING.RUN_STORE_SYNC, self.start_store_sync, self)
         event_binder[BINDING.SYNC_LOCK] = self.sync_lock
 
         self.load()
@@ -66,7 +67,7 @@ class ConfigTab(ttk.Frame):
             "App": [TABLE.APP],
             "Boards": [TABLE.E621, TABLE.R34, TABLE.DANBOORU],
             "Stores": [TABLE.EAGLE, TABLE.LOCAL],
-            "Hotkeys": [TABLE.HOTKEY]
+            "Hotkeys": [TABLE.HOTKEY],
         }
         self.group_widgets = {}
 
@@ -209,7 +210,12 @@ class ConfigTab(ttk.Frame):
     def configure_style(self, root):
         self.style = ttk.Style()
 
-    def start_sync(self):
+    def start_sync(self, only_recent=None, board_override=None, artist_override = None):
+        if only_recent is None:
+            only_recent = config[APP.ONLY_RECENT_ENABLED]
+
+        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Syncing...")
+        self.update_idletasks()
         func_name = "start_sync"
         if not self.sync_lock.acquire(blocking=False):
             if self.lock_owner == func_name:
@@ -231,11 +237,22 @@ class ConfigTab(ttk.Frame):
             self.start_sync_button.configure(state="active", text="Cancel Sync")
             self.start_store_sync_button.configure(state="disabled")
             if config.log_level == "DEBUG":
-                sync_config(self.sync_event)
+                sync_config(
+                    self.sync_event,
+                    only_recent=only_recent,
+                    board_override=board_override,
+                    artist_override=artist_override
+                )
                 self.finish_sync()
             else:
                 thread_caller.add(
-                    sync_config, self.finish_sync, func_name, self.sync_event
+                    sync_config,
+                    self.finish_sync,
+                    func_name,
+                    self.sync_event,
+                    only_recent=only_recent,
+                    board_override=board_override,
+                    artist_override=artist_override
                 )
         except Exception:
             thread_caller.cancel(func_name)
@@ -251,46 +268,12 @@ class ConfigTab(ttk.Frame):
         self.sync_event.clear()
         self.sync_lock.release()
 
-    def start_artist_sync(self, artist="", board="", only_recent=False):
-        logger.info("START ARTIST SYNC %s, %s, %s", artist, board, only_recent)
-        func_name = "artist_sync"
-        if not self.sync_lock.acquire(blocking=False):
-            logger.warning("Failed to acquire lock.")
-            if self.lock_owner == func_name:
-                logger.warning("Canceling %s.", func_name)
-                thread_caller.cancel(func_name)
-                self.sync_lock.release()
-                self.start_sync_button.configure(state="normal", text="Start Sync")
-                self.start_store_sync_button.configure(state="normal")
-                return
-            else:
-                logger.warning(
-                    "Could not acquire sync for %s because %s is running.",
-                    func_name,
-                    self.lock_owner,
-                )
-        thread_caller.add(
-            sync_artist,
-            self.finish_artist_sync,
-            func_name,
-            artist_name=artist,
-            board_name=board,
-            stop_event=self.sync_event,
-            only_recent=only_recent,
-        )
-
-    def finish_artist_sync(self, *args, **kwargs):
-        self.sync_lock.release()
-        self.lock_owner = ""
-        logger.info("FINISH ARTIST SYNC")
-        event_binder.event_generate(BINDING.ON_LOADING_DONE)
-
     def config_menu(self):
         self.root.filemenu.add_command(
             label="Edit Config", command=lambda: os.startfile(config.path)
         )
 
-    def start_store_sync(self):
+    def start_store_sync(self, board_override = None):
         func_name = "start_store_sync"
         if not self.sync_lock.acquire(blocking=False):
             if func_name == self.lock_owner:
@@ -309,14 +292,15 @@ class ConfigTab(ttk.Frame):
             )
             self.start_sync_button.configure(state="disabled")
             if config.log_level == "DEBUG":
-                sync_from_store(self.sync_event)
+                sync_from_store(stop_event=self.sync_event, board_override= board_override)
                 self.finish_store_sync()
             else:
                 thread_caller.add(
                     sync_from_store,
                     self.finish_store_sync,
                     func_name,
-                    self.sync_event,
+                    stop_event = self.sync_event,
+                    board_override = board_override
                 )
         except Exception:
             thread_caller.cancel(func_name)

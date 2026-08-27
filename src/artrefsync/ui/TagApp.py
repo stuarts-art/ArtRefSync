@@ -9,7 +9,6 @@ from tkinterdnd2 import TkinterDnD
 
 from artrefsync.config import Config, set_config
 from artrefsync.constants import APP, BINDING, ICON, TABLE
-from artrefsync.ui.widgets.LoadingBar import LoadingBars
 from artrefsync.ui.widgets.ModernTopBar import ModernTopBar
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.event_binder import event_binder
@@ -109,7 +108,7 @@ class App(ttk.Window):
             logger.exception("Exception Raised")
 
     def init_scaffolding(self):
-
+        from artrefsync.ui.widgets.LoadingBar import LoadingBars
         logger.info("Init Scaffolding")
 
         self.rowconfigure(0, weight=1)
@@ -161,7 +160,7 @@ class App(ttk.Window):
             self.left_bar,
             text=ICON.SETTINGS,
             size=30,
-            pack_kwargs={"side": tk.TOP},
+            pack_kwargs={"side": tk.BOTTOM},
             font=("Helvetica", 10),
         )
 
@@ -216,11 +215,23 @@ class App(ttk.Window):
 
     def tab_toggle_closure(self, widget: ttk.Frame):
         def raise_toggle_widget(focus_entry=True):
-            if not self.left_tabs.grid_info():
+
+            widget_changed = widget != self.last_widget
+            left_tabs_showing = len(self.left_tabs.grid_info()) > 0
+            change_focus = widget_changed or left_tabs_showing
+
+            print(f"{widget_changed}, {left_tabs_showing}, {change_focus}")
+
+            if not widget_changed and left_tabs_showing:
+                self.left_tabs.grid_forget()
+                return
+            else:
                 self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
-                self.update_idletasks()
-            if self.last_widget != widget:
+            
+            if widget_changed:
                 self.last_widget = widget
+            
+            if change_focus:
                 widget.lift()
                 if focus_entry and (entry := getattr(widget, "entry", "")):
                     entry.focus_set()
@@ -228,9 +239,41 @@ class App(ttk.Window):
                     tree.focus_set()
                 else:
                     widget.focus_set()
+            
+            
+            
+                
 
-            else:
-                self.left_tabs.grid_forget()
+
+
+            
+        
+            # if not self.left_tabs.grid_info():
+            #     self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
+
+            # if self.last_widget == widget:
+
+            
+
+                
+                
+
+            
+            # if not self.left_tabs.grid_info():
+            #     self.left_tabs.grid(row=0, column=2, sticky=tk.NSEW)
+            #     self.update_idletasks()
+            # if self.last_widget != widget:
+            #     self.last_widget = widget
+            #     widget.lift()
+            #     if focus_entry and (entry := getattr(widget, "entry", "")):
+            #         entry.focus_set()
+            #     elif tree := getattr(widget, "tree", ""):
+            #         tree.focus_set()
+            #     else:
+            #         widget.focus_set()
+
+            # else:
+            #     self.left_tabs.grid_forget()
 
         return raise_toggle_widget
 

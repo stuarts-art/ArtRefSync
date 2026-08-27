@@ -28,4 +28,4 @@ dev = [
 ]
 
 [project.scripts]
-sync_cli = "artrefsync.cli:ui"
+sync_cli = "artrefsync.cli:cli"

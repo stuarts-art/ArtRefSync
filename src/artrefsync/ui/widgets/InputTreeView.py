@@ -4,9 +4,6 @@ from collections.abc import Iterable
 import ttkbootstrap as ttk
 from sortedcontainers import SortedSet
 
-from artrefsync.config import get_config
-
-config = get_config()
 logger = logging.getLogger(__name__)
 
 

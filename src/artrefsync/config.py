@@ -22,7 +22,6 @@ from artrefsync.constants import (
     TABLE,
 )
 from artrefsync.default_config import default_config
-from artrefsync.utils.utils import censor_text
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +111,7 @@ class Config:
             reload()
 
     def __getitem__(self, field: TABLE | STORE | BOARD) -> dict:
-        if (
-            type(field) is str
-            or isinstance(field, TABLE)
-            or isinstance(field, BOARD)
-            or isinstance(field, STORE)
-        ):
+        if type(field) is str or isinstance(field, (TABLE, BOARD, STORE)):
             return self.settings.config[field]
         else:
             class_name = field.__class__.__name__.lower()

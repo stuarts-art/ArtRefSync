@@ -61,7 +61,7 @@ class ArtistTab(ttk.Frame):
         self.ui_frame.pack(side=tk.TOP, fill="x")
         self.tree.pack(side=tk.TOP, fill="both", expand=True)
         self.tree.column("#0", width=0, minwidth=0, stretch=False)
-        self.tree.column("#1", width=30, stretch=0, anchor="w")
+        self.tree.column("#1", width=40, stretch=0, anchor="w")
         self.tree.column("#2", width=0, stretch=1, anchor="w")
         self.tree.column("#3", width=80, stretch=0, anchor="e")
         self.tree["displaycolumns"] = ("Icon", "Name", "Count")
@@ -77,6 +77,7 @@ class ArtistTab(ttk.Frame):
 
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
         self.tree.bind("<Key>", self.__keystroke)
+        self.tree.bind("<Double-Button-1>", lambda _: None, add=True)
         self.tree.bind("<Button>", self.__button, add=True)
         self.tree.bind(
             "<<TreeviewOpen>>",
@@ -265,6 +266,7 @@ class ArtistTab(ttk.Frame):
         elif num == EVENT.NUM.LEFT.value:
             pass
         elif num == EVENT.NUM.RIGHT.value:
+            self.on_artist_left(tag)
             self.on_menu(tag, parent, col, x, y)
 
     def on_tree_focusin(self, e):
@@ -323,8 +325,27 @@ class ArtistTab(ttk.Frame):
         menu.add_separator()
         menu.add_command(label="Open config.", compound="left", state="disabled")
         menu.add_command(label="Add artist", compound="left", state="disabled")
-        menu.add_command(label="Sync All", compound="left", state="disabled")
-        menu.add_command(label="Sync Recent", compound="left", state="disabled")
+        menu.add_command(
+            label="Sync All",
+            compound="left",
+            command=lambda: event_binder.event_generate(
+                BINDING.RUN_SYNC, only_recent=False, board_override=board
+            ),
+        )
+        menu.add_command(
+            label="Sync Recent",
+            compound="left",
+            command=lambda: event_binder.event_generate(
+                BINDING.RUN_SYNC, only_recent=True, board_override=board
+            ),
+        )
+        menu.add_command(
+            label="Update app from local files",
+            compound="left",
+            command=lambda: event_binder.event_generate(
+                BINDING.RUN_STORE_SYNC, board_override=board
+            ),
+        )
         return menu
 
     def get_artist_menu(self, artist, board):
@@ -335,13 +356,19 @@ class ArtistTab(ttk.Frame):
         menu.add_command(
             label=prefix + "Sync All",
             command=lambda: event_binder.event_generate(
-                BINDING.ON_ARTIST_SYNC, artist, board, False
+                BINDING.RUN_SYNC,
+                only_recent=False,
+                board_override=board,
+                artist_override=artist,
             ),
         )
         menu.add_command(
             label=prefix + "Sync New",
             command=lambda: event_binder.event_generate(
-                BINDING.ON_ARTIST_SYNC, artist, board, True
+                BINDING.RUN_SYNC,
+                only_recent=True,
+                board_override=board,
+                artist_override=artist,
             ),
         )
         menu.add_command(

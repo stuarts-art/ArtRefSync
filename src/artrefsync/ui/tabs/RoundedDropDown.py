@@ -1,13 +1,10 @@
 import logging
-
-from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
-from artrefsync.utils.image_utils import ImageUtils
-
+import tkinter as tk
 
 import ttkbootstrap as ttk
 
-
-import tkinter as tk
+from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
+from artrefsync.utils.image_utils import ImageUtils
 
 logger = logging.getLogger(__name__)
 

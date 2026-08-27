@@ -16,7 +16,7 @@ class ActiveTagsTab(ttk.Frame):
         logger.info("Initializing Active Tags Tab.")
         super().__init__(root, *args, **kwargs)
         self.font = nametofont("TkDefaultFont")
-        self.artist = None
+        self._artist = tk.StringVar(value="")
         self.tags = []
         self.last_filter = None
         self.stored_grid_info = None
@@ -36,6 +36,18 @@ class ActiveTagsTab(ttk.Frame):
         self.clear_button = RoundedIcon.from_text(self, text="✕")
         ttk.Frame(self.tags_frame).pack(side=tk.LEFT)
         self.add_bindings()
+        self._artist.trace_add("write", lambda v, i, m: event_binder.event_generate(BINDING.ON_ARTIST_UPDATE, self.artist))
+
+    @property
+    def artist(self) -> str:
+        return self._artist.get()
+
+    @artist.setter
+    def artist(self, value: str) -> None:
+        if value is None:
+            value = ""
+        self._artist.set(value)
+    
 
     def add_bindings(self):
         self.clear_button.bind("<Button-1>", self.clear_active)

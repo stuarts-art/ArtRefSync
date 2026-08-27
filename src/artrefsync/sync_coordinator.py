@@ -21,7 +21,6 @@ from artrefsync.constants import (
     R34,
     TABLE,
 )
-from artrefsync.db.db_models import ArtistTagCount
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.eagle_store_handler import EagleHandler
 from artrefsync.stores.file_store_handler import FileStoreHandler
@@ -34,85 +33,65 @@ config = get_config()
 logger = logging.getLogger(__name__)
 
 
-def sync_config(event: Event):
-    try:
-        limit = int(config[TABLE.APP][APP.LIMIT])
-        store = None
-        if config[TABLE.EAGLE][EAGLE.ENABLED]:
-            store = EagleHandler()
-        elif config[TABLE.LOCAL][LOCAL.ENABLED]:
-            store = FileStoreHandler()
-
-        only_recent = config[TABLE.APP][APP.ONLY_RECENT_ENABLED]
-
-        if store is None:
-            logger.warning("NO STORE ENABLED. ENDING SYNC")
-            return
-
-        if config[TABLE.E621][E621.ENABLED] and not event.is_set():
-            logger.info("Syncing %s with store: %s", TABLE.E621, store.get_store())
-            board = E621Handler(only_recent, event)
-            sync(board, store, limit, event)
-
-        if config[TABLE.R34][R34.ENABLED] and not event.is_set():
-            logger.info("Syncing %s with store: %s", TABLE.R34, store.get_store())
-            board = R34Handler(only_recent, event)
-            sync(board, store, limit, event)
-
-        if config[TABLE.DANBOORU][DANBOORU.ENABLED] and not event.is_set():
-            logger.info("Syncing %s with store: %s", TABLE.DANBOORU, store.get_store())
-            board = DanbooruHandler(only_recent, event)
-            sync(board, store, limit, event)
-    finally:
-        event_binder.event_generate(BINDING.ON_LOADING_DONE)
-
-
-def sync_artist(
-    artist_name: str,
-    board_name: str | BOARD,
-    stop_event: Event | None = None,
-    only_recent=False,
-    limit: int | None = None,
+def sync_config(
+    stop_event: Event,
+    only_recent=None,
+    board_override: BOARD | None = None,
+    artist_override=None,
+    max_per_artist = 3000
 ):
     try:
-        event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, 1)
-        event_binder.event_generate(
-            BINDING.ON_LOAD_MID_SET,
-            f"Syncing {'recent' if only_recent else 'all'} posts for {artist_name}",
-        )
-        if not board_name:
-            logger.error("No board name provided")
-            return
-        elif not artist_name:
-            logger.error("No artist name provided")
-            return
-        board = BOARD(board_name)
-        match board:
-            case BOARD.E621:
-                board_handler = E621Handler(only_recent=only_recent)
-            case BOARD.DANBOORU:
-                board_handler = DanbooruHandler(only_recent=only_recent)
-            case BOARD.R34:
-                board_handler = R34Handler(only_recent=only_recent)
-        if limit is None:
-            limit = int(config[TABLE.APP][APP.LIMIT])
+        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
+        limit = int(config[TABLE.APP][APP.LIMIT])
+        store_handler = None
         if config[TABLE.EAGLE][EAGLE.ENABLED]:
             store_handler = EagleHandler()
         elif config[TABLE.LOCAL][LOCAL.ENABLED]:
             store_handler = FileStoreHandler()
+        if only_recent is None:
+            only_recent = config[TABLE.APP][APP.ONLY_RECENT_ENABLED]
 
-        sync_coordinator = SyncCoordinator(
-            board_handler=board_handler,
-            store_handler=store_handler,
-            max_per_artist=limit,
-        )
-        sync_coordinator.sync([artist_name])
+        if store_handler is None:
+            logger.warning("NO STORE ENABLED. ENDING SYNC")
+            return
+
+        if board_override:
+            boards = [board_override]
+        else:
+            enabled = {
+                BOARD.E621: E621.ENABLED,
+                BOARD.R34: R34.ENABLED,
+                BOARD.DANBOORU: DANBOORU.ENABLED,
+            }
+            boards = [k for k, v in enabled.items() if config[v]]
+
+        for board in boards:
+            match board:
+                case BOARD.E621:
+                    board_handler = E621Handler(only_recent=only_recent)
+                case BOARD.DANBOORU:
+                    board_handler = DanbooruHandler(only_recent=only_recent)
+                case BOARD.R34:
+                    board_handler = R34Handler(only_recent=only_recent)
+            artist_list = [artist_override] if artist_override else config[board]["artists"]
+            
+            coordinator = SyncCoordinator(
+                board_handler, store_handler=store_handler, max_per_artist=max_per_artist, stop_event=stop_event
+            )
+            coordinator.sync(artist_list=artist_list)
+
+    except Exception:  # noqa: BLE001
+        logger.error("Error raised while syncing.")
+        stop_event.set()
     finally:
         event_binder.event_generate(BINDING.ON_LOADING_DONE)
 
 
-def sync_from_store(event: Event):
+def sync_from_store(stop_event: Event | None = None, board_override=None):
+    if stop_event is None:
+        stop_event = Event()
     try:
+
         store = None
         if config[TABLE.EAGLE][EAGLE.ENABLED]:
             store = EagleHandler()
@@ -122,7 +101,17 @@ def sync_from_store(event: Event):
             logger.warning("NO STORE ENABLED. ENDING SYNC")
             return
 
-        for board in BOARD:
+        if board_override:
+            boards = [board_override]
+        else:
+            enabled = {
+                BOARD.E621: E621.ENABLED,
+                BOARD.R34: R34.ENABLED,
+                BOARD.DANBOORU: DANBOORU.ENABLED,
+            }
+            boards = [k for k, v in enabled.items() if config[v]]
+
+        for board in boards:
             match board:
                 case BOARD.R34:
                     handler = R34Handler()
@@ -137,24 +126,21 @@ def sync_from_store(event: Event):
                 handler.get_board(),
                 store.get_store(),
             )
-            sync_coordinator = SyncCoordinator(handler, store)
-            sync_coordinator.update_metadata(handler.artist_list)
-
+            sync_coordinator = SyncCoordinator(handler, store, stop_event)
+            artist_list = sync_coordinator.artist_list
+            event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(artist_list))
+            for artist in artist_list:
+                event_binder.event_generate(
+                    BINDING.ON_LOAD_LEFT_INCR, f"{board}: {artist}"
+                )
+                sync_coordinator.update_post_file_table(artist)
     except Exception:
+        stop_event.set()
         logger.exception("Failed to sync from store.")
+    finally:
+        event_binder.event_generate(BINDING.ON_LOADING_DONE)
 
 
-def sync(
-    board: ImageBoardHandler,
-    store: ImageStoreHandler,
-    max_per_artist=10000,
-    event: Event | None = None,
-):
-    logger.info(
-        "Syncing %s to %s", board.get_board(), ", ".join(board.get_artist_list())
-    )
-    coordinator = SyncCoordinator(board, store, max_per_artist, event)
-    coordinator.sync()
 
 
 class SyncCoordinator:
@@ -216,8 +202,8 @@ class SyncCoordinator:
             self.update_metadata(artist)
         self.update_tag_types()
 
-    def sync_artist_files(self, artist:str) -> int:
-        """ Syncs missing files to the local store.
+    def sync_artist_files(self, artist: str) -> int:
+        """Syncs missing files to the local store.
 
         Args:
             artist (str): Artist name

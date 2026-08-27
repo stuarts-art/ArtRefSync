@@ -1,9 +1,17 @@
-from artrefsync.constants import APP, DANBOORU, DB, E621, EAGLE, HOTKEY, LOCAL, R34, TABLE
-
-
 from enum import StrEnum
 from typing import Any
 
+from artrefsync.constants import (
+    APP,
+    DANBOORU,
+    DB,
+    E621,
+    EAGLE,
+    HOTKEY,
+    LOCAL,
+    R34,
+    TABLE,
+)
 
 default_config: dict[StrEnum, dict[StrEnum, Any]] = {
     TABLE.APP: {
@@ -61,6 +69,5 @@ default_config: dict[StrEnum, dict[StrEnum, Any]] = {
         HOTKEY.ZOOM_IN_LIST: ["e", "o", "equal"],
         HOTKEY.ZOOMED_PREV_LIST: ["z", "m", "underscore"],
         HOTKEY.ZOOMED_NEXT_LIST: ["c", "period", "plus"],
-        
-    }
+    },
 }
