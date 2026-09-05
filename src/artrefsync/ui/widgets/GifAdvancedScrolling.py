@@ -308,11 +308,12 @@ class CanvasImage:
         copy: Image.Image = image.copy()
         copy.thumbnail(frame_size)
         image_tk = ImageTk.PhotoImage(copy)
-        offset = (frame_size[0] - copy.width) // 2
+        x_offset = (frame_size[0] - copy.width) // 2
+        y_offset = (frame_size[1] - copy.height) // 2
 
         self.canvas.itemconfigure(self.image, image=image_tk)
         self.canvas.image_tk = image_tk
-        self.canvas.moveto(self.image, x=offset, y=0)
+        self.canvas.moveto(self.image, x=x_offset, y=y_offset)
 
     __show_image_cancel_key = "show_image"
 
