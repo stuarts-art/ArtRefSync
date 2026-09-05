@@ -13,34 +13,42 @@ from tkinterdnd2 import COPY, DND_FILES
 from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
 from artrefsync.constants import APP, BINDING, HOTKEY, TABLE
-from artrefsync.db.post_db import PostDb
+from artrefsync.db.post_db import PostDb, get_sorted_posts
 from artrefsync.stores.store_models import PostFile
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
+from artrefsync.ui.widgets.WidgetPresets import FRAME_NO_BORDER
 from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.TkThreadCaller import thread_caller
 
 config = get_config()
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
+text_pad_x = 5
+text_pad_y = 5
 
 class PhotoImageGallery(ttk.Frame):
-    def __init__(self, root: ttk.Frame, thread_caller_arg=None):
+    def __init__(self, root: ttk.Frame, **kwargs):
         logger.info("Init Photo Image Gallery.")
         self.root = root
-        super().__init__(root)
+        super().__init__(root, **kwargs)
 
+        self.page = None
         self.init_vars()
         self.init_widgets()
         self.init_scaffolding()
         self.init_bindings()
         logger.info("Init Photo Image Complete.")
         event_binder[BINDING.GALLERY_WIDGET] = self
+        self.target_count = 0
+        self.loaded_count = 0
+        thread_caller.add(get_sorted_posts, None)
+        logger.info("Init Photo Image Gallery Done.")
 
     def init_vars(self):
         logger.info("Init vars")
         self.colors = ttk.Style().colors
-        self.tags = ["Initial Value"]
+        self.tags = []
         self.tag_sets: dict[str, set] = {}
         self.frame_height = ttk.IntVar(self, value=500)
         self.frame_width = ttk.IntVar(self, value=500)
@@ -48,7 +56,8 @@ class PhotoImageGallery(ttk.Frame):
 
     def init_widgets(self):
         logger.info("Init widgets")
-        self.scrolled_text = ttk.ScrolledText(self, autohide=True)
+        self.scrolled_text = ttk.ScrolledText(self, autohide=True, vbar=False)
+        self.scrolled_text._border.config(**FRAME_NO_BORDER)
         self.text = self.scrolled_text.text
         self.simple_frames = SimpleFrames(
             self.scrolled_text, self.frame_width, self.frame_height
@@ -79,9 +88,11 @@ class PhotoImageGallery(ttk.Frame):
         logger.info("Init bindings")
         self.bind("<Configure>", self.update_width)
         self.bind("<FocusIn>", self.simple_frames.on_swap)
+        event_binder.bind(BINDING.ON_NEXT_PAGE, self.fetch_next_page, self)
         event_binder.bind(BINDING.ON_FILTER_UPDATE, self.change_tags, self)
         event_binder.bind(BINDING.ON_SORT_BY_UPDATE, self.update_posts, self)
         event_binder.bind(BINDING.ON_DB_UPDATE, self.update_posts, self)
+        event_binder.bind(BINDING.ON_DB_UPDATE, get_sorted_posts.cache_clear, self)
 
     def place_top_button(self, e):
         w = self.winfo_width()
@@ -105,7 +116,6 @@ class PhotoImageGallery(ttk.Frame):
             self.place_top_button(e)
 
     def change_tags(self, tags=None):
-        logger.info("Updating tags to be %s", self.tags)
         if self.tags == tags:
             return
         if tags is None:
@@ -115,47 +125,80 @@ class PhotoImageGallery(ttk.Frame):
         self.update_posts()
 
     def update_posts(self, *args, **kwargs):
-        cancel_key = "get_sorted_posts"
-        sort_by = event_binder.get_or_default(BINDING.SORT_BY, "id")
-        sort_dir = event_binder.get_or_default(BINDING.SORT_DIR, "DESC")
-        logger.info(
-            "Displaying image gallery, sorted by: %s %s, with tags: %s",
-            sort_by,
-            sort_dir,
-            self.tags,
-        )
-        thread_caller.add(
-            self.get_sorted_posts,
-            self.simple_frames.change_posts,
-            cancel_key,
-            tags=self.tags,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-        )
 
+        cancel_key = "get_sorted_count"
+        thread_caller.cancel(cancel_key)
+        self.page = None
+        self.fetch_next_page()
+
+        order_by = event_binder.get_or_default(BINDING.SORT_BY, "id")
+        order_dir = event_binder.get_or_default(BINDING.SORT_DIR, "DESC")
         thread_caller.add(
             self.get_sorted_posts,
             self.update_count,
             "get_sorted_count",
             tags=self.tags,
+            order_by=order_by,
+            order_dir=order_dir,
             as_count=True,
         )
 
     def update_count(self, row):
         if row:
-            event_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, row)
+            event_binder.after_idle(BINDING.ON_SET_TOP_RIGHT_TEXT, row)
+            self.simple_frames.target_frames_count = row
         else:
-            event_binder.event_generate(BINDING.ON_SET_TOP_RIGHT_TEXT, 0)
+            event_binder.after_idle(BINDING.ON_SET_TOP_RIGHT_TEXT, 0)
+            self.simple_frames.target_frames_count = None
+
+    def fetch_next_page(self):
+        cancel_key = "get_sorted_posts"
+        if self.page == None:
+            self.page = 0
+            thread_caller.cancel(cancel_key)
+        elif self.target_count and self.loaded_count >= self.target_count:
+            return
+
+        else:
+            self.page += 1
+
+        sort_by = event_binder.get_or_default(BINDING.SORT_BY, "id")
+        sort_dir = event_binder.get_or_default(BINDING.SORT_DIR, "DESC")
+        thread_caller.add(
+            self.get_sorted_posts,
+            self.simple_frames.change_posts,
+            cancel_key,
+            after=0,
+            tags=self.tags,
+            order_by=sort_by,
+            order_dir=sort_dir,
+            page=self.page,
+        )
 
     def get_sorted_posts(
-        self, tags, sort_by="", sort_dir="", limit=200, offset=0, as_count=False
+        self, tags, order_by="", order_dir="", limit=10, page=0, as_count=False
     ):
-        with PostDb() as post_db:
-            sorted_posts = post_db.posts_in_intersection(
-                tags, sort_by, sort_dir, limit=limit, offset=offset, as_count=as_count
-            )
-        return sorted_posts
+        if not tags:
+            tags = ()
+        elif isinstance(tags, list):
+            tags = tuple(tags)
+        elif isinstance(tags, str):
+            tags = (tags,)
 
+        sorted_posts = get_sorted_posts(
+            *tags,
+            order_by=order_by,
+            order_dir=order_dir,
+            limit=limit,
+            offset=page * limit,
+            as_count=as_count,
+        )
+        if as_count:
+            self.target_count = sorted_posts
+            return sorted_posts
+        else:
+            self.loaded_count = self.page * limit + len(sorted_posts)
+            return limit * page, sorted_posts
 
 class SimpleFrames:
     frames: ClassVar[list[SimplePhotoLabel]] = []
@@ -167,6 +210,7 @@ class SimpleFrames:
         SimplePhotoLabel.text = scrolled_text.text
         self.width_var = width_var
         self.height_var = height_var
+        self.target_frames_count = 0
 
         self.post_ids = []
         self.focused = None
@@ -193,12 +237,15 @@ class SimpleFrames:
         event_binder.bind(BINDING.ON_PREV_GALLERY_IMAGE, self.focus_prev, self.text)
         event_binder.bind(BINDING.ON_NEXT_GALLERY_IMAGE, self.focus_next, self.text)
         event_binder.bind(BINDING.ON_ZOOM_DELTA, self.change_zoom, self.text)
-        self.text.bind("<FocusOut>", self.unbind_canvas_escape)
-        self.text.bind("<KeyRelease-space>", self.on_space)
-        self.text.bind("<Key>", lambda e: self.text.after_idle(self.__keystroke, e))
         self.text.bind(
             "<FocusIn>", lambda e: self.text.after(100, self.add_escape_binding)
         )
+        self.text.bind("<FocusOut>", self.unbind_canvas_escape)
+        self.text.bind("<Key>", self.delayed_key)
+    
+    def delayed_key(self, e):
+        self.text.after_idle(self.__keystroke,e)
+        return "break"
 
     def __keystroke(self, event: tk.Event):
         keysym = event.keysym
@@ -206,36 +253,35 @@ class SimpleFrames:
 
         ctrl_pressed = (state & 0x4) != 0
 
-        if keysym == "q":
-            event_binder.event_generate(BINDING.ON_ZOOM_DELTA, -100)
-        elif keysym == "e":
-            event_binder.event_generate(BINDING.ON_ZOOM_DELTA, +100)
+        if keysym in config[HOTKEY.ZOOM_OUT_LIST]:
+            event_binder.after_idle(BINDING.ON_ZOOM_DELTA, -100)
+        elif keysym in config[HOTKEY.ZOOM_IN_LIST]:
+            event_binder.after_idle(BINDING.ON_ZOOM_DELTA, +100)
         elif keysym in config[HOTKEY.UP_LIST]:
             self.throttled_focus_prev()
         elif keysym in config[HOTKEY.LEFT_LIST]:
-            event_binder.event_generate(BINDING.ON_GALLERY_SHIFT_TAB)
+            event_binder.after_idle(BINDING.ON_GALLERY_SHIFT_TAB)
         elif keysym in config[HOTKEY.RIGHT_LIST]:
-            event_binder.event_generate(BINDING.ON_TOGGLE_UI)
+            event_binder.after_idle(BINDING.ON_TOGGLE_LAST_WIDGET)
         elif keysym in config[HOTKEY.DOWN_LIST]:
             self.throttled_focus_next()
-        elif keysym == "Return":
-            event_binder.event_generate(BINDING.ON_GALLERY_SHIFT_TAB, True)
-        elif keysym == "z":
-            event_binder.event_generate(BINDING.ON_TEXT_Z)
-        elif keysym == "x":
-            event_binder.event_generate(BINDING.ON_TEXT_X)
-        elif keysym == "c":
+        elif keysym == config[HOTKEY.SEARCH_LIST]:
+            event_binder.after_idle(BINDING.ON_GALLERY_SHIFT_TAB, True)
+        elif keysym in config[HOTKEY.ZOOMED_PREV_LIST]:
+            event_binder.after_idle(BINDING.ON_TEXT_Z)
+        elif keysym in config[HOTKEY.ZOOMED_PAUSE_LIST]:
+            event_binder.after_idle(BINDING.ON_TEXT_X)
+        elif keysym in config[HOTKEY.ZOOMED_NEXT_LIST]:
             if ctrl_pressed:
                 self.on_ctrl_c()
             else:
-                event_binder.event_generate(BINDING.ON_TEXT_C)
-        elif keysym == "grave":
-            event_binder.event_generate(BINDING.ON_TEXT_ESCAPE)
-        elif keysym == "Tab":
-            event_binder.event_generate(BINDING.ON_GALLERY_SHIFT_TAB)
-        elif keysym == "BackSpace":
-            event_binder.event_generate(BINDING.RUN_TAG_REMOVE_LAST)
-
+                event_binder.after_idle(BINDING.ON_TEXT_C)
+        elif keysym in config[HOTKEY.SWAP_LIST]:
+            event_binder.after_idle(BINDING.ON_GALLERY_SHIFT_TAB)
+        elif keysym in config[HOTKEY.DELETE_LIST]:
+            event_binder.after_idle(BINDING.RUN_TAG_REMOVE_LAST)
+        elif keysym in config[HOTKEY.OPEN_LIST]:
+            self.on_space()
         else:
             return ""
 
@@ -258,10 +304,10 @@ class SimpleFrames:
                     self.text.see(frame)
                     self.add_select_tag(frame, False, False)
 
-    def on_space(self, *e):
+    def on_space(self, *_):
         logger.info("ON SPACE")
         if self.selected and self.selected.bbox:
-            event_binder.event_generate(
+            event_binder.after_idle(
                 BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid
             )
         else:
@@ -269,7 +315,7 @@ class SimpleFrames:
                 if frame.bbox:
                     self.text.see(frame)
                     self.add_select_tag(frame, False, False)
-                    event_binder.event_generate(
+                    event_binder.after_idle(
                         BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid
                     )
                     break
@@ -298,12 +344,12 @@ class SimpleFrames:
         label.bind("<Double-1>", self.on_double_button_1)
         label.drag_source_register(DND_FILES)
         label.dnd_bind("<<DragInitCmd>>", self.drag_binding)
-        self.text.window_create(tk.END, window=label, padx=3, pady=3)
+        self.text.window_create(tk.END, window=label, padx=text_pad_x, pady=text_pad_y)
         self.text.tag_add("center", label)
 
     def on_double_button_1(self, e):
         self.text.focus_set()
-        event_binder.event_generate(
+        event_binder.after_idle(
             BINDING.ON_IMAGE_DOUBLE_CLICK, self.post_ids[e.widget.idx]
         )
 
@@ -335,12 +381,24 @@ class SimpleFrames:
     def clear_zoom(self):
         self.zooming = False
 
-    def change_posts(self, posts):
+    def change_posts(self, data):
+        logger.debug("Change Posts called with %s", data)
+        offset, posts = data
+        if offset:
+            if posts:
+                start = len(self.post_ids)
+                self.post_ids.extend(posts)
+                for i, frame in enumerate(self.frames[start : len(self.post_ids)]):
+                    if frame.bbox:
+                        frame.get_image(True)
+                    else:
+                        frame.reset()
+            return
+
         if posts is None:
             posts = []
         if posts == SimplePhotoLabel.post_ids:
             return
-        logger.info("%s posts recieved for change_post", len(posts))
         self.post_ids = posts
         SimplePhotoLabel.post_ids = posts
         self.update()
@@ -398,7 +456,7 @@ class SimpleFrames:
     def updated_selected_post(self, pid):
         if self.last_selected != pid:
             self.last_selected = pid
-            event_binder.event_generate(BINDING.ON_POST_SELECT, self.selected.pid)
+            event_binder.after_idle(BINDING.ON_POST_SELECT, self.selected.pid)
 
     @property
     def selected(self) -> SimplePhotoLabel:
@@ -518,6 +576,12 @@ class SimpleFrames:
         self.focussing_next = False
         self.last_focus_next = time.time()
         if self.selected:
+            if (
+                self.target_frames_count
+                and self.target_frames_count - self.selected.idx <= 1
+            ):
+                return
+
             if widget := self.selected.next:
                 self.text.tag_add("sel", widget)
                 self.text.tag_remove("sel", 1.0, self.text.index(widget))
@@ -531,7 +595,6 @@ class SimpleFrames:
             for frame in self.frames:
                 if frame.bbox:
                     frame.event_generate("<Button-1>")
-                    # break
 
     def focus_prev_row(self, e=None):
         label: SimplePhotoLabel = self.selected
@@ -572,10 +635,22 @@ class SimpleFrames:
     def on_visibility(self, e):
         widget: SimplePhotoLabel = e.widget
         if widget.bbox:
-            logger.debug("Visibility TRUE for %s", widget.pid)
             idx = widget.idx
+            logger.debug(
+                "Visibility TRUE for %s, %s, %s",
+                widget.pid,
+                idx,
+                self.target_frames_count,
+            )
+
+            if len(self.post_ids) - idx < 5:
+                logger.info("Requesting next page")
+
+                event_binder.after_idle(BINDING.ON_NEXT_PAGE)
+
             if len(self.frames) - idx < 10 and len(self.frames) < len(self.post_ids):
                 self.increase_frames(idx + 10)
+                event_binder.after_idle(BINDING.ON_NEXT_PAGE)
             for i in range(idx, idx + 8):
                 try:
                     SimpleFrames.frames[i].get_image()
@@ -738,15 +813,6 @@ class SimplePhotoLabel(tk.Label):
         self.file = None
         self.loading = False
 
-    def update_size(self):
-        try:
-            thumb_size = ImageUtils.get_cv_thumb_size(
-                (self.post_file.width, self.post_file.height),
-                (self.width_var.get(), self.height_var.get()),
-            )
-            return thumb_size
-        except Exception:  # noqa: BLE001
-            return (self.width_var.get(), self.height_var.get())
 
     def get_image(self, force_update=False):
         if self.pid is None or not self.post_file:
@@ -772,8 +838,8 @@ class SimplePhotoLabel(tk.Label):
             self.config(image=None)
 
             text_width = self.root.winfo_width()
-            self.thumb_size = (text_width, self.height_var.get())
-            if self.file.ext not in ["webm", "mp4"] and self.image_h > 400:
+            self.thumb_size = (text_width-2*text_pad_x, self.height_var.get() - 2* text_pad_y)
+            if self.image_h > 400:
                 logger.debug("Upscaling file %s to the full file", self.file_name)
                 self.file_name = self.file.file
 
@@ -788,10 +854,11 @@ class SimplePhotoLabel(tk.Label):
                 ImageUtils.get_cv2_pil_image,
                 self.set_image,
                 self.get_image_cancel_key,
-                self.file_name,
-                self.thumb_size,
-                False,
-                blur,
+                after=0,
+                file=self.file_name,
+                size=self.thumb_size,
+                as_photoimage=False,
+                blur=blur,
             )
 
     def set_image(self, image):

@@ -1,6 +1,7 @@
 import fnmatch
 import logging
 import tkinter as tk
+import tkinter.font as tkfont
 
 import ttkbootstrap as ttk
 from sortedcontainers import SortedSet
@@ -16,6 +17,7 @@ from artrefsync.constants import (
 )
 from artrefsync.db.post_db import PostDb
 from artrefsync.ui.tabs.RoundedDropDown import RoundedDropDown
+from artrefsync.ui.widgets.ImagePreview import update_preview_with_tags
 from artrefsync.utils.event_binder import event_binder
 
 config = get_config()
@@ -35,12 +37,40 @@ class ArtistTab(ttk.Frame):
         self.init_bindings()
         self.load_config()
         config.subscribe_reload(self.load_config)
+        self.last_hover_row = None
+        self.previewing = ""
+        self.is_focused = False
+
+    def update_preview(self, artist):
+        if event_binder[BINDING.APP_WIDGET].last_widget != self:
+            return
+
+        if artist == self.previewing:
+            return
+        self.previewing = artist
+        if not artist:
+            update_preview_with_tags("")
+        self.tree.tk.call(self.tree, "tag", "remove", "underlined")
+        self.tree.item(artist, tags=("underlined",))
+        # logger.info("UPDATE PREVIEW called for %s", artist)
+        app = event_binder[BINDING.APP_WIDGET]
+        rootx = self.tree.winfo_rootx() - app.winfo_rootx()
+        rooty = self.tree.winfo_rooty() - app.winfo_rooty()
+        if bbox := self.tree.bbox(artist):
+            x, y, w, h = bbox
+            x_offset = rootx + x + w + 14
+            y_offset = rooty + y + h // 2
+            update_preview_with_tags(artist, x=x_offset, y=y_offset, anchor=tk.W)
 
     def init_structure(self):
         self.board_var = ttk.StringVar(value="Artists")
         self.tab_label = ttk.Label(self, text="Artists", anchor="center")
         self.tab_label.pack(side=tk.TOP, fill="x")
         self.ui_frame = ttk.Frame(self)
+
+        self.entry = ttk.Entry(self.ui_frame)
+        self.entry.pack(side=tk.LEFT, fill="x")
+
         RoundedDropDown(
             self.ui_frame,
             ["Board", BOARD.DANBOORU, BOARD.R34, BOARD.E621],
@@ -53,11 +83,9 @@ class ArtistTab(ttk.Frame):
         ).pack(side=tk.RIGHT)
         self.ui_frame.pack(side=tk.TOP, fill="x")
 
-        self.entry = ttk.Entry(self.ui_frame)
-        self.entry.pack(side=tk.RIGHT, fill="x")
         self.artist_right_menu = ttk.Menu(self, tearoff=False)
         self.tree = ttk.Treeview(self, columns=("Icon", "Name", "Count"), show="")
-
+        self.artist_preview = ttk.Label(event_binder[BINDING.APP_WIDGET])
         self.ui_frame.pack(side=tk.TOP, fill="x")
         self.tree.pack(side=tk.TOP, fill="both", expand=True)
         self.tree.column("#0", width=0, minwidth=0, stretch=False)
@@ -66,16 +94,30 @@ class ArtistTab(ttk.Frame):
         self.tree.column("#3", width=80, stretch=0, anchor="e")
         self.tree["displaycolumns"] = ("Icon", "Name", "Count")
 
+        style = ttk.Style()
+        if not (font_name := style.lookup("Treeview", "font")):
+            font_name = "TkTextFont"
+        font = tkfont.nametofont(font_name)
+        family = font.actual("family")
+        size = font.actual("size")
+        underline_font = tkfont.Font(
+            family=family, size=size + 1, weight="bold", underline=True
+        )
+        self.tree.tag_configure("underlined", font=underline_font)
+
     def init_bindings(self):
 
         self.entry.bind("<Tab>", event_binder.closure(BINDING.ON_ICON_TAG), add=False)
         self.entry.bind("<Down>", lambda e: self.tree.focus_set())
         self.entry.bind("<Return>", lambda e: self.tree.focus_set())
-        self.tree.bind("<Return>", lambda e: self.entry.focus_set())
 
         self.entry.bind("<KeyRelease>", self.on_entry_key_release)
 
+        self.tree.bind("<Motion>", self.on_tree_hover)
+        self.tree.bind("<Enter>", self.on_tree_enter)
+        self.tree.bind("<Leave>", self.on_tree_leave)
         self.tree.bind("<FocusIn>", self.on_tree_focusin)
+        self.tree.bind("<FocusOut>", self.on_tree_focusout)
         self.tree.bind("<Key>", self.__keystroke)
         self.tree.bind("<Double-Button-1>", lambda _: None, add=True)
         self.tree.bind("<Button>", self.__button, add=True)
@@ -140,7 +182,6 @@ class ArtistTab(ttk.Frame):
                 )
             for artist, artist_count in artist_count_map.items():
                 if not self.tree.exists(artist):
-                    # count = self.count_map.get(artist, 0)
                     self.tree.insert(
                         board_str,
                         "end",
@@ -158,11 +199,11 @@ class ArtistTab(ttk.Frame):
         ctrl_pressed = (event.state & 0x4) != 0
         shift_pressed = (event.state & 0x1) != 0  # noqa: F841
 
-        if keysym in config[HOTKEY.ZOOM_IN_LIST] + ["Tab"]:
-            event_binder.event_generate(BINDING.ON_ICON_TAG, focus_entry=False)
+        if keysym in config[HOTKEY.ZOOM_IN_LIST] + config[HOTKEY.SWAP_LIST]:
+            event_binder.after_idle(BINDING.ON_ICON_TAG, focus_entry=False)
 
         elif keysym in config[HOTKEY.ZOOM_OUT_LIST]:
-            event_binder.event_generate(BINDING.ON_ICON_INFO, focus_entry=False)
+            event_binder.after_idle(BINDING.ON_ICON_INFO, focus_entry=False)
 
         elif keysym in config[HOTKEY.UP_LIST]:
             tag = self.tree.focus()
@@ -185,6 +226,7 @@ class ArtistTab(ttk.Frame):
                 self.tree.focus(target)
                 self.tree.selection_set(target)
                 self.tree.see(target)
+                self.update_preview(target)
 
             # self.tree.event_generate("<Up>", event)
         elif keysym in config[HOTKEY.LEFT_LIST]:
@@ -195,7 +237,6 @@ class ArtistTab(ttk.Frame):
                 self.tree.selection_set(parent)
                 self.tree.see(parent)
 
-                # self.on_artist_left(parent)
             else:
                 row = self.tree.item(tag)
                 if row["open"] in (True, 1, "true"):
@@ -223,36 +264,38 @@ class ArtistTab(ttk.Frame):
                 self.tree.selection_set(target)
                 self.tree.see(target)
 
-        elif keysym in config[HOTKEY.RIGHT_LIST]:
-            # elif keysym in ["d", "l", "Right"]:
+                self.update_preview(target)
+
+        elif keysym in config[HOTKEY.RIGHT_LIST] + config[HOTKEY.OPEN_LIST]:
             tag = self.tree.focus()
-            self.on_artist_left(tag)
+            self.on_artist_left(tag, ctrl_pressed=ctrl_pressed or shift_pressed)
             if parent := self.tree.parent(self.tree.focus()):
-                event_binder.event_generate(BINDING.RUN_FOCUS_GALLERY)
+                event_binder.after_idle(BINDING.RUN_FOCUS_GALLERY)
                 self.last_parent = parent
             elif row := self.tree.item(tag):
                 is_open = row["open"]
                 if is_open:
-                    event_binder.event_generate(BINDING.RUN_FOCUS_GALLERY)
+                    event_binder.after_idle(BINDING.RUN_FOCUS_GALLERY)
                 else:
                     self.tree.item(tag, open=True)
 
                 if is_open := row["open"] in (True, 1, "true"):
-                    event_binder.event_generate(BINDING.RUN_FOCUS_GALLERY)
+                    event_binder.after_idle(BINDING.RUN_FOCUS_GALLERY)
                 else:
                     self.tree.item(tag, open=not is_open)
-
-        elif keysym == "space":
-            pass
-        elif keysym == "BackSpace":
+        elif keysym in config[HOTKEY.DELETE_LIST]:
             tag = self.focus()
-            event_binder.event_generate(BINDING.RUN_TAG_REMOVE_LAST, tag)
+            event_binder.after_idle(BINDING.RUN_TAG_REMOVE_LAST, tag)
+        elif keysym in config[HOTKEY.SEARCH_LIST]:
+            self.entry.focus_set()
 
         else:
             return ""
         return "break"
 
     def __button(self, event: tk.Event):
+        ctrl_pressed = (event.state & 0x4) != 0
+        shift_pressed = (event.state & 0x1) != 0  # noqa: F841
         num = event.num
         y = event.y
         x = event.x
@@ -261,16 +304,49 @@ class ArtistTab(ttk.Frame):
         parent = self.tree.parent(tag)
 
         if num == EVENT.NUM.LEFT.value:
-            self.on_artist_left(tag)
+            self.on_artist_left(tag, ctrl_pressed=ctrl_pressed or shift_pressed)
             return "break"
         elif num == EVENT.NUM.LEFT.value:
             pass
         elif num == EVENT.NUM.RIGHT.value:
-            self.on_artist_left(tag)
+            self.on_artist_left(tag, ctrl_pressed=ctrl_pressed or shift_pressed)
             self.on_menu(tag, parent, col, x, y)
 
-    def on_tree_focusin(self, e):
-        tag = self.tree.focus()
+    def on_tree_enter(self, e):
+        pass
+
+    def on_tree_leave(self, e):
+        self.last_hover_row = ""
+        if self.is_focused:
+            tag = self.tree.focus()
+            self.update_preview(tag)
+        else:
+            self.update_preview("")
+
+    def on_tree_hover(self, e):
+        if row := self.tree.identify_row(e.y):
+            if row == self.last_hover_row:
+                return
+            else:
+                self.last_hover_row = row
+                self.update_preview(row)
+
+    def on_tree_focusout(self, e):
+        self.is_focused = False
+        if self.last_hover_row:
+            self.update_preview(self.last_hover_row)
+        else:
+            self.update_preview("")
+
+    def on_tree_focusin(self, *_):
+        self.is_focused = True
+        # self.after(50, self.delayed_focusin)
+
+    # def delayed_focusin(self):
+        if self.previewing:
+            tag = self.previewing
+        else:
+            tag = self.tree.focus()
 
         if tag:
             if not self.tree.parent(tag) and not self.tree.get_children(tag):
@@ -279,16 +355,19 @@ class ArtistTab(ttk.Frame):
             self.tree.selection_set(tag)
             self.tree.focus(tag)
             self.tree.see(tag)
+            self.update_preview(tag)
 
         elif children := self.tree.get_children():
-            self.tree.focus(children[0])
-            self.tree.selection_set(children[0])
-            self.tree.see(children[0])
+            tag = children[0]
+            self.tree.selection_set(tag)
+            self.tree.focus(tag)
+            self.tree.see(tag)
+            self.update_preview(tag)
 
     def on_artist_middle(self, e: tk.Event):
         tag = self.tree.identify_row(e.y)
         logger.info("Middle click recieved for %s", tag)
-        event_binder.event_generate(BINDING.ON_ARTIST_SELECT, tag, True)
+        event_binder.after_idle(BINDING.ON_ARTIST_SELECT, tag, True)
 
     def on_menu(self, tag, parent, col, x, y):
         if col != "#2":
@@ -328,21 +407,21 @@ class ArtistTab(ttk.Frame):
         menu.add_command(
             label="Sync All",
             compound="left",
-            command=lambda: event_binder.event_generate(
+            command=lambda: event_binder.after_idle(
                 BINDING.RUN_SYNC, only_recent=False, board_override=board
             ),
         )
         menu.add_command(
             label="Sync Recent",
             compound="left",
-            command=lambda: event_binder.event_generate(
+            command=lambda: event_binder.after_idle(
                 BINDING.RUN_SYNC, only_recent=True, board_override=board
             ),
         )
         menu.add_command(
             label="Update app from local files",
             compound="left",
-            command=lambda: event_binder.event_generate(
+            command=lambda: event_binder.after_idle(
                 BINDING.RUN_STORE_SYNC, board_override=board
             ),
         )
@@ -355,7 +434,7 @@ class ArtistTab(ttk.Frame):
         prefix = "   "
         menu.add_command(
             label=prefix + "Sync All",
-            command=lambda: event_binder.event_generate(
+            command=lambda: event_binder.after_idle(
                 BINDING.RUN_SYNC,
                 only_recent=False,
                 board_override=board,
@@ -364,7 +443,7 @@ class ArtistTab(ttk.Frame):
         )
         menu.add_command(
             label=prefix + "Sync New",
-            command=lambda: event_binder.event_generate(
+            command=lambda: event_binder.after_idle(
                 BINDING.RUN_SYNC,
                 only_recent=True,
                 board_override=board,
@@ -387,7 +466,7 @@ class ArtistTab(ttk.Frame):
             selected_board = ""
         logger.info('Selected "%s"', selected_board)
         if selected_board != "":
-            event_binder.event_generate(BINDING.ON_ARTIST_SELECT, selected_board)
+            event_binder.after_idle(BINDING.ON_ARTIST_SELECT, selected_board)
             selected_found = False
             for c in self.tree.get_children(""):
                 if c == selected_board:
@@ -404,12 +483,15 @@ class ArtistTab(ttk.Frame):
             for i, b in enumerate(self.board_artists_map.keys()):
                 self.tree.move(b, "", i)
             self.tree.selection_set((selected_board,))
-            event_binder.event_generate(BINDING.ON_ARTIST_CLEAR, "")
+            event_binder.after_idle(BINDING.ON_ARTIST_CLEAR, "")
 
     def on_entry_key_release(self, e=None):
         text = self.entry.get()
         logger.debug("On Key Release for text = %s", text)
         artist_index = 0
+        active = []
+
+        first_child = ""
         for board in self.tree.get_children():
             self.tree.item(board, open=True)
             artists = sorted(self.board_artists_map[board])
@@ -420,14 +502,27 @@ class ArtistTab(ttk.Frame):
                     self.tree.detach(artist)
                 elif artist not in active_children and artist in filtered:
                     self.tree.move(artist, board, artist_index)
-                artist_index += 1
+                    active.append(artist)
+                if not first_child and artist in filtered:
+                    first_child = artist
 
-    def on_artist_left(self, artist):
+                artist_index += 1
+        if not text:
+            self.update_preview("")
+        elif first_child:
+            self.update_preview(first_child)
+        else:
+            for board in self.tree.get_children():
+                if text in board:
+                    self.last_parent = board
+                    self.update_preview(board)
+
+    def on_artist_left(self, artist, ctrl_pressed=False):
         if artist:
             self.tree.focus(artist)
             self.tree.selection_set((artist,))
             logger.info("Querying by artist: %s", artist)
-            event_binder.event_generate(BINDING.ON_ARTIST_SELECT, artist)
+            event_binder.after_idle(BINDING.ON_ARTIST_SELECT, artist, ctrl_pressed)
 
     def set_open_icon(self, event):
         for b in [BOARD.E621, BOARD.R34, BOARD.DANBOORU]:

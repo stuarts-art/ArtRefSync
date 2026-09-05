@@ -2,18 +2,47 @@ import functools
 import logging
 import os
 import sqlite3
+from functools import lru_cache
+import time
 
 from dataclassdb import DataclassDb, QueryBuilder
 from tenacity import retry, stop_after_attempt
 
 from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
-from artrefsync.constants import APP, BOARD, DANBOORU, E621, R34, TABLE
+from artrefsync.constants import APP, BINDING, BOARD, TABLE
 from artrefsync.db.db_models import ArtistTagCount, PostTagLink, Tag, TagType
 from artrefsync.stores.store_models import PostFile
+from artrefsync.utils.event_binder import event_binder
 
 config = get_config()
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=50)
+def get_sorted_posts(
+    *tags: str,
+    order_by: str = "id",
+    order_dir: str = "DESC",
+    limit: int = 10,
+    offset: int = 0,
+    as_count: bool = False,
+):
+    start = time.time()
+    tags = [tag for tag in tags if tag]
+    with PostDb() as post_db:
+        output = post_db.posts_in_intersection(
+            tags=tags,
+            order_by=order_by,
+            order_dir=order_dir,
+            limit=limit,
+            offset=offset,
+            as_count=as_count,
+        )
+    logger.info(
+        "Get sorted posts for %s, LIMIT %s was %0.3f", tags, limit, time.time() - start
+    )
+    return output
 
 
 class PostDb:
@@ -58,7 +87,6 @@ class PostDb:
         self.commit = self.connection.commit
         if not PostDb.tables_initialized:
             verify_table = True
-            PostDb.tables_initialized = True
         else:
             verify_table = False
 
@@ -75,15 +103,20 @@ class PostDb:
             PostTagLink, self.connection, verify_table=verify_table
         )
 
-        self.posts.CREATE.INDEX.IF.NOT.EXISTS("post_id_index").ON(Post).par(
-            "id"
-        ).execute()
-        self.posts.CREATE.INDEX.IF.NOT.EXISTS("post_artist_index").ON(Post).par(
-            "artist_name"
-        ).execute()
-        self.files.CREATE.INDEX.IF.NOT.EXISTS("postfile_artist_index").ON(Post).par(
-            "artist_name"
-        ).execute()
+        if not self.tables_initialized:
+            PostDb.tables_initialized = True
+            self.posts.CREATE.INDEX.IF.NOT.EXISTS("post_board_index").ON(Post).par(
+                "board"
+            ).execute()
+            self.posts.CREATE.INDEX.IF.NOT.EXISTS("post_id_index").ON(Post).par(
+                "id"
+            ).execute()
+            self.posts.CREATE.INDEX.IF.NOT.EXISTS("post_artist_index").ON(Post).par(
+                "artist_name"
+            ).execute()
+            self.files.CREATE.INDEX.IF.NOT.EXISTS("postfile_artist_index").ON(Post).par(
+                "artist_name"
+            ).execute()
 
     @retry(stop=stop_after_attempt(3))
     def update_tag_link_table(self, post_sql_id, tags):
@@ -197,6 +230,7 @@ class PostDb:
             qb.from_(PostTagLink, "pt")
             qb.join(Tag, "t", "t.sql_id = pt.tag_id")
             qb.join(Post, "p", "p.sql_id = pt.post_id")
+            qb.join(PostFile, "pf", "p.id = pf.id")
             qb.WHERE("p.artist_name").eq.quote(artist)
             qb.GROUP.BY("p.artist_name", "t.tag").end()
             qb.END.TRANSACTION.end()
@@ -220,7 +254,6 @@ class PostDb:
             qb.END.TRANSACTION.end()
             qb.execute_script()
 
-    @retry(stop=stop_after_attempt(3))
     def posts_in_intersection(
         self,
         tags: list[str] | None = None,
@@ -230,53 +263,50 @@ class PostDb:
         offset=0,
         as_count=False,
     ):
-        if tags is None:
-            tags = []
-        if isinstance(tags, str):
-            tags = [tags]
-
-        query = QueryBuilder(self.connection)
-        params = []
-        if not tags:
-            if as_count:
-                query.SELECT("pf.id")
+        with QueryBuilder(self.connection) as qb:
+            if not tags:
+                qb.SELECT("COUNT(DISTINCT pf.id) AS count" if as_count else "pf.id")
+                qb.from_(PostFile, "pf")
+                qb.join(Post, "p1", "pf.id = p1.id")
             else:
-                query.SELECT("pf.id")
-            query.from_(PostFile, "pf")
-            query.join(Post, "p1", "pf.id = p1.id")
+                table_names = []
+                qb.WITH.br()
+                for i, tag in enumerate(tags):
+                    table_name = f"table_{i}"
+                    if table_names:
+                        qb.comma.br()
+                    table_names.append(table_name)
+                    qb.add(table_name).AS.lpar()
+                    qb.SELECT("pt.post_id as id")
+                    qb.from_(PostTagLink, "pt")
+                    qb.join(Tag, "t1", "pt.tag_id = t1.sql_id", join_type="INNER")
+                    qb.WHERE("t1.tag").eq.placeholder(tag)
+                    qb.rpar()
+                if as_count:
+                    qb.SELECT("COUNT(*)")
+                else:
+                    qb.SELECT("p1.id")
+                qb.FROM(table_names[0])
+                for table_name in table_names[1:]:
+                    qb.join(table_name, on=f"{table_names[0]}.id = {table_name}.id")
+                    qb.join(table_name, using_cols="id")
+                qb.join(Post, as_="p1", on=f"p1.sql_id = {table_name}.id")
+                qb.join(PostFile, as_="pf", on="p1.id = pf.id")
+            if not as_count:
+                if order_by:
+                    qb.ORDER.BY(f"p1.{order_by} {order_dir}")
+                qb.LIMIT(limit).OFFSET(offset)
 
-        else:
             if as_count:
-                query.SELECT("COUNT(DISTINCT pf.id) AS count")
+                if row := qb.execute_one():
+                    return row[0]
+                else:
+                    return 0
             else:
-                query.SELECT("pf.id")
-
-            query.from_(PostTagLink, "pt")
-            query.join(Post, "p1", "pt.post_id = p1.sql_id", join_type="INNER")
-            query.join(PostFile, "pf", "p1.id = pf.id", join_type="INNER")
-            query.join(Tag, "t1", "pt.tag_id = t1.sql_id", join_type="INNER")
-            query.WHERE("t1.tag").IN(["?"] * len(tags), par=True)
-            params.extend(tags)
-            query.GROUP.BY("pf.id")
-            query.HAVING.Count("DISTINCT t1.tag").eq(len(tags))
-
-        if as_count:
-            subquery_name = "intersection_rows"
-            temp_query = query.as_string()
-            query.WITH(subquery_name).AS(temp_query, par=True).SELECT("COUNT(*)").FROM(
-                subquery_name
-            )
-        else:
-            if order_by:
-                query.ORDER.BY(f"p1.{order_by} {order_dir}")
-            if limit:
-                query.LIMIT(limit).OFFSET(offset)
-
-        rows = query.execute(*params, as_dict=False)
-        if as_count:
-            return rows[0][0]
-        else:
-            return [row[0] for row in rows]
+                if rows := qb.execute():
+                    return [row[0] for row in rows]
+                else:
+                    return []
 
     def remove_black_listed_posts(self, board):
         black_list = config[board]["black_list"]
@@ -304,3 +334,34 @@ class PostDb:
             qb.DELETE.FROM(PostFile).WHERE("id").IN.quote(*ids, par=True).end()
             qb.END.TRANSACTION.end()
             qb.execute_script()
+
+    def get_thumbnail(self, pid):
+        try:
+            if thumbnail := self.files.get(
+                pid, select_fields=["thumbnail"], as_tuple=True
+            ):
+                return thumbnail[0]
+            return ""
+        except Exception:
+            return ""
+
+    def get_file(self, pid):
+        if thumbnail := self.files.get(pid, select_fields=["file"], as_tuple=True):
+            return thumbnail[0]
+        else:
+            return ""
+
+    def is_rating_s(self, pid: str) -> bool:
+        with QueryBuilder(self.connection) as qb:
+            qb.SELECT.EXISTS.lpar()
+            qb.SELECT(1).from_(PostTagLink, "pt")
+            qb.join(Tag, "t", "t.sql_id = pt.tag_id")
+            qb.join(Post, "p", "p.sql_id = pt.post_id")
+            qb.WHERE("t.tag").eq.placeholders("rating_s")
+            qb.AND("p.id").eq.placeholders(pid)
+            qb.rpar.end()
+            result = qb.execute_one()
+        if result:
+            return bool(result[0])
+        else:
+            return False

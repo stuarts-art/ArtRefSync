@@ -103,7 +103,7 @@ class DanbooruHandler(ImageBoardHandler):
                     )
                     is_black_listed = True
                     break
-            if is_black_listed:
+            if is_black_listed or d_post.is_banned or d_post.is_deleted or d_post.is_flagged or d_post.is_pending:
                 continue
 
             self.type_tags["metadata"].update(d_post.tag_string_meta)

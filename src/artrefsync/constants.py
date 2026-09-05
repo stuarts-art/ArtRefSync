@@ -42,8 +42,13 @@ class ICON(StrEnum):
 
 
 class BINDING(StrEnum):
+    ACTIVE_WIDGET = auto()
+    APP_WIDGET = auto()
     GALLERY_WIDGET = auto()
     VIEWER_WIDGET = auto()
+    PREVIEW_WIDGET = auto()
+
+
     # Mapped vars
     ARTIST_SET = auto()
     BOARD_SET = auto()
@@ -57,12 +62,14 @@ class BINDING(StrEnum):
     RUN_TAG_REMOVE_LAST = auto()
     RUN_SYNC = auto()
     RUN_STORE_SYNC = auto()
+    REMOVE_IF_ACTIVE = auto()
 
     # On: Triggered by event
     ON_ARTIST_CLEAR = auto()
     ON_ARTIST_SELECT = auto()
     ON_ARTIST_UPDATE = auto()
     ON_DB_UPDATE = auto()
+    ON_NEXT_PAGE = auto()
     ON_FILTER_UPDATE = auto()
     ON_IMAGE_DOUBLE_CLICK = auto()
     ON_IMAGE_VISIBILITY = auto()
@@ -87,6 +94,7 @@ class BINDING(StrEnum):
     ON_ICON_ARTIST = auto()
     ON_ICON_INFO = auto()
     ON_ICON_CONFIG = auto()
+    ON_TOGGLE_LAST_WIDGET = auto()
 
     ON_TEXT_ESCAPE = auto()
     ON_TEXT_Z = auto()
@@ -142,11 +150,14 @@ class APP(StrEnum):
     DB_DIR = auto()
     DB_FILE_NAME = auto()
     DB_BLOB_NAME = auto()
+    DOWNLOAD_SIZE_DOWN = auto()
+    FORMAT_LIST = auto()
     THUMBNAIL_WIDTH = auto()
     THUMBNAIL_HEIGHT = auto()
     ONLY_RECENT_ENABLED = auto()
     MAX_DOWNLOAD_THREADS = auto()
     BLUR_UNSAFE_ENABLED = auto()
+    PREVIEW_ENABLED = auto()
 
 
 class BOARD(StrEnum):
@@ -227,7 +238,12 @@ class HOTKEY(StrEnum):
     ZOOM_IN_LIST = auto()
     ZOOM_OUT_LIST = auto()
     ZOOMED_NEXT_LIST = auto()
+    ZOOMED_PAUSE_LIST = auto()
     ZOOMED_PREV_LIST = auto()
+    OPEN_LIST = auto()
+    SEARCH_LIST = auto()
+    DELETE_LIST = auto()
+    SWAP_LIST = auto()
 
 
 class TTKColor(StrEnum):

@@ -107,7 +107,7 @@ class ImageUtils:
         else:
             width = w
             height = vh
-        return (width, height)
+        return (int(width), int(height))
 
     @staticmethod
     def cv_array_to_image(cv_image):
@@ -150,23 +150,24 @@ class ImageUtils:
         )
         cv_image[h_start:h_end, w_start:w_end] = blur_region
 
-        text = "Censored"
+        text = ""
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.75
         thickness = 2
         text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
 
-        text_x = (w - text_size[0]) // 2
-        text_y = (h + text_size[1]) // 2
-        cv2.putText(
-            cv_image,
-            text,
-            (text_x, text_y),
-            font,
-            font_scale,
-            (255, 255, 255),
-            thickness,
-        )
+        if text:
+            text_x = (w - text_size[0]) // 2
+            text_y = (h + text_size[1]) // 2
+            cv2.putText(
+                cv_image,
+                text,
+                (text_x, text_y),
+                font,
+                font_scale,
+                (255, 255, 255),
+                thickness,
+            )
 
     @staticmethod
     def get_cv2_pil_image(

@@ -36,7 +36,13 @@ class ActiveTagsTab(ttk.Frame):
         self.clear_button = RoundedIcon.from_text(self, text="✕")
         ttk.Frame(self.tags_frame).pack(side=tk.LEFT)
         self.add_bindings()
-        self._artist.trace_add("write", lambda v, i, m: event_binder.event_generate(BINDING.ON_ARTIST_UPDATE, self.artist))
+        self._artist.trace_add(
+            "write",
+            lambda v, i, m: event_binder.after_idle(
+                BINDING.ON_ARTIST_UPDATE, self.artist
+            ),
+        )
+        event_binder[BINDING.ACTIVE_WIDGET] = self
 
     @property
     def artist(self) -> str:
@@ -47,7 +53,6 @@ class ActiveTagsTab(ttk.Frame):
         if value is None:
             value = ""
         self._artist.set(value)
-    
 
     def add_bindings(self):
         self.clear_button.bind("<Button-1>", self.clear_active)
@@ -55,6 +60,7 @@ class ActiveTagsTab(ttk.Frame):
         event_binder.bind(BINDING.ON_ARTIST_SELECT, self.on_artist, self)
         event_binder.bind(BINDING.ON_TAG_SELECT, self.on_tag, self)
         event_binder.bind(BINDING.RUN_TAG_REMOVE_LAST, self.remove_last_tag, self)
+        event_binder.bind(BINDING.REMOVE_IF_ACTIVE, self.remove_tag, self)
 
     def remove_tag_cmd(self, e):
         widget = e.widget
@@ -84,7 +90,9 @@ class ActiveTagsTab(ttk.Frame):
         self.pack(side=tk.LEFT, expand=tk.TRUE, fill=tk.X)
 
     def is_artist(self, artist):
-        return artist in event_binder[BINDING.ARTIST_SET] | event_binder[BINDING.BOARD_SET]
+        return (
+            artist in event_binder[BINDING.ARTIST_SET] | event_binder[BINDING.BOARD_SET]
+        )
 
     def on_artist(self, artist, middle_click=False):
         logger.debug("Artist Recieved: %s, Middle Clicked: %d", artist, middle_click)
@@ -106,9 +114,11 @@ class ActiveTagsTab(ttk.Frame):
         logger.info("Tag Recieved: %s. Middle click = %s", tag, middle_clicked)
         if tag in self.active_tags:
             logger.info("Tag %s already selected")
+            event_binder.after_idle(BINDING.RUN_FOCUS_GALLERY)
             return
         elif tag == self.artist:
             logger.info("Artist %s already selected")
+            event_binder.after_idle(BINDING.RUN_FOCUS_GALLERY)
             return
         elif self.is_artist(tag):
             return self.on_artist(tag)
@@ -150,7 +160,6 @@ class ActiveTagsTab(ttk.Frame):
         self.add_tag(tag)
         self.update_filter()
 
-
     def remove_tag(self, tag) -> bool:
         removed = False
         if tag == self.artist:
@@ -170,8 +179,8 @@ class ActiveTagsTab(ttk.Frame):
 
         self.update_idletasks()
         return removed
-    
-    def remove_last_tag(self, tag = "", *args, **kwargs) -> bool:
+
+    def remove_last_tag(self, tag="", *args, **kwargs) -> bool:
         if tag and tag in self.active_tags or tag == self.artist:
             self.remove_tag(tag)
         elif self.active_tags:
@@ -180,8 +189,11 @@ class ActiveTagsTab(ttk.Frame):
             self.remove_tag(tag)
         elif self.artist:
             self.remove_tag(self.artist)
+        self.update_filter()
+        self.update_idletasks()
 
-    def add_artist(self, artist=""):
+
+    def add_artist(self, artist="", middle_click = False):
         if artist == self.artist:
             logger.info("Artist %s already selected", artist)
             return False
@@ -223,17 +235,17 @@ class ActiveTagsTab(ttk.Frame):
         self.artist_button.update_text("")
         self.grid_clear_frame(forget=True)
         self.grid_artist_button(forget=True)
-        event_binder.event_generate(BINDING.ON_ARTIST_SELECT, "")
+        event_binder.after_idle(BINDING.ON_ARTIST_SELECT, "")
         self.update_filter()
 
     def update_filter(self):
-        tags = [tag for tag in list(self.active_tags.keys()) + [self.artist] if tag]
+        tags = [tag for tag in [self.artist] + list(self.active_tags.keys()) if tag]
         if tags == self.last_filter:
             return
         self.update_idletasks()
         logger.info("Updating filter to be: %s", tags)
         self.last_filter = tags
-        event_binder.event_generate(BINDING.ON_FILTER_UPDATE, tags)
+        event_binder.after_idle(BINDING.ON_FILTER_UPDATE, tags)
 
     def forget_self(self):
         logger.info("Forgetting Active Tags from Grid")

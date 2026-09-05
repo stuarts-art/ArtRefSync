@@ -25,6 +25,7 @@ class TkThreadCaller:
         self.executor = ThreadPoolExecutor()
         self.root = root
         self.on_finish_map = {}
+        self.after_map = {}
         self.cancel_map = defaultdict(set)
         self.cancel_key_map = {}
 
@@ -36,11 +37,12 @@ class TkThreadCaller:
             self.reply_event = Event()
 
     def add(
-        self, task: callable, on_finish: callable, cancel_key="key", *args, **kwargs
+        self, task: callable, on_finish: callable, cancel_key="key", after: int | None=None, *args, **kwargs
     ) -> Future:
         future = self.executor.submit(task, *args, **kwargs)
         if on_finish:
             self.on_finish_map[future] = on_finish
+            self.after_map[future] = after
             future.add_done_callback(self.call_on_finish)
         if cancel_key:
             self.cancel_map[cancel_key].add(future)
@@ -69,12 +71,15 @@ class TkThreadCaller:
                 cancel_key = self.cancel_key_map.pop(future)
                 if future.cancelled():
                     return
-                on_finish = self.on_finish_map.pop(future)
                 result = future.result()
-                if self.root:
-                    self.root.after_idle(on_finish, result)
-                else:
-                    on_finish(result)
+                if on_finish := self.on_finish_map.pop(future, None):
+                    if self.root:
+                        if (after := self.after_map.pop(future, None)) is not None:
+                            self.root.after(after, on_finish, result)
+                        else:
+                            self.root.after_idle(on_finish, result)
+                    else:
+                        on_finish(result)
 
                 if (
                     cancel_key in self.cancel_map

@@ -88,13 +88,14 @@ class PostInfoTab(ttk.Frame):
             "File",
             self.colors.primary,
         )
+        tooltip_delay = 400
         self.file.grid(column=0, row=5, sticky=tk.NSEW)
-        self.file_tooltip = ttk.ToolTip(self.file)
+        self.file_tooltip = ttk.ToolTip(self.file, delay=tooltip_delay)
 
         self.link_button = RoundedIcon.from_text(
             self, "Link", self.colors.primary, command=self.on_link_click
         ).grid(column=0, row=6, sticky=tk.NSEW)
-        self.link_tooltip = ttk.ToolTip(self.link_button)
+        self.link_tooltip = ttk.ToolTip(self.link_button, delay=tooltip_delay)
 
         self.tags_frame = ttk.Frame(self)
         self.tags_frame.grid(column=0, row=7, sticky=tk.NSEW)
@@ -132,12 +133,12 @@ class PostInfoTab(ttk.Frame):
         shift_pressed = (state & 0x1) != 0  # noqa: F841
 
         if keysym in config[HOTKEY.ZOOM_OUT_LIST] + ["Tab"]:
-            event_binder.event_generate(BINDING.ON_ICON_TAG, focus_entry = False)
+            event_binder.after_idle(BINDING.ON_ICON_TAG, focus_entry=False)
 
         elif keysym in config[HOTKEY.ZOOM_IN_LIST]:
-            event_binder.event_generate(BINDING.ON_ICON_ARTIST, focus_entry = False)
+            event_binder.after_idle(BINDING.ON_ICON_ARTIST, focus_entry=False)
         elif keysym in config[HOTKEY.RIGHT_LIST]:
-            event_binder.event_generate(BINDING.RUN_FOCUS_GALLERY)
+            event_binder.after_idle(BINDING.RUN_FOCUS_GALLERY)
         elif keysym in config[HOTKEY.UP_LIST]:
             self.tags.text.yview_scroll(-1, "units")
         elif keysym in config[HOTKEY.DOWN_LIST]:
@@ -151,13 +152,13 @@ class PostInfoTab(ttk.Frame):
         state = event.state
         ctrl_pressed = (state & 0x4) != 0
         widget_text = event.widget.text
-        event_binder.event_generate(BINDING.ON_ARTIST_SELECT, widget_text, ctrl_pressed)
+        event_binder.after_idle(BINDING.ON_ARTIST_SELECT, widget_text, ctrl_pressed)
 
     def on_tag_click(self, event: tk.Event):
         state = event.state
         ctrl_pressed = (state & 0x4) != 0
         widget_text = event.widget.text
-        event_binder.event_generate(BINDING.ON_TAG_SELECT, widget_text, ctrl_pressed)
+        event_binder.after_idle(BINDING.ON_TAG_SELECT, widget_text, ctrl_pressed)
 
     def start_file(self, event):
         file = self.file.data
@@ -185,10 +186,14 @@ class PostInfoTab(ttk.Frame):
             post: Post = post_db.posts.get(id=post_id)
             post_file: PostFile = post_db.files.get(id=post_id)
 
+        if not post:
+            logger.info("Post for id %s not found.", post_id)
+        if not post_file:
+            logger.info("PostFile for %s not found.", post_file)
+
         if not post or not post_file:
             return
         logger.info("Post and PostFile for %s recieved.", post_id)
-
 
         website = post.website
         domain = urlparse(website).netloc
@@ -205,10 +210,10 @@ class PostInfoTab(ttk.Frame):
 
         self.file.update_text(text=f"{post.file_link[:30]}...", data=post.file_link)
         self.file_tooltip.text = (
-            f"{post.file_link}\n<L-Click> Open\n<R-Click>: Open In Explorer"
+            f"{post.file_link}\nOpen - Left click\nOpen In Explorer - Right click"
         )
         self.link_button.update_text(domain, post.website)
-        self.link_tooltip.text = f"{post.website}\n<L-Click>: Open in browser\n<R-Click>: Copy to clipboard"
+        self.link_tooltip.text = f"{post.website}\nOpen in browser - Left click\nCopy to clipboard - Right click"
 
         self.tags.config(state=tk.NORMAL)
         self.tags.delete("1.0", tk.END)
@@ -271,7 +276,7 @@ class PostInfoTab(ttk.Frame):
             tag_text = word
             if blur_tags:
                 tag_text = self.blur_map[word]
-            event_binder.event_generate(BINDING.ON_TAG_SELECT, tag_text, ctrl_pressed)
+            event_binder.after_idle(BINDING.ON_TAG_SELECT, tag_text, ctrl_pressed)
         return "break"
 
     def get_word_box(self, widget, index):

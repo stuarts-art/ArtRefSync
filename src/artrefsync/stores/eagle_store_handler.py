@@ -24,7 +24,6 @@ class EagleHandler(ImageStoreHandler):
     Helper class for interacting with Eagle using https://api.eagle.cool/
     """
 
-
     handler_map = {}  # noqa: RUF012
     library_path_dict = {}
     switched_to_lib = ""
@@ -179,7 +178,7 @@ class EagleHandler(ImageStoreHandler):
         else:
             suffix = f".{post.url.split('.')[-1]}"
             with tempfile.NamedTemporaryFile(mode="wb", suffix=suffix) as f:
-                LinkCache.download_link_to_file(post.url, tempfile)
+                LinkCache.download_link_to_file(post.url, f)
                 eagle_id = self.post_add_from_path(post, f.name)
         eagle_item = self.client.item.info(eagle_id)
         return self.eagle_item_to_postfile(eagle_item, post.artist_name, post.board)
@@ -249,4 +248,3 @@ class EagleHandler(ImageStoreHandler):
 
     def update_thumbnails(self, board: BOARD, artist: str):
         pass
-

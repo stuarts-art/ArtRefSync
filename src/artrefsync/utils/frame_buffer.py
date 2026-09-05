@@ -3,7 +3,7 @@ from pathlib import Path
 from threading import Lock
 
 import cv2
-from PIL import Image, ImageTk
+from PIL import Image
 
 from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.managed_cache import ManagedCache
@@ -11,7 +11,7 @@ from artrefsync.utils.managed_cache import ManagedCache
 logger = logging.getLogger(__name__)
 
 
-class FrameBuffer(list[ImageTk.PhotoImage]):
+class FrameBuffer(list[Image.Image]):
     cache = ManagedCache()
 
     def __init__(self, size=(1440, 1440)):
@@ -25,6 +25,7 @@ class FrameBuffer(list[ImageTk.PhotoImage]):
         self.duration = None
         self.get_lock = Lock()
         self.last_frame = -1
+        self.video_format = False
 
         super().__init__()
 
@@ -32,6 +33,16 @@ class FrameBuffer(list[ImageTk.PhotoImage]):
         with self.get_lock:
             if self.cap and self.cap.isOpened():
                 self.cap.release()
+            path = Path(path)
+            if not path.exists():
+                logger.info("path %s does not exist.")
+                self.cap = None
+                self.len = 1
+                self.fps = None
+                self.duration = None
+                self.path = None
+                return
+
             self.path: Path = Path(path)
             self.video_format = self.path.suffix in [".gif", ".mp4", ".webm", ".mov"]
 
@@ -49,9 +60,9 @@ class FrameBuffer(list[ImageTk.PhotoImage]):
     def __len__(self):
         return self.len
 
-    def __getitem__(self, s) -> Image:
+    def __getitem__(self, i) -> Image:
         with self.get_lock:
-            i = int(s) % len(self)
+            i = int(i) % len(self)
             key = (self.path, i)
             if key not in self.cache:
                 self.update_at_index(i, key)
@@ -62,6 +73,8 @@ class FrameBuffer(list[ImageTk.PhotoImage]):
         return frame_key in self.cache
 
     def update_at_index(self, i, key):
+        if not self.path or not self.path.exists():
+            return
         if key not in self.cache:
             if self.video_format:
                 self.set_frame(i)
@@ -79,14 +92,12 @@ class FrameBuffer(list[ImageTk.PhotoImage]):
                     self.cache[key] = frame
                 self.last_frame = i
             else:
-                self.cache[key] = ImageUtils.get_cv2_pil_image(
-                    str(self.path), size=(1080, 1080)
-                )
+                self.cache[key] = ImageUtils.get_cv2_pil_image(str(self.path))
 
     def set_frame(self, i):
-        if i - self.last_frame != 1:
+        if i - self.last_frame != 1:  # noqa: SIM102
             if self.cap and self.cap.isOpened():
-                logger.info("SETTING FRAME from:%s, to:%s", self.last_frame, i)
+                logger.debug("SETTING FRAME from:%s, to:%s", self.last_frame, i)
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, i)
 
     @property

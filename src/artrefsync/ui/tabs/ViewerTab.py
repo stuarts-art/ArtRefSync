@@ -54,8 +54,6 @@ class ViewerTab(ttk.Frame):
 
     def init_bindings(self):
         self.clear_button.bind("<Button-1>", self.close_image_viewer)
-        self.canvas_image.canvas.bind("<FocusIn>", self.on_focus_in)
-        self.canvas_image.canvas.bind("<FocusOut>", self.unbind_canvas_escape)
         event_binder.bind(BINDING.ON_IMAGE_DOUBLE_CLICK, self.open_image_viewer, self)
         event_binder.bind(BINDING.ON_POST_SELECT, self.update_viewer_image, self)
         event_binder.bind(BINDING.ON_FILTER_UPDATE, self.close_image_viewer, self)
@@ -84,7 +82,10 @@ class ViewerTab(ttk.Frame):
 
     def init_gif_control(self):
         self.count_button = RoundedIcon(
-            self.gif_controls, text_variable=self.index_var, command=self.toggle_play, size=30
+            self.gif_controls,
+            text_variable=self.index_var,
+            command=self.toggle_play,
+            size=30,
         )
         self.scale = ttk.Scale(
             self.gif_controls,
@@ -95,19 +96,22 @@ class ViewerTab(ttk.Frame):
             command=lambda e: self.after_idle(self.on_scale),
         )
 
-        self.left_button = RoundedIcon(self.gif_controls, "<", command=self.prev_frame, size = 30)
+        self.left_button = RoundedIcon(
+            self.gif_controls, "<", command=self.prev_frame, size=30
+        )
         self.pause_play_button = RoundedIcon(
             self.gif_controls, "⏸", command=self.toggle_play, size=30
- 
         )
-        self.right_button = RoundedIcon(self.gif_controls, "˃", command=self.next_frame, size=30)
+        self.right_button = RoundedIcon(
+            self.gif_controls, "˃", command=self.next_frame, size=30
+        )
         self.rightright_button = RoundedIcon(
             self.gif_controls,
             "˃˃",
-            command=lambda x: event_binder.event_generate(
+            command=lambda x: event_binder.after_idle(
                 BINDING.ON_NEXT_GALLERY_IMAGE
             ),
-            size=30
+            size=30,
         )
 
         self.pause_play_button.grid(row=0, column=0, padx=0, pady=0)
@@ -127,14 +131,13 @@ class ViewerTab(ttk.Frame):
         self.in_frame = True
         self.clear_button.place(relx=1.0, rely=0.0, anchor=tk.NE)
         if self.gif_active:
-            self.gif_controls.place(relx=0.5, rely=.99, anchor=tk.S)
+            self.gif_controls.place(relx=0.5, rely=0.99, anchor=tk.S)
 
     def delayed_leave(self, e):
         self.in_frame = False
         if self.delayed_leave_job:
             self.after_cancel(self.delayed_leave_job)
         self.delayed_leave_job = self.after(1000, self.on_leave, e)
-    
 
     def on_leave(self, e):
         self.clear_button.place_forget()
@@ -144,8 +147,7 @@ class ViewerTab(ttk.Frame):
 
     def on_playing_change(self, *args):
         text = "⏸" if self.canvas_image.playing.get() else "▶"
-        self.pause_play_button.config(text = text)
-    
+        self.pause_play_button.config(text=text)
 
     def toggle_gif_control(self, toggle_on=True):
         if toggle_on:
@@ -166,7 +168,7 @@ class ViewerTab(ttk.Frame):
         if self.grid_info():
             return
 
-        event_binder.event_generate(BINDING.ON_TOGGLE_UI, toggle_on=False)
+        event_binder.after_idle(BINDING.ON_TOGGLE_UI, toggle_on=False)
 
         if pid is None:
             return
@@ -174,9 +176,10 @@ class ViewerTab(ttk.Frame):
 
         self.grid(column=0, row=0, sticky=tk.NSEW)
         self.lift()
+        self.update_idletasks()
         self.update_viewer_image(pid)
 
-    def close_image_viewer(self, _=None):
+    def close_image_viewer(self, *_):
         logger.info("Closing Image Viewer")
         if self.after_add_binding_id:
             self.after_cancel(self.after_add_binding_id)
@@ -186,7 +189,7 @@ class ViewerTab(ttk.Frame):
             logger.info("Closing Image Viewer")
             event_binder[BINDING.GALLERY_WIDGET].lift()
             self.grid_forget()
-            event_binder.event_generate(BINDING.ON_TOGGLE_UI, toggle_on=True)
+            event_binder.after_idle(BINDING.ON_TOGGLE_UI, toggle_on=True)
 
     def unbind_canvas_escape(self, *_):
         if self.after_add_binding_id:
@@ -245,8 +248,3 @@ class ViewerTab(ttk.Frame):
     def toggle_play(self, e=None):
         if self.grid_info() and self.canvas_image:
             playing = self.canvas_image.toggle_pause()
-
-    def resize_gif(self, e=None):
-        if self.grid_info() and self.canvas_image:
-            self.canvas_image.update_frame_size()
-            self.canvas_image.__show_image()

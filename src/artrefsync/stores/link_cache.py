@@ -5,9 +5,12 @@ from tempfile import (
 )
 from typing import ClassVar
 
+import cv2
 from requests_ratelimiter import LimiterSession
 
 from artrefsync.config import get_config
+from artrefsync.constants import APP
+from artrefsync.utils.image_utils import ImageUtils
 from artrefsync.utils.utils import singleton
 
 config = get_config()
@@ -60,11 +63,16 @@ class LinkCache:
     def get_file_from_link(self, link: str) -> str:
         if link not in self._link_cache:
             suffix = f".{link.split('.')[-1]}"
-            temp = NamedTemporaryFile(  # noqa: SIM115
-                mode="wb", suffix=suffix, dir=self.temp_dir.name, delete=False
-            )
-            self.download_link_to_file(link, temp)
-            self._link_cache[link] = temp.name
+            with NamedTemporaryFile(mode="wb", suffix=suffix, dir=self.temp_dir.name, delete=False) as temp:
+                self.download_link_to_file(link, temp)
+                file_name = temp.name
+            if (download_size := int(config[APP.DOWNLOAD_SIZE_DOWN])) and suffix in [".webp", ".png", ".jpg"]:
+                # TODO: add options to config.
+                img = ImageUtils.getPilImage(file_name, download_size, download_size)
+                with NamedTemporaryFile(suffix="webp", dir=self.temp_dir.name, delete=False) as thumb_temp:
+                    img.save(thumb_temp, "webp", quality=90, method=6)
+                    file_name = thumb_temp.name
+            self._link_cache[link] = file_name
         return self._link_cache[link]
 
     def __exit__(self, exc_type, exc_value, traceback):

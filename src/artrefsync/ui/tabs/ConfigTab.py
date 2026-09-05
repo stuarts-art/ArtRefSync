@@ -214,7 +214,7 @@ class ConfigTab(ttk.Frame):
         if only_recent is None:
             only_recent = config[APP.ONLY_RECENT_ENABLED]
 
-        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Syncing...")
+        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Syncing...")
         self.update_idletasks()
         func_name = "start_sync"
         if not self.sync_lock.acquire(blocking=False):
@@ -249,7 +249,7 @@ class ConfigTab(ttk.Frame):
                     sync_config,
                     self.finish_sync,
                     func_name,
-                    self.sync_event,
+                    stop_event=self.sync_event,
                     only_recent=only_recent,
                     board_override=board_override,
                     artist_override=artist_override

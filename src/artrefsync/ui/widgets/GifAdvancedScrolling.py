@@ -1,11 +1,13 @@
-# Taken from https://stackoverflow.com/a/48137257 by user foobar167.
-# Only slight modification made was to change Image.ANTIALIAS to the new Image.LAZCOS
+# Initial version taken from https://stackoverflow.com/a/48137257 by user foobar167.
+# Majority of functionality has been modified, but i'm keeping this in here because the solution
 # ---
 # Updated class to work on gifs
 # - stuart (@stuarts-art) 2026-04-07
+# --
+# Removed tiling method to improve performance on gifs and videos.
+# - stuart (@stuarts-art) 2026-08-27
 
 import logging
-import math
 import time
 import tkinter as tk
 
@@ -16,6 +18,7 @@ from artrefsync.config import get_config
 from artrefsync.constants import BINDING, HOTKEY
 from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.frame_buffer import FrameBuffer
+from artrefsync.utils.TkThreadCaller import thread_caller
 
 config = get_config()
 logger = logging.getLogger(__name__)
@@ -52,31 +55,30 @@ class CopyDict(dict):
 class CanvasImage:
     """Display and zoom image"""
 
-    def __init__(self, placeholder, index_var):
+    popups = []
+
+    def __init__(self, placeholder, index_var, is_popup=False):
         logger.info("Canvas Image Init")
         self.last_run = time.time()
+        self.is_popup = is_popup
         """Initialize the ImageFrame"""
         self.cancel_key = "GifViewerCancelKey"
         self.index_var: tk.IntVar = index_var
         self.after_next_frame_id = None
         self.path = None
-        self.__pyramid = None
         self.clear_canvas = False
 
-        self.imscale = 1.0  # scale for the canvas image zoom, public for outer classes
         self.__delta = 1.3  # zoom magnitude
+        self.scale = 1.0
         self.__filter = (
             Image.Resampling.LANCZOS
         )  # could be: NEAREST, BILINEAR, BICUBIC and ANTIALIAS
         self.__previous_state = 0  # previous state of the keyboard
-        # Create ImageFrame in placeholder widget
         self.__imframe = ttk.Frame(placeholder)  # placeholder of the ImageFrame object
-        # Vertical and horizontal scrollbars for canvas
         hbar = AutoScrollbar(self.__imframe, orient="horizontal")
         vbar = AutoScrollbar(self.__imframe, orient="vertical")
         hbar.grid(row=1, column=0, sticky="we")
         vbar.grid(row=0, column=1, sticky="ns")
-        # Create canvas and bind it with scrollbars. Public for outer classes
         self.canvas = ttk.Canvas(
             self.__imframe,
             highlightthickness=0,
@@ -84,7 +86,10 @@ class CanvasImage:
             yscrollcommand=vbar.set,
         )
         self.canvas.grid(row=0, column=0, sticky="nswe")
-        # self.canvas.update_idletasks()
+        img = ImageTk.PhotoImage(Image.new("RGB", (100, 100), color="grey"))
+        self.image = self.canvas.create_image(0, 0, image=img, anchor=tk.NW)
+        self.canvas.image_tk = img
+
         hbar.configure(command=self.__scroll_x)  # bind scrollbars to the canvas
         vbar.configure(command=self.__scroll_y)
         # Bind events to the Canvas
@@ -94,6 +99,11 @@ class CanvasImage:
         self.canvas.bind(
             "<ButtonPress-1>", self.__move_from
         )  # remember canvas position
+
+        if not is_popup:
+            self.canvas.bind(
+                "<ButtonPress-2>", self.__show_popup
+            )  # remember canvas position
         self.canvas.bind(
             "<B1-Motion>", self.__move_to
         )  # move canvas to the new position
@@ -104,15 +114,13 @@ class CanvasImage:
             "<Button-5>", self.__wheel
         )  # zoom for Linux, wheel scroll down
         self.canvas.bind("<Button-4>", self.__wheel)  # zoom for Linux, wheel scroll up
-        # Handle keystrokes in idle mode, because program slows down on a weak computers,
-        # when too many key stroke events in the same time
         self.playing = ttk.BooleanVar(value=False)
 
         self.canvas.bind(
             "<Key>", lambda event: self.canvas.after_idle(self.__keystroke, event)
         )
 
-        self.frames = FrameBuffer()
+        self.frames: FrameBuffer = FrameBuffer()
         self.__images = CopyDict(self.frames)
         self.container = None
 
@@ -125,21 +133,18 @@ class CanvasImage:
         self.index_var.set(int(value))
 
     def load_media(self, path: str | None):
+        self.scale = 1.0
+        self.canvas.yview_moveto(0)
+        self.canvas.xview_moveto(0)
         if self.path == path:
-            self.canvas.yview_moveto(0)
-            self.canvas.xview_moveto(0)
             self.__show_image()
             return
 
-        self.imscale = 1.0
-        self.canvas.yview_moveto(0)
-        self.canvas.xview_moveto(0)
+        size = (self.canvas.winfo_width(), self.canvas.winfo_height())
+        self.frames.thumb_size = size
         if path is None:
             return
-        if self.path == path:
-            self.__show_image()
-            self.toggle_pause(toggle_on=True)
-            return
+
         if self.after_next_frame_id:
             self.__imframe.after_cancel(self.after_next_frame_id)
             self.after_next_frame_id = None
@@ -153,11 +158,6 @@ class CanvasImage:
         self.index = 0
         self.path = path  # path to the image, should be public for outer classes
 
-        self.update_frame_size()
-        self.__scale = self.imscale * self.__ratio  # image pyramide scale
-        self.__reduction = 2  # reduction degree of image pyramid
-        self.__pyramid = {}
-        self.__curr_img = 0  # current image from the pyramid
         self.clear_canvas = True
 
         if len(self.frames) > 1:
@@ -171,6 +171,7 @@ class CanvasImage:
         if self.after_next_frame_id is not None:
             self.__imframe.after_cancel(self.after_next_frame_id)
             self.after_next_frame_id = None
+        self.cancel_show_image()
 
     def show_next_frame(self, path):
         self.cancel_next_frame()
@@ -185,7 +186,7 @@ class CanvasImage:
             self.index += 1
             self.index %= len(self.frames)
 
-        if self.index in self.__pyramid:
+        if self.index:
             self.after_next_frame_id = self.__imframe.after(
                 self.duration, self.show_next_frame, path
             )
@@ -197,10 +198,6 @@ class CanvasImage:
                 self.after_next_frame_id = self.__imframe.after(
                     self.duration, self.show_next_frame, path
                 )
-        for i in [1]:
-            next_index = (self.index + i) % len(self.frames)
-            if next_index not in self.frames:
-                self.__imframe.after_idle(self.frames.__getitem__, next_index)
 
     def toggle_pause(self, toggle_on=None):
         """_summary_
@@ -242,19 +239,6 @@ class CanvasImage:
             self.index %= len(self.frames)
             self.__show_image()
 
-    def update_frame_size(self):
-        index = 0
-        if not self.frames:
-            logger.info("NO FRAME SET")
-            return
-
-        self.imwidth, self.imheight = self.frames[0].size  # public for outer classes
-        frame_width = self.__imframe.master.winfo_width()
-        frame_height = self.__imframe.master.winfo_height()
-        self.imscale = min(frame_width / self.imwidth, frame_height / self.imheight)
-        self.__min_side = min(self.imwidth, self.imheight)  # get the smaller image side
-        self.__ratio = 1.0
-
     def redraw_figures(self):
         """Dummy function to redraw figures in the children classes"""
 
@@ -267,15 +251,11 @@ class CanvasImage:
 
     def pack(self, **kw):
         """Exception: cannot use pack with this widget"""
-        raise Exception(
-            "Cannot use pack with the widget " + self.__class__.__name__
-        )
+        raise Exception("Cannot use pack with the widget " + self.__class__.__name__)
 
     def place(self, **kw):
         """Exception: cannot use place with this widget"""
-        raise Exception(
-            "Cannot use place with the widget " + self.__class__.__name__
-        )
+        raise Exception("Cannot use place with the widget " + self.__class__.__name__)
 
     # noinspection PyUnusedLocal
     def __scroll_x(self, *args, **kwargs):
@@ -283,7 +263,6 @@ class CanvasImage:
         self.canvas.xview(*args)  # scroll horizontally
         self.__show_image()  # redraw the image
 
-    # noinspection PyUnusedLocal
     def __scroll_y(self, *args, **kwargs):
         """Scroll canvas vertically and redraw the image"""
         self.canvas.yview(*args)  # scroll vertically
@@ -306,7 +285,6 @@ class CanvasImage:
                 self.__pyramid[index].append(
                     self.__pyramid[index][-1].resize((int(w), int(h)), self.__filter)
                 )
-            # self.update_container_size()
 
     def update_container_size(self):
         self.container = self.canvas.create_rectangle(
@@ -320,85 +298,63 @@ class CanvasImage:
         )
         self.canvas.lower(self.container)  # set image into background
 
-    def __show_image(self):
-        index = self.index % len(self.frames)
-
-        self.__update_pyramid(index)
-        if self.__pyramid is None:
+    def __update_image(self, image):
+        if not image:
             return
-
-        """Show image on the Canvas. Implements correct image zoom almost like in Google Maps"""
-        if self.clear_canvas:
-            self.update_container_size()
-
-        box_image = self.canvas.coords(self.container)  # get image area
-        if not box_image:
-            return
-        box_canvas = (
-            self.canvas.canvasx(0),  # get visible area of the canvas
-            self.canvas.canvasy(0),
-            self.canvas.canvasx(self.canvas.winfo_width()),
-            self.canvas.canvasy(self.canvas.winfo_height()),
+        frame_size = (
+            self.__imframe.winfo_width() * self.scale,
+            self.__imframe.winfo_height() * self.scale,
         )
-        box_img_int = tuple(
-            map(int, box_image)
-        )  # convert to integer or it will not work properly
-        # Get scroll region box
-        box_scroll = [
-            min(box_img_int[0], box_canvas[0]),
-            min(box_img_int[1], box_canvas[1]),
-            max(box_img_int[2], box_canvas[2]),
-            max(box_img_int[3], box_canvas[3]),
-        ]
-        # Horizontal part of the image is in the visible area
-        if box_scroll[0] == box_canvas[0] and box_scroll[2] == box_canvas[2]:
-            box_scroll[0] = box_img_int[0]
-            box_scroll[2] = box_img_int[2]
-        # Vertical part of the image is in the visible area
-        if box_scroll[1] == box_canvas[1] and box_scroll[3] == box_canvas[3]:
-            box_scroll[1] = box_img_int[1]
-            box_scroll[3] = box_img_int[3]
-        # Convert scroll region to tuple and to integer
-        self.canvas.configure(
-            scrollregion=tuple(map(int, box_scroll))
-        )  # set scroll region
-        x1 = max(
-            box_canvas[0] - box_image[0], 0
-        )  # get coordinates (x1,y1,x2,y2) of the image tile
-        y1 = max(box_canvas[1] - box_image[1], 0)
-        x2 = min(box_canvas[2], box_image[2]) - box_image[0]
-        y2 = min(box_canvas[3], box_image[3]) - box_image[1]
-        if (
-            int(x2 - x1) > 0 and int(y2 - y1) > 0
-        ):  # show image if it in the visible area
-            image: ImageTk.PhotoImage = self.frames[index]
-            image = image.crop(  # crop current img from pyramid
-                (
-                    int(x1 / self.__scale),
-                    int(y1 / self.__scale),
-                    int(x2 / self.__scale),
-                    int(y2 / self.__scale),
-                )
-            )
+        copy: Image.Image = image.copy()
+        copy.thumbnail(frame_size)
+        image_tk = ImageTk.PhotoImage(copy)
+        offset = (frame_size[0] - copy.width) // 2
 
-            imagetk = ImageTk.PhotoImage(
-                image.resize((int(x2 - x1), int(y2 - y1)), self.__filter)
-            )
+        self.canvas.itemconfigure(self.image, image=image_tk)
+        self.canvas.image_tk = image_tk
+        self.canvas.moveto(self.image, x=offset, y=0)
 
-            imageid = self.canvas.create_image(
-                max(box_canvas[0], box_img_int[0]),
-                max(box_canvas[1], box_img_int[1]),
-                anchor="nw",
-                image=imagetk,
+    __show_image_cancel_key = "show_image"
+
+    def cancel_show_image(self):
+        thread_caller.cancel(self.__show_image_cancel_key)
+
+    def __show_image(self):
+        cancel_key = self.__show_image_cancel_key
+        thread_caller.cancel(cancel_key)
+
+        index = self.index % len(self.frames)
+        thread_caller.add(
+            self.frames.__getitem__,
+            self.__update_image,
+            cancel_key=cancel_key,
+            after=None,
+            i=index,
+        )
+
+    class Popup:
+        def __init__(self, root, path=""):
+            self.index_var = ttk.IntVar(value=0)
+            self.window = ttk.Toplevel(event_binder[BINDING.APP_WIDGET])
+            self.window.columnconfigure(0, weight=1)
+            self.window.rowconfigure(0, weight=1)
+            self.canvas = CanvasImage(
+                self.window, index_var=self.index_var, is_popup=True
             )
-            self.canvas.lower(imageid)  # set image into background
-            self.canvas.imagetk = (
-                imagetk  # keep an extra reference to prevent garbage-collection
-            )
-            if self.clear_canvas:
-                canvas_objs = self.canvas.find_all()
-                self.canvas.delete(*canvas_objs[3:])
-                self.clear_canvas = False
+            self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
+            if path:
+                self.canvas.load_media(path)
+
+        def load_media(self, path):
+            self.canvas.load_media(path)
+
+    def __show_popup(self, event):
+        # index_var = ttk.IntVar
+        popup = self.Popup(event_binder[BINDING.APP_WIDGET], self.path)
+        self.popups.append(popup)
+
+        """Remember previous coordinates for scrolling with the mouse"""
+        # self.canvas.scan_mark(event.x, event.y)
 
     def __move_from(self, event):
         """Remember previous coordinates for scrolling with the mouse"""
@@ -419,53 +375,34 @@ class CanvasImage:
 
     def __wheel(self, event):
         """Zoom with mouse wheel"""
-        x = self.canvas.canvasx(event.x)  # get coordinates of the event on the canvas
-        y = self.canvas.canvasy(event.y)
-        # if self.outside(x, y): return  # zoom only inside image area
-        scale = 1.0
+
         # Respond to Linux (event.num) or Windows (event.delta) wheel event
         if event.num == 5 or event.delta == -120:  # scroll down, smaller
-            if round(self.__min_side * self.imscale) < 30:
-                return  # image is less than 30 pixels
-            self.imscale /= self.__delta
-            scale /= self.__delta
+            self.scale /= self.__delta
         if event.num == 4 or event.delta == 120:  # scroll up, bigger
-            i = min(self.canvas.winfo_width(), self.canvas.winfo_height()) >> 1
-            if i < self.imscale:
-                return  # 1 pixel is bigger than the visible area
-            self.imscale *= self.__delta
-            scale *= self.__delta
-        # Take appropriate image from the pyramid
-        k = self.imscale * self.__ratio  # temporary coefficient
-        self.__curr_img = min(
-            (-1) * int(math.log(k, self.__reduction)),
-            len(self.__pyramid[self.index]) - 1,
-        )
-        self.__scale = k * math.pow(self.__reduction, max(0, self.__curr_img))
-        self.canvas.scale("all", x, y, scale, scale)  # rescale all objects
-        # Redraw some figures before showing image on the screen
-        self.redraw_figures()  # method for child classes
+            self.scale *= self.__delta
         self.__show_image()
 
     def __keystroke(self, event):
         """Scrolling with the keyboard.
         Independent from the language of the keyboard, CapsLock, <Ctrl>+<key>, etc."""
         ctrl_pressed = (event.state & 0x4) != 0
+        shift_pressed = (event.state & 0x1) != 0
         keysym = event.keysym
         if keysym in config[HOTKEY.RIGHT_LIST]:
-            if ctrl_pressed:
+            if ctrl_pressed or shift_pressed:
                 self.move_right()
             else:
                 self.__scroll_x("scroll", 1, "unit", event=event)
         elif keysym in config[HOTKEY.LEFT_LIST]:
-            if ctrl_pressed:
+            if ctrl_pressed or shift_pressed:
                 self.move_left()
             else:
                 self.__scroll_x("scroll", -1, "unit", event=event)
         elif keysym in config[HOTKEY.UP_LIST]:
             self.__scroll_y("scroll", -1, "unit", event=event)
         elif keysym in config[HOTKEY.DOWN_LIST]:
-            if ctrl_pressed:
+            if ctrl_pressed or shift_pressed:
                 self.toggle_pause()
             else:
                 self.__scroll_y("scroll", 1, "unit", event=event)
@@ -473,14 +410,23 @@ class CanvasImage:
             self.canvas.event_generate("<MouseWheel>", delta=-120)
         elif keysym in config[HOTKEY.ZOOM_IN_LIST]:
             self.canvas.event_generate("<MouseWheel>", delta=+120)
-
+        elif self.is_popup:
+            logger.debug(
+                "KeyCode: %s, KeySym: %s, State: %s",
+                event.keycode,
+                event.keysym,
+                event.state,
+            )
+            return ""
         elif keysym in config[HOTKEY.ZOOMED_PREV_LIST]:
-            event_binder.event_generate(BINDING.ON_PREV_GALLERY_IMAGE)
+            event_binder.after_idle(BINDING.ON_PREV_GALLERY_IMAGE)
         elif keysym in config[HOTKEY.ZOOMED_NEXT_LIST]:
-            event_binder.event_generate(BINDING.ON_NEXT_GALLERY_IMAGE)
-        elif keysym in ["Tab"]:
-            event_binder.event_generate(BINDING.ON_CLOSE_VIEWER)
-            event_binder.event_generate(BINDING.ON_GALLERY_SHIFT_TAB)
+            event_binder.after_idle(BINDING.ON_NEXT_GALLERY_IMAGE)
+        elif keysym in config[HOTKEY.SWAP_LIST]:
+            event_binder.after_idle(BINDING.ON_CLOSE_VIEWER)
+            event_binder.after_idle(BINDING.ON_GALLERY_SHIFT_TAB)
+        elif keysym in config[HOTKEY.OPEN_LIST]:
+            event_binder.after_idle(BINDING.ON_CLOSE_VIEWER)
         else:
             logger.debug(
                 "KeyCode: %s, KeySym: %s, State: %s",
@@ -499,8 +445,5 @@ class CanvasImage:
         """ImageFrame destructor"""
         for image in self.__images:
             image.close()
-        for pyramid in self.__pyramid.values():
-            (i.close for i in pyramid)  # close all pyramid images
-        del self.__pyramid  # delete pyramid variable
         self.canvas.destroy()
         self.__imframe.destroy()

@@ -4,6 +4,7 @@ import tkinter as tk
 import ttkbootstrap as ttk
 
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
+from artrefsync.ui.widgets.WidgetPresets import FRAME_NO_BORDER
 
 logger = logging.getLogger(__name__)
 
@@ -65,16 +66,16 @@ class ModernTopBar(ttk.Frame):
         self._top.grid_propagate(False)
 
         # Mid sub_frames init and grid placement
-        self.mid_left = ttk.Frame(self._mid, padding=5, style=self.side_style)
+        self.mid_left = ttk.Frame(self._mid, style=self.side_style, **FRAME_NO_BORDER)
         self.mid_left_sep = ttk.Separator(self._mid, orient="vertical")
         self.mid_mid = ttk.Frame(self._mid)
         self.mid_right_sep = ttk.Separator(self._mid, orient="vertical")
-        self.mid_right = ttk.Frame(self._mid, padding=0, style=self.side_style)
+        self.mid_right = ttk.Frame(self._mid, padding=0, style=self.side_style, **FRAME_NO_BORDER)
         self.mid_left.grid(column=0, row=0, sticky="nws")
-        self.mid_left_sep.grid(column=1, row=0, sticky="ns")
+        # self.mid_left_sep.grid(column=1, row=0, sticky="ns")
         self.mid_mid.grid(column=2, row=0, sticky="nswe")
-        self.mid_right_sep.grid(column=3, row=0, sticky="ns")
-        self.mid_right.grid(column=4, row=0, sticky="nes")
+        # self.mid_right_sep.grid(column=3, row=0, sticky="ns")
+        # self.mid_right.grid(column=4, row=0, sticky="nes")
 
     def init_menu(self):
 
@@ -107,11 +108,11 @@ class ModernTopBar(ttk.Frame):
         if toggle_on and not self.mid_left.grid_info():
             self.sidebar_left_toggle.update_text("◧")
             self.mid_left.grid(column=0, row=0, sticky="nws")
-            self.mid_left_sep.grid(column=1, row=0, sticky="ns")
+            # self.mid_left_sep.grid(column=1, row=0, sticky="ns")
         elif not toggle_on and self.mid_left.grid_info():
             self.sidebar_left_toggle.update_text("◨")
             self.mid_left.grid_forget()
-            self.mid_left_sep.grid_forget()
+            # self.mid_left_sep.grid_forget()
 
     def toggle_right_sidebar(self, event=None):
         right_info = self.mid_right.grid_info()

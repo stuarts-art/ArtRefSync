@@ -45,4 +45,4 @@ class SortByTab(ttk.Frame):
 
     def update_posts(self, *args, **kwargs):
         self.update_dict()
-        event_binder.event_generate(BINDING.ON_SORT_BY_UPDATE)
+        event_binder.after_idle(BINDING.ON_SORT_BY_UPDATE)

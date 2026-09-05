@@ -41,7 +41,7 @@ def sync_config(
     max_per_artist = 3000
 ):
     try:
-        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
+        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating metadata")
         limit = int(config[TABLE.APP][APP.LIMIT])
         store_handler = None
         if config[TABLE.EAGLE][EAGLE.ENABLED]:
@@ -84,7 +84,7 @@ def sync_config(
         logger.error("Error raised while syncing.")
         stop_event.set()
     finally:
-        event_binder.event_generate(BINDING.ON_LOADING_DONE)
+        event_binder.after_idle(BINDING.ON_LOADING_DONE)
 
 
 def sync_from_store(stop_event: Event | None = None, board_override=None):
@@ -128,9 +128,9 @@ def sync_from_store(stop_event: Event | None = None, board_override=None):
             )
             sync_coordinator = SyncCoordinator(handler, store, stop_event)
             artist_list = sync_coordinator.artist_list
-            event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(artist_list))
+            event_binder.after_idle(BINDING.ON_LOAD_LEFT_SET, len(artist_list))
             for artist in artist_list:
-                event_binder.event_generate(
+                event_binder.after_idle(
                     BINDING.ON_LOAD_LEFT_INCR, f"{board}: {artist}"
                 )
                 sync_coordinator.update_post_file_table(artist)
@@ -138,7 +138,7 @@ def sync_from_store(stop_event: Event | None = None, board_override=None):
         stop_event.set()
         logger.exception("Failed to sync from store.")
     finally:
-        event_binder.event_generate(BINDING.ON_LOADING_DONE)
+        event_binder.after_idle(BINDING.ON_LOADING_DONE)
 
 
 
@@ -175,28 +175,28 @@ class SyncCoordinator:
                 self.artist_list = self.board_handler.get_artist_list()
             self.sync_artist_metadata(self.artist_list)
             self.remove_blacklisted_posts()  # Additional check before downloading.
-            event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+            event_binder.after_idle(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
             for artist in self.artist_list:
                 if self.stop_event and self.stop_event.is_set():
                     return
-                event_binder.event_generate(
+                event_binder.after_idle(
                     BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
                 )
-                if self.sync_artist_files(artist):
-                    self.update_board_artist_tag_counts(self.board, self.artist_list)
-                    event_binder.event_generate(BINDING.ON_DB_UPDATE)
+                self.sync_artist_files(artist)
+                self.update_board_artist_tag_counts(self.board, self.artist_list)
+                event_binder.after_idle(BINDING.ON_DB_UPDATE)
 
         except Exception:
             logger.exception("Sync Failed.")
 
     def sync_artist_metadata(self, artists: list[str]):
-        event_binder.event_generate(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+        event_binder.after_idle(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
         logger.info("Syncing artists: %s", artists)
         for artist in artists:
-            event_binder.event_generate(
+            event_binder.after_idle(
                 BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
             )
-            event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
+            event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating metadata")
             if self.stop_event and self.stop_event.is_set():
                 return
             self.update_metadata(artist)
@@ -221,7 +221,7 @@ class SyncCoordinator:
 
     def update_metadata(self, artist) -> list[Post]:
         logger.debug("Updating metadata for artist: %s", artist)
-        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating metadata")
+        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating metadata")
         updated_posts = []
         board_posts: dict[str, Post] = self.board_handler.get_posts(
             artist, self.max_per_artist
@@ -263,12 +263,13 @@ class SyncCoordinator:
             post_ids = post_db.posts.get_all(
                 artist_name=artist,
                 board=self.board,
-                select_fields=["id"],
+                select_fields=["id", "ext"],
                 as_tuple=True,
             )
-            post_ids = [row[0] for row in post_ids]
 
+            post_ids = [row[0] for row in post_ids if row[1] in config[APP.FORMAT_LIST]]
             for pid in post_ids:
+
                 if pid not in store_posts:
                     missing_ids.append(pid)
                 else:
@@ -277,7 +278,7 @@ class SyncCoordinator:
             return missing_ids
 
     def download_missing_ids(self, artist):
-        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Downloading missing")
+        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Downloading missing")
 
         missing_ids = self.get_missing_ids(artist)
         failure_list = []
@@ -287,7 +288,7 @@ class SyncCoordinator:
         with PostDb() as post_db:
             missing_posts = [post_db.posts.get(id=id) for id in missing_ids]
         if not missing_posts:
-            event_binder.event_generate(
+            event_binder.after_idle(
                 BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), ""
             )
             return
@@ -303,13 +304,13 @@ class SyncCoordinator:
                     event=self.stop_event,
                 )
                 future_to_pid[future] = post.id
-            event_binder.event_generate(
+            event_binder.after_idle(
                 BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "Downloading: "
             )
             for future in concurrent.futures.as_completed(future_to_pid.keys()):
                 try:
                     result = future.result()
-                    event_binder.event_generate(BINDING.ON_LOAD_RIGHT_INCR)
+                    event_binder.after_idle(BINDING.ON_LOAD_RIGHT_INCR)
                     if self.stop_event and self.stop_event.is_set():
                         logger.warning("Stop Event Recieved.")
                         executor.shutdown(wait=True, cancel_futures=True)
@@ -358,7 +359,7 @@ class SyncCoordinator:
         logger.info(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist
         )
-        event_binder.event_generate(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
+        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(
             str(self.board), artist
         )

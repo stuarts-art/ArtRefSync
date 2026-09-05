@@ -47,7 +47,43 @@ class EventBinder:
             self.sequence_bindings[sequence] = []
         self.sequence_bindings[sequence].append(_EventBinding(func, root))
 
-    def event_generate(self, sequence: str, *args, **kwargs):
+    def after_idle(self, sequence: str, *args, **kwargs):
+        sequence = str(sequence)
+        logger.debug("Generating event for sequence: %s", sequence)
+        if args:
+            if len(args) == 1:
+                self[sequence] = args[0]
+            else:
+                self[sequence] = args
+        if sequence in self.sequence_bindings:
+            for binding in self.sequence_bindings[sequence]:
+                binding.root.after_idle(binding.func, *args, **kwargs)
+        elif sequence.startswith("on_"):
+            logger.debug(
+                "Sequence %s not bound. Currently bound keys: %s.",
+                sequence,
+                self.sequence_bindings.keys(),
+            )
+
+    def after(self, ms, sequence: str, *args, **kwargs):
+        sequence = str(sequence)
+        logger.debug("Generating event for sequence: %s", sequence)
+        if args:
+            if len(args) == 1:
+                self[sequence] = args[0]
+            else:
+                self[sequence] = args
+        if sequence in self.sequence_bindings:
+            for binding in self.sequence_bindings[sequence]:
+                binding.root.after(ms, binding.func, *args, **kwargs)
+        elif sequence.startswith("on_"):
+            logger.debug(
+                "Sequence %s not bound. Currently bound keys: %s.",
+                sequence,
+                self.sequence_bindings.keys(),
+            )
+
+    def run(self, sequence: str, *args, **kwargs):
         sequence = str(sequence)
         logger.info("Generating event for sequence: %s", sequence)
         if args:
@@ -57,7 +93,7 @@ class EventBinder:
                 self[sequence] = args
         if sequence in self.sequence_bindings:
             for binding in self.sequence_bindings[sequence]:
-                binding.root.after(0, binding.func, *args, **kwargs)
+                binding.func(*args, **kwargs)
         elif sequence.startswith("on_"):
             logger.debug(
                 "Sequence %s not bound. Currently bound keys: %s.",
@@ -67,15 +103,14 @@ class EventBinder:
         
     def closure(self, sequence, use_event = False, returns_break = True):
         """Returns a closure method method that can be passed to normal bind calls"""
-        
         if use_event:
             def gen_event(event):
-                self.event_generate(sequence, event)
+                self.after_idle(sequence, event)
                 if returns_break:
                     return "break"
         else:
             def gen_event(*args, **kwargs):
-                self.event_generate(sequence, *args, **kwargs)
+                self.after_idle(sequence, *args, **kwargs)
                 if returns_break:
                     return "break"
         return gen_event

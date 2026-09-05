@@ -21,7 +21,6 @@ class InputTreeviewFrame(ttk.Frame):
             "<KeyRelease>", lambda e: self.tree.focus_on_text(self.entry.get())
         )
         self.tree.bind("<Double-1>", self.on_tree_lclick)
-        self.tree.bind("<BackSpace>", self.tree.delete_selected)
         self.tree.bind("<KeyRelease-a>", self.tree.delete_selected)
         self.tree.bind("<Control-z>", self.tree.undo_delete)
 
