@@ -5,7 +5,6 @@ from tempfile import (
 )
 from typing import ClassVar
 
-import cv2
 from requests_ratelimiter import LimiterSession
 
 from artrefsync.config import get_config

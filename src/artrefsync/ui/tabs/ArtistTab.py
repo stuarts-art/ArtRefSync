@@ -197,7 +197,7 @@ class ArtistTab(ttk.Frame):
 
         keysym = event.keysym
         ctrl_pressed = (event.state & 0x4) != 0
-        shift_pressed = (event.state & 0x1) != 0  # noqa: F841
+        shift_pressed = (event.state & 0x1) != 0
 
         if keysym in config[HOTKEY.ZOOM_IN_LIST] + config[HOTKEY.SWAP_LIST]:
             event_binder.after_idle(BINDING.ON_ICON_TAG, focus_entry=False)
@@ -295,7 +295,7 @@ class ArtistTab(ttk.Frame):
 
     def __button(self, event: tk.Event):
         ctrl_pressed = (event.state & 0x4) != 0
-        shift_pressed = (event.state & 0x1) != 0  # noqa: F841
+        shift_pressed = (event.state & 0x1) != 0
         num = event.num
         y = event.y
         x = event.x

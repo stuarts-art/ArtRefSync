@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 from asyncio import Event
@@ -5,7 +6,6 @@ from collections import defaultdict
 from collections.abc import Iterable
 from enum import StrEnum, auto
 from pathlib import Path
-import logging
 from typing import ClassVar
 
 from PIL import Image

@@ -100,6 +100,9 @@ class CanvasImage:
         self.canvas.bind(
             "<ButtonPress-1>", self.__move_from
         )  # remember canvas position
+        self.canvas.bind(
+            "<Double-1>", lambda x:self.toggle_pause()
+        )
 
         if not is_popup:
             self.canvas.bind(
