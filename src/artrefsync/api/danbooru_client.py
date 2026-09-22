@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 import time
 from threading import Event
 

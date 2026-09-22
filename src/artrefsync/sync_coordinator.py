@@ -37,12 +37,10 @@ def sync_config(
     stop_event: Event,
     only_recent: bool | None = None,
     board_override: BOARD | None = None,
-    artist_override: str | None = None,
-    max_per_artist=3000,
+    artist_override: str | None = None
 ):
     try:
-        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating metadata")
-        limit = int(config[TABLE.APP][APP.LIMIT])
+        max_per_artist = int(config[TABLE.APP][APP.LIMIT])
         store_handler = None
         if config[TABLE.EAGLE][EAGLE.ENABLED]:
             store_handler = EagleHandler()
@@ -174,6 +172,9 @@ class SyncCoordinator:
         self.artist_list = self.board_handler.get_artist_list()
 
     def sync(self, artist_list: None | list[str] = None):
+        event_binder.after_idle(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Syncing metadata...")
+
         try:
             if artist_list:
                 self.artist_list = artist_list
@@ -205,6 +206,7 @@ class SyncCoordinator:
         
         """
         event_binder.after_idle(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
+        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating metadata")
         logger.info("Syncing artists: %s", artists)
         updated = []
         for artist in artists:
@@ -304,7 +306,7 @@ class SyncCoordinator:
         with PostDb() as post_db:
             missing_posts = [post_db.posts.get(id=id) for id in missing_ids]
         if not missing_posts:
-            event_binder.after_idle(BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "")
+            event_binder.after_idle(BINDING.ON_LOAD_RIGHT_RESET)
             return
 
         logger.info("Downloading %d missing posts for %s", len(missing_posts), artist)
@@ -373,7 +375,7 @@ class SyncCoordinator:
         logger.info(
             "Updating PostFile Table for %s, %s, %s", self.store, self.board, artist
         )
-        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating PostFile table")
+        event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating DB")
         store_posts: dict[str, PostFile] = self.store_handler.get_posts(
             str(self.board), artist
         )

@@ -2,18 +2,17 @@ import functools
 import logging
 import os
 import sqlite3
-from functools import lru_cache
 import time
+from functools import lru_cache
 
 from dataclassdb import DataclassDb, QueryBuilder
 from tenacity import retry, stop_after_attempt
 
 from artrefsync.boards.board_models import Post
 from artrefsync.config import get_config
-from artrefsync.constants import APP, BINDING, BOARD, TABLE
+from artrefsync.constants import APP, TABLE
 from artrefsync.db.db_models import ArtistTagCount, PostTagLink, Tag, TagType
 from artrefsync.stores.store_models import PostFile
-from artrefsync.utils.event_binder import event_binder
 
 config = get_config()
 logger = logging.getLogger(__name__)
@@ -40,7 +39,10 @@ def get_sorted_posts(
             as_count=as_count,
         )
     logger.debug(
-        "Query time to get sorted posts for tags %s, LIMIT %s was %0.3f seconds.", tags, limit, time.time() - start
+        "Query time to get sorted posts for tags %s, LIMIT %s was %0.3f seconds.",
+        tags,
+        limit,
+        time.time() - start,
     )
     return output
 

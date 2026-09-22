@@ -78,6 +78,7 @@ class BINDING(StrEnum):
     ON_LOAD_MID_SET = auto()
     ON_LOAD_RIGHT_INCR = auto()
     ON_LOAD_RIGHT_SET = auto()
+    ON_LOAD_RIGHT_RESET = auto()
     ON_LOADING_DONE = auto()
     ON_NEXT_GALLERY_IMAGE = auto()
     ON_POST_FOCUS_CHANGE = auto()

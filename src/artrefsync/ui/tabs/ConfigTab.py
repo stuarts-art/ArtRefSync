@@ -308,7 +308,7 @@ class ConfigTab(ttk.Frame):
             self.after_idle(self.finish_sync)
 
     def finish_store_sync(self, *nargs, **kwargs):
-        logger.info("Store sync Finished. Reseting button.")
+        logger.info("Store sync Finished. Resetting button.")
         self.sync_event.clear()
         self.start_store_sync_button.configure(
             state="normal", text="Start Store Sync", bootstyle="default"

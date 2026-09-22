@@ -59,6 +59,7 @@ class LoadingBar(ttk.Frame):
             max_str = str(self.bar_max_val.get())
             max_len = len(max_str)
             self.bar_right_text.set(f"{count:0{max_len}d}/{max_str}")
+        self.update_idletasks()
 
 
 class LoadingBars(ttk.Frame):
@@ -83,13 +84,16 @@ class LoadingBars(ttk.Frame):
         self.mid_label.grid(column=1, row=0, sticky=tk.NSEW)
 
         event_binder.bind(BINDING.ON_LOAD_LEFT_SET, self.reset_right, self)
-        event_binder.bind(BINDING.ON_LOAD_MID_SET, self.set_mid, self)
-        event_binder.bind(BINDING.ON_LOAD_RIGHT_SET, self.set_right, self)
-        event_binder.bind(BINDING.ON_LOADING_DONE, self.reset_bar, self)
-
         event_binder.bind(BINDING.ON_LOAD_LEFT_SET, self.left_bar.set, self)
         event_binder.bind(BINDING.ON_LOAD_LEFT_INCR, self.left_bar.increment, self)
+
+        event_binder.bind(BINDING.ON_LOAD_MID_SET, self.set_mid, self)
+
+        event_binder.bind(BINDING.ON_LOAD_RIGHT_SET, self.set_right, self)
         event_binder.bind(BINDING.ON_LOAD_RIGHT_SET, self.right_bar.set, self)
+        event_binder.bind(BINDING.ON_LOAD_RIGHT_RESET, self.reset_right, self)
+
+        event_binder.bind(BINDING.ON_LOADING_DONE, self.reset_bar, self)
         event_binder.bind(BINDING.ON_LOAD_RIGHT_INCR, self.right_bar.increment, self)
 
     def reset_bar(self):
@@ -97,6 +101,7 @@ class LoadingBars(ttk.Frame):
         self.root.grid_forget()
 
     def set_mid(self, text, *args, **kwargs):
+        self.set_bar()
         self.mid_label.config(text=text)
 
     def set_bar(self, *args, **kwargs):

@@ -34,7 +34,7 @@ class TagTab(ttk.Frame):
         self.colors = ttk.Style().colors
         self.last_hover_row = None
         self.previewing = ""
-        self.is_focus = False
+        self.is_focused = False
 
 
         self.tab_label = ttk.Label(self, text="Tags", anchor="center")

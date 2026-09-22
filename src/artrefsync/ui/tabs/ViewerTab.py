@@ -248,4 +248,4 @@ class ViewerTab(ttk.Frame):
 
     def toggle_play(self, e=None):
         if self.grid_info() and self.canvas_image:
-            playing = self.canvas_image.toggle_pause()
+            self.playing = self.canvas_image.toggle_pause()

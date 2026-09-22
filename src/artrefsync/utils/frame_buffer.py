@@ -77,20 +77,15 @@ class FrameBuffer(list[Image.Image]):
             return
         if key not in self.cache:
             if self.video_format:
-                self.set_frame(i)
-                ret, frame = self.cap.read()
-                if ret:
-                    # if self.thumb_size:
-                    #     h, w = frame.shape[:2]
-                    #     thumb_size = ImageUtils.get_cv_thumb_size(
-                    #         (w, h), self.thumb_size
-                    #     )
-                    #     frame = cv2.resize(
-                    #         frame, thumb_size, interpolation=cv2.INTER_AREA
-                    #     )
-                    frame = ImageUtils.cv_array_to_image(frame)
-                    self.cache[key] = frame
-                self.last_frame = i
+                try:
+                    self.set_frame(i)
+                    ret, frame = self.cap.read()
+                    if ret:
+                        frame = ImageUtils.cv_array_to_image(frame)
+                        self.cache[key] = frame
+                    self.last_frame = i
+                except:
+                    pass
             else:
                 self.cache[key] = ImageUtils.get_cv2_pil_image(str(self.path))
 

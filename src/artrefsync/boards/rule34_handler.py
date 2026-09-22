@@ -74,7 +74,7 @@ class R34Handler(ImageBoardHandler):
         logger.debug("Recieved %s from client.", len(r34_posts))
 
         for r_post in r34_posts:
-            skip_rpost = False
+            skip_r_post = False
             website = f"https://rule34.xxx/index.php?page=post&s=view&id={r_post.id}"
             post_id = Post.make_storage_id(r_post.id, self.get_board())
             ext = r_post.file_url.split(".")[-1]
@@ -85,10 +85,10 @@ class R34Handler(ImageBoardHandler):
             for black_listed in self.black_list:
                 if black_listed in r_post.tags:
                     logger.debug(f"Skipping {post_id} for {black_listed}. ({website})")
-                    skip_rpost = True
+                    skip_r_post = True
                     break
 
-            if skip_rpost:
+            if skip_r_post:
                 continue
 
             for info in r_post.tag_info:

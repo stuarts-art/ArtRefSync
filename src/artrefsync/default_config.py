@@ -16,7 +16,7 @@ from artrefsync.constants import (
 default_config: dict[StrEnum, dict[StrEnum, Any]] = {
     TABLE.APP: {
         APP.THEME: "bootstrap-dark",
-        APP.LIMIT: 5000,
+        APP.LIMIT: 2000,
         APP.LOG_LEVEL: "INFO",
         APP.ID_LENGTH: 8,
         APP.CACHE_DIR: ".metadata_cache",
