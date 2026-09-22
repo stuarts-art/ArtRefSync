@@ -85,8 +85,9 @@ class CanvasImage:
             xscrollcommand=hbar.set,
             yscrollcommand=vbar.set,
         )
+        colors = ttk.Style().colors
         self.canvas.grid(row=0, column=0, sticky="nswe")
-        img = ImageTk.PhotoImage(Image.new("RGB", (100, 100), color="grey"))
+        img = ImageTk.PhotoImage(Image.new("RGB", (100, 100), color=colors.bg))
         self.image = self.canvas.create_image(0, 0, image=img, anchor=tk.NW)
         self.canvas.image_tk = img
 

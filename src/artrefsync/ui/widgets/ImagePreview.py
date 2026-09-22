@@ -21,14 +21,19 @@ def cancel_preview_jobs():
         widget.cancel_preview_jobs()
 
 
+last_tag_update = None
 def update_preview_with_tags(tags: str | tuple[str] | list[str] = "", x=10, y=10, anchor=tk.NW):
+    global last_tag_update
     widget: ImagePreview = event_binder[BINDING.PREVIEW_WIDGET]
     if widget:
         if not tags:
             tags = []
         elif isinstance(tags, str) | isinstance(tags, tuple):
             tags = [tags]
+        if tags == last_tag_update:
+            return
         widget.update_preview(tags=tags, x=x, y=y, anchor=anchor)
+        last_tag_update = tags
 
 
 class ImagePreview:
@@ -50,7 +55,7 @@ class ImagePreview:
 
 
     def clear(self):
-        logger.info("Clearing preview")
+        logger.debug("Clearing preview")
         self.cancel_preview_jobs()
         for label in self.labels:
             label.config(image=None)
@@ -61,7 +66,6 @@ class ImagePreview:
 
     def update_preview(self, tags, x=10, y=10, anchor=tk.NW):
         args = (tags, x, y, anchor)
-        logger.info("updating with tags %s", args)
         if args == self.last_update:
             return
         self.last_update = args
@@ -84,7 +88,6 @@ class ImagePreview:
         )
 
     def _get_image(self, tags:list[str], x, y, anchor):
-        logger.info("Getting images for tags %s", tags)
         sort_by = event_binder.get_or_default(BINDING.SORT_BY, "id")
         sort_dir = event_binder.get_or_default(BINDING.SORT_DIR, "DESC")
         
@@ -183,5 +186,5 @@ class ImagePreview:
                 images[1:], x=x_offset, y=y_offset, anchor=tk.NW, index=index + 1
             )
         else:
-            self.root.update_idletasks()
+            pass
         label.lift()

@@ -15,6 +15,7 @@ from artrefsync.config import get_config
 from artrefsync.constants import APP, BINDING, HOTKEY, TABLE
 from artrefsync.db.post_db import PostDb, get_sorted_posts
 from artrefsync.stores.store_models import PostFile
+from artrefsync.ui.widgets.ImagePreview import update_preview_with_tags
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.ui.widgets.WidgetPresets import FRAME_NO_BORDER
 from artrefsync.utils.event_binder import event_binder
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 text_pad_x = 5
 text_pad_y = 5
+
 
 class PhotoImageGallery(ttk.Frame):
     def __init__(self, root: ttk.Frame, **kwargs):
@@ -200,6 +202,7 @@ class PhotoImageGallery(ttk.Frame):
             self.loaded_count = self.page * limit + len(sorted_posts)
             return limit * page, sorted_posts
 
+
 class SimpleFrames:
     frames: ClassVar[list[SimplePhotoLabel]] = []
     frame_map: ClassVar[dict] = {}
@@ -242,9 +245,9 @@ class SimpleFrames:
         )
         self.text.bind("<FocusOut>", self.unbind_canvas_escape)
         self.text.bind("<Key>", self.delayed_key)
-    
+
     def delayed_key(self, e):
-        self.text.after_idle(self.__keystroke,e)
+        self.text.after_idle(self.__keystroke, e)
         return "break"
 
     def __keystroke(self, event: tk.Event):
@@ -307,17 +310,13 @@ class SimpleFrames:
     def on_space(self, *_):
         logger.info("ON SPACE")
         if self.selected and self.selected.bbox:
-            event_binder.after_idle(
-                BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid
-            )
+            event_binder.after_idle(BINDING.ON_IMAGE_DOUBLE_CLICK, self.selected.pid)
         else:
             for frame in self.frames:
                 if frame.bbox:
                     self.text.see(frame)
                     self.add_select_tag(frame, False, False)
-                    event_binder.after_idle(
-                        BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid
-                    )
+                    event_binder.after_idle(BINDING.ON_IMAGE_DOUBLE_CLICK, frame.pid)
                     break
 
     def unbind_canvas_escape(self, *_):
@@ -457,6 +456,7 @@ class SimpleFrames:
         if self.last_selected != pid:
             self.last_selected = pid
             event_binder.after_idle(BINDING.ON_POST_SELECT, self.selected.pid)
+        update_preview_with_tags("")
 
     @property
     def selected(self) -> SimplePhotoLabel:
@@ -813,7 +813,6 @@ class SimplePhotoLabel(tk.Label):
         self.file = None
         self.loading = False
 
-
     def get_image(self, force_update=False):
         if self.pid is None or not self.post_file:
             self.config(image=None)
@@ -838,7 +837,10 @@ class SimplePhotoLabel(tk.Label):
             self.config(image=None)
 
             text_width = self.root.winfo_width()
-            self.thumb_size = (text_width-2*text_pad_x, self.height_var.get() - 2* text_pad_y)
+            self.thumb_size = (
+                text_width - 2 * text_pad_x,
+                self.height_var.get() - 2 * text_pad_y,
+            )
             if self.image_h > 400:
                 logger.debug("Upscaling file %s to the full file", self.file_name)
                 self.file_name = self.file.file
@@ -871,4 +873,5 @@ class SimplePhotoLabel(tk.Label):
         self.config(image=photo, height=photo.height(), width=photo.width())
         self.loading = False
         logger.debug("Setting Image")
+
         self.update_idletasks()

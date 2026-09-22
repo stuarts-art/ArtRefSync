@@ -66,12 +66,15 @@ class E621_Client:
         logger.info("For Tag %s Getting Page %d", tags, page)
         tag_param = []
         if tags:
-            tag_param.append(tags)
+            if isinstance(tags, list):
+                tag_param.extend(tags)
+            else:
+                tag_param.append(tags)
         if last_id:
             tag_param.append(f"id:>{last_id}")
         if order:
             tag_param.append(f"order:{order}")
-        params = [("limit", limit), ("tags", "+".join(tag_param)), ("page", page)]
+        params = [("limit", limit), ("tags", " ".join(tag_param)), ("page", page)]
         response = self.session.get(
             self.website,
             params=params,
@@ -88,3 +91,5 @@ class E621_Client:
             except DaciteError as e:
                 logger.error(e)
         return posts
+
+        

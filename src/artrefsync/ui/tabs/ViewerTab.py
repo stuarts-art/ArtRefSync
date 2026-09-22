@@ -176,7 +176,6 @@ class ViewerTab(ttk.Frame):
 
         self.grid(column=0, row=0, sticky=tk.NSEW)
         self.lift()
-        self.update_idletasks()
         self.update_viewer_image(pid)
 
     def close_image_viewer(self, *_):
@@ -208,7 +207,7 @@ class ViewerTab(ttk.Frame):
         self.last_open_time = time.time()
         thread_caller.cancel(__name__)
         self.canvas_image.cancel_next_frame()
-        self.update_idletasks()
+        # self.update_idletasks()
 
         if not pid:
             logger.error("Missing PID in viewer")
@@ -222,9 +221,11 @@ class ViewerTab(ttk.Frame):
                     logger.info("Failed to load postFile for %s", pid)
                     return
             filename = post_file.file
+            thumbnail = post_file.thumbnail
             thread_caller.cancel(self.cancel_key)
             self.curr_focus = self.canvas_image.canvas.focus_get()
             self.canvas_image.canvas.focus_set()
+            self.canvas_image.load_media(thumbnail)
             self.canvas_image.load_media(filename)
             self.on_canvas_set_image()
             self.pid = pid

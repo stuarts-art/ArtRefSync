@@ -39,8 +39,8 @@ def get_sorted_posts(
             offset=offset,
             as_count=as_count,
         )
-    logger.info(
-        "Get sorted posts for %s, LIMIT %s was %0.3f", tags, limit, time.time() - start
+    logger.debug(
+        "Query time to get sorted posts for tags %s, LIMIT %s was %0.3f seconds.", tags, limit, time.time() - start
     )
     return output
 

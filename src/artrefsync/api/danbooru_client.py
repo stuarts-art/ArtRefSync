@@ -55,13 +55,17 @@ class Danbooru_Client:
         url_request = f"{self.tags_base_url}?search[name_matches]={tag}&search[order]=count&limit={limit}"
         return url_request
 
-    def get_posts(self, tag, post_limit=10000, last_id=None) -> list[Danbooru_Post]:
-        logger.debug("Getting posts for %s", tag)
+    def get_posts(self, tags: str | list[str], post_limit=10000, last_id=None) -> list[Danbooru_Post]:
+        if isinstance(tags, str):
+            tags = tags.split()
+        if len(tags) > 2:
+            logger.error("Danbooru client can only have two tags at a time for this account type.")
+        if not isinstance(tags, list):
+            tags = [tags]
+        
+        logger.info("Getting posts for %s", tags)
 
-        if "+limit:" in tag:
-            limit = int(re.split("\rD+", tag.split("limit:")[-1])[0])
-            if limit:
-                post_limit = limit
+        last_id = int(last_id) if last_id else 0
 
         posts: list[Danbooru_Post] = []
         failed = []
@@ -72,13 +76,16 @@ class Danbooru_Client:
         for page in range(1, 20):
             if self.stop_event and self.stop_event.is_set():
                 return []
-            page_data = self.get_page(tag, page, last_id)
+            page_data = self.get_page(tags, page)
             posts_data.extend(page_data)
-            logger.debug("%s - Page %d, %d", tag, page, len(page_data))
+            logger.debug("%s - Page %d, %d", tags, page, len(page_data))
             if len(page_data) < self.limit:
                 logger.debug(f"Page {page} Breaking Loop")
                 break
             if len(posts) > post_limit:
+                break
+            elif (last_page_id:=page_data[-1]["id"]) < last_id:
+                logger.debug("Last page id of %s reached, which is less than the specified last_id of %s", last_page_id, last_id)
                 break
         for post_data in posts_data:
             try:
@@ -102,15 +109,8 @@ class Danbooru_Client:
         return posts
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1))
-    def get_page(self, tag: str, page: int = 1, last_id="", order=""):
-        tags = [tag]
-        if last_id:
-            tags.append(f"id:>{last_id}")
-        if order:
-            tags.append(f"order:{order}")
-
-        params = {"tags": "+".join(tags), "limit": self.limit, "page": page}
-
+    def get_page(self, tags: list[str], page: int = 1):
+        params = {"tags": " ".join(tags), "limit": self.limit, "page": page}
         response = self.session.get(
             self.post_base_url,
             params=params,
@@ -121,3 +121,4 @@ class Danbooru_Client:
         post_data = json.loads(response.content)
         self.last_run = time.time()
         return post_data
+

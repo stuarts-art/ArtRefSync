@@ -15,6 +15,7 @@ from artrefsync.config import get_config
 from artrefsync.constants import APP, BINDING, HOTKEY, TABLE
 from artrefsync.db.post_db import PostDb
 from artrefsync.stores.store_models import PostFile
+from artrefsync.ui.widgets.ImagePreview import update_preview_with_tags
 from artrefsync.ui.widgets.RoundedIcon import RoundedIcon
 from artrefsync.utils.event_binder import event_binder
 from artrefsync.utils.image_utils import ImageUtils
@@ -114,6 +115,10 @@ class PostInfoTab(ttk.Frame):
 
         self.add_bindings()
 
+    def lift(self):
+        super().lift()
+        update_preview_with_tags("")
+
     def add_bindings(self):
         self.bind("<Key>", self.__keystroke)
         event_binder.bind(BINDING.ON_POST_SELECT, self.on_post_select, self)
@@ -193,7 +198,6 @@ class PostInfoTab(ttk.Frame):
 
         if not post or not post_file:
             return
-        logger.info("Post and PostFile for %s recieved.", post_id)
 
         website = post.website
         domain = urlparse(website).netloc

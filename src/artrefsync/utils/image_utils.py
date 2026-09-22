@@ -8,7 +8,6 @@ from typing import ClassVar
 import cv2
 import ttkbootstrap as ttk
 from PIL import Image, ImageDraw, ImageTk
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +121,7 @@ class ImageUtils:
     k_size = 20
 
     @staticmethod
+    @functools.lru_cache(maxsize=20)
     def get_cv2_rgb_array(file, size, blur=False) -> cv2.typing.MatLike:
         cv_image = ImageUtils.cv2_image_open(file)
         if cv_image is None:

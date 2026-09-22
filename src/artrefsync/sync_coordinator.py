@@ -35,10 +35,10 @@ logger = logging.getLogger(__name__)
 
 def sync_config(
     stop_event: Event,
-    only_recent=None,
+    only_recent: bool | None = None,
     board_override: BOARD | None = None,
-    artist_override=None,
-    max_per_artist = 3000
+    artist_override: str | None = None,
+    max_per_artist=3000,
 ):
     try:
         event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating metadata")
@@ -73,10 +73,20 @@ def sync_config(
                     board_handler = DanbooruHandler(only_recent=only_recent)
                 case BOARD.R34:
                     board_handler = R34Handler(only_recent=only_recent)
-            artist_list = [artist_override] if artist_override else config[board]["artists"]
-            
+
+            if artist_override:
+                if isinstance(artist_override, list):
+                    artist_list = artist_override
+                else:
+                    artist_list = [artist_override]
+            else:
+                artist_list = config[board]["artists"]
+
             coordinator = SyncCoordinator(
-                board_handler, store_handler=store_handler, max_per_artist=max_per_artist, stop_event=stop_event
+                board_handler,
+                store_handler=store_handler,
+                max_per_artist=max_per_artist,
+                stop_event=stop_event,
             )
             coordinator.sync(artist_list=artist_list)
 
@@ -130,17 +140,13 @@ def sync_from_store(stop_event: Event | None = None, board_override=None):
             artist_list = sync_coordinator.artist_list
             event_binder.after_idle(BINDING.ON_LOAD_LEFT_SET, len(artist_list))
             for artist in artist_list:
-                event_binder.after_idle(
-                    BINDING.ON_LOAD_LEFT_INCR, f"{board}: {artist}"
-                )
+                event_binder.after_idle(BINDING.ON_LOAD_LEFT_INCR, f"{board}: {artist}")
                 sync_coordinator.update_post_file_table(artist)
     except Exception:
         stop_event.set()
         logger.exception("Failed to sync from store.")
     finally:
         event_binder.after_idle(BINDING.ON_LOADING_DONE)
-
-
 
 
 class SyncCoordinator:
@@ -189,9 +195,18 @@ class SyncCoordinator:
         except Exception:
             logger.exception("Sync Failed.")
 
-    def sync_artist_metadata(self, artists: list[str]):
+    def sync_artist_metadata(self, artists: list[str]) -> list[str]:
+        """ Sync list of artists and returns updated post ids.
+        Args:
+            list[str]: List of artist to sync metadata for
+
+        Returns:
+            list[str]: Updated post ids
+        
+        """
         event_binder.after_idle(BINDING.ON_LOAD_LEFT_SET, len(self.artist_list))
         logger.info("Syncing artists: %s", artists)
+        updated = []
         for artist in artists:
             event_binder.after_idle(
                 BINDING.ON_LOAD_LEFT_INCR, f"{self.board}: {artist}"
@@ -199,8 +214,9 @@ class SyncCoordinator:
             event_binder.after_idle(BINDING.ON_LOAD_MID_SET, "Updating metadata")
             if self.stop_event and self.stop_event.is_set():
                 return
-            self.update_metadata(artist)
+            updated.extend(self.update_metadata(artist))
         self.update_tag_types()
+        return updated
 
     def sync_artist_files(self, artist: str) -> int:
         """Syncs missing files to the local store.
@@ -288,9 +304,7 @@ class SyncCoordinator:
         with PostDb() as post_db:
             missing_posts = [post_db.posts.get(id=id) for id in missing_ids]
         if not missing_posts:
-            event_binder.after_idle(
-                BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), ""
-            )
+            event_binder.after_idle(BINDING.ON_LOAD_RIGHT_SET, len(missing_posts), "")
             return
 
         logger.info("Downloading %d missing posts for %s", len(missing_posts), artist)
